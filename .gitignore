@@ -13,6 +13,7 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.backup
 
 # Database
 *.sql
@@ -66,3 +67,6 @@ pids/
 # Misc
 *.bak
 *.tmp
+
+# Nested project directories (duplicates)
+bsc-ranging-bot/
