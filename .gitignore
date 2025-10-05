@@ -2,15 +2,17 @@
 node_modules/
 package-lock.json
 
-# Environment variables
-.env
-.env.local
-.env.backup
-
 # Logs
 logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # Database
 *.sql
@@ -18,54 +20,49 @@ npm-debug.log*
 *.db
 *.sqlite
 
-# IDE
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE - Cursor specific
 .vscode/
 .idea/
+.specstory/
+.cursorindexingignore
 *.swp
 *.swo
-.DS_Store
-Thumbs.db
+*~
+.project
+.settings/
+.classpath
 
 # Build artifacts
 dist/
 build/
+.next/
+out/
+
+# Testing
 coverage/
+.nyc_output/
+.jest/
 
 # Temporary files
-tmp/
 temp/
+tmp/
+.cache/
+.temp/
+
+# PM2
+.pm2/
+pids/
+*.pid
+
+# Misc
+*.bak
 *.tmp
-
-# Documentation markdown (keeping only essential)
-ALL_CRITICAL_FIXES_COMPLETE.md
-ALL_OPTIMIZATIONS_COMPLETE.md
-COMPLETE_EXPERT_REVIEW_RESPONSE.md
-CRITICAL_FIXES_IMPLEMENTED.md
-CRITICAL_FIXES_PHASE_1_COMPLETE.md
-CRITICAL_FIXES_PRIORITY_1.md
-EXPERT_CODE_REVIEW_REQUEST.md
-EXPERT_CODE_REVIEW_REQUEST_V3.md
-EXPERT_FEEDBACK_RESPONSE.md
-EXPERT_QUICK_VALIDATION.md
-EXPERT_REVIEW_REQUEST_V2.md
-EXPERT_REVIEW_RESPONSE.md
-EXPERT_VALIDATION_REQUEST_V4.md
-FINAL_COMPLETION_SUMMARY.md
-FINAL_EXPERT_REVIEW_REQUEST.md
-HOW_TO_GET_EXPERT_VALIDATION.md
-IMPROVEMENTS_SUMMARY.md
-PERFORMANCE_OPTIMIZATIONS_IMPLEMENTED.md
-PHASE_1_IMPLEMENTATION_SUMMARY.md
-PRODUCTION_READY_SUMMARY.md
-QUICK_REVIEW_SUMMARY.md
-TECHNICAL_REVIEW_FOR_EXPERT.md
-TOP_TIER_IMPROVEMENTS_IMPLEMENTED.md
-RUN_THIS_NEXT.md
-
-# Old nested project
-bsc-ranging-bot/
-
-# Test files
-test-setup.js
-quick-start.js
-
