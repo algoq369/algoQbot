@@ -1,0 +1,27 @@
+{
+  "name": "young-mother-earth",
+  "version": "1.0.0",
+  "description": "A beautiful 3D Earth model with cursor and scroll animations",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.158.0",
+    "gsap": "^3.12.2"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "keywords": [
+    "three.js",
+    "3d",
+    "earth",
+    "animation",
+    "gsap"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

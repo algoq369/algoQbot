@@ -3,9 +3,10 @@ const logger = require('../logger');
 const config = require('../config');
 
 class MultiDexManager {
-  constructor(provider, wallet) {
+  constructor(provider, wallet, txVerifier = null) {
     this.provider = provider;
     this.wallet = wallet;
+    this.txVerifier = txVerifier; // ✅ SECURITY FIX #3: Pass transaction verifier to DEXs
     this.dexs = {};
     this.initializeDEXs();
   }
@@ -13,8 +14,9 @@ class MultiDexManager {
   async initializeDEXs() {
     try {
       // PancakeSwap V2 (Primary DEX)
-      this.dexs.pancakeSwap = new (require('../pancakeSwap'))(this.provider, this.wallet);
-      logger.info('✅ PancakeSwap initialized');
+      // ✅ SECURITY FIX #3: Pass txVerifier to PancakeSwap
+      this.dexs.pancakeSwap = new (require('../pancakeSwap'))(this.provider, this.wallet, this.txVerifier);
+      logger.info('✅ PancakeSwap initialized' + (this.txVerifier ? ' with transaction verifier' : ''));
       
       // Try to initialize other DEXs (optional)
       try {

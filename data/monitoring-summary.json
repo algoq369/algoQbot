@@ -1,0 +1,62 @@
+{
+  "timestamp": "2025-10-19T13:57:08.726Z",
+  "logAnalysis": {
+    "currentPrice": 0.000871,
+    "activePositions": 12,
+    "positions": [
+      {
+        "id": "pos_1760195310618_5xspgewxq",
+        "profitPercent": -0.74,
+        "entryPrice": 0.000878
+      },
+      {
+        "id": "pos_1760196875109_3qx6y7une",
+        "profitPercent": 0.38,
+        "entryPrice": 0.000868
+      },
+      {
+        "id": "pos_1760198281586_5ydjwureb",
+        "profitPercent": 0.17,
+        "entryPrice": 0.00087
+      },
+      {
+        "id": "pos_1760198312614_7rbhmfif3",
+        "profitPercent": 0.15,
+        "entryPrice": 0.00087
+      },
+      {
+        "id": "pos_1760198340611_zqzciii03",
+        "profitPercent": 0.18,
+        "entryPrice": 0.00087
+      },
+      {
+        "id": "pos_1760198370624_j2f80qzdu",
+        "profitPercent": 0.19,
+        "entryPrice": 0.00087
+      },
+      {
+        "id": "pos_1760198401017_e6urgetor",
+        "profitPercent": 0.08,
+        "entryPrice": 0.000871
+      },
+      {
+        "id": "pos_1760198430652_yc468pn6b",
+        "profitPercent": 0.08,
+        "entryPrice": 0.000871
+      },
+      {
+        "id": "pos_1760198460714_ny2mch2rd",
+        "profitPercent": 0.09,
+        "entryPrice": 0.000871
+      },
+      {
+        "id": "pos_1760198490687_3ccsphdfn",
+        "profitPercent": 0.14,
+        "entryPrice": 0.00087
+      }
+    ],
+    "exitedPositions": [],
+    "timestamp": "2025-10-19T13:57:07.654Z"
+  },
+  "nextCheck": "2025-10-19T14:57:08.725Z"
+}

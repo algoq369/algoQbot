@@ -3,9 +3,10 @@ const config = require('./config');
 const logger = require('./logger');
 
 class PancakeSwap {
-  constructor(provider, wallet) {
+  constructor(provider, wallet, txVerifier = null) {
     this.provider = provider;
     this.wallet = wallet;
+    this.txVerifier = txVerifier; // ✅ SECURITY FIX #3: Add transaction verifier
     this.router = new ethers.Contract(
       config.dex.router,
       [
@@ -32,9 +33,15 @@ class PancakeSwap {
 
   async getCurrentPrice() {
     try {
+      // ✅ FIX: Return price in BNB per USDT format for consistent calculations
+      // Instead of getting "1 BNB = X USDT", we return "1 USDT = Y BNB"
       const amountIn = ethers.parseUnits('1', 18); // 1 USDT
       const price = await this.getPrice(config.tokens.USDT, config.tokens.WBNB, amountIn);
-      return parseFloat(ethers.formatEther(price));
+      const bnbPerUsdt = parseFloat(ethers.formatUnits(price, 18));
+
+      // Result: ~0.000929 (BNB per USDT) instead of ~1076 (USDT per BNB)
+      // This format works directly for calculations: usdAmount × bnbPerUsdt = bnbAmount
+      return bnbPerUsdt;
     } catch (error) {
       logger.error('Error getting current price:', error);
       throw error;
@@ -45,15 +52,15 @@ class PancakeSwap {
     try {
       const amounts = await this.router.getAmountsOut(amountIn, path);
       const amountOut = amounts[amounts.length - 1];
-      
+
       // Get price for 1 unit to calculate impact
       const oneUnit = ethers.parseUnits('1', 18);
       const oneUnitAmounts = await this.router.getAmountsOut(oneUnit, path);
       const oneUnitOut = oneUnitAmounts[oneUnitAmounts.length - 1];
-      
+
       const expectedOut = Number(oneUnitOut) * Number(amountIn) / Number(oneUnit);
       const priceImpact = ((expectedOut - Number(amountOut)) / expectedOut) * 100;
-      
+
       return priceImpact;
     } catch (error) {
       logger.error('Error calculating price impact:', error);
@@ -74,7 +81,8 @@ class PancakeSwap {
 
       logger.info(`Price impact: ${priceImpact.toFixed(2)}%`);
 
-      const tx = await this.router.swapExactTokensForTokens(
+      // ✅ SECURITY FIX #3: Build transaction first (populateTransaction)
+      const unsignedTx = await this.router.swapExactTokensForTokens.populateTransaction(
         amountIn,
         Math.floor(Number(minAmountOut) * 0.98), // Allow 2% slippage (conventional) for small trades
         path,
@@ -82,10 +90,28 @@ class PancakeSwap {
         deadline
       );
 
+      // 🔒 EXPERT FIX: Sign FIRST, then verify what will ACTUALLY be sent
+      const signedTx = await this.wallet.signTransaction(unsignedTx);
+
+      // Parse the signed transaction to get ACTUAL parameters
+      const parsedTx = ethers.Transaction.from(signedTx);
+
+      // ✅ SECURITY FIX #3: Verify SIGNED transaction (not unsigned)
+      if (this.txVerifier) {
+        logger.debug('Verifying SIGNED swap transaction...');
+        await this.txVerifier.verifyBeforeSign(parsedTx);
+        logger.debug('✅ Signed transaction verified, broadcasting');
+      } else {
+        logger.warn('⚠️  No transaction verifier configured - skipping verification');
+      }
+
+      // Broadcast the signed transaction
+      const tx = await this.provider.sendTransaction(signedTx);
+
       logger.info(`Swap transaction sent: ${tx.hash}`);
       const receipt = await tx.wait();
       logger.info(`Swap completed: ${receipt.transactionHash}`);
-      
+
       return receipt;
     } catch (error) {
       logger.error('Error swapping tokens:', error);
@@ -95,10 +121,10 @@ class PancakeSwap {
 
   async swapUSDTForBNB(usdtAmount, minBnbAmount) {
     const amountIn = ethers.parseUnits(usdtAmount.toString(), 18); // USDT has 18 decimals
-    
+
     // Approve USDT spending
     await this.approveToken(config.tokens.USDT, config.dex.router, amountIn);
-    
+
     return await this.swapTokens(config.tokens.USDT, config.tokens.WBNB, amountIn, minBnbAmount);
   }
 
@@ -120,7 +146,7 @@ class PancakeSwap {
 
       // Check current allowance
       const currentAllowance = await tokenContract.allowance(this.wallet.address, spenderAddress);
-      
+
       if (currentAllowance >= amount) {
         logger.info('Token already approved');
         return { hash: 'already_approved' };
@@ -129,10 +155,10 @@ class PancakeSwap {
       // Approve token
       const tx = await tokenContract.approve(spenderAddress, amount);
       logger.info(`Approval transaction sent: ${tx.hash}`);
-      
+
       const receipt = await tx.wait();
       logger.info(`Token approved successfully: ${receipt.transactionHash}`);
-      
+
       return receipt;
     } catch (error) {
       logger.error('Error approving token:', error);
@@ -147,7 +173,7 @@ class PancakeSwap {
         ['function balanceOf(address owner) view returns (uint256)'],
         this.provider
       );
-      
+
       const balance = await tokenContract.balanceOf(this.wallet.address);
       return balance;
     } catch (error) {

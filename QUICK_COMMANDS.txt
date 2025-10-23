@@ -1,0 +1,75 @@
+═══════════════════════════════════════════════════════════════════
+📋 COMMANDES RAPIDES - BSC TRADING BOT
+═══════════════════════════════════════════════════════════════════
+
+🚀 REDÉMARRER LE BOT (EN UNE LIGNE):
+
+lsof -ti:3001 | xargs kill -9 2>/dev/null; sleep 2 && cd /Users/sheirraza/bsc-ranging-bot && npm start &
+
+───────────────────────────────────────────────────────────────────
+
+📊 VÉRIFIER QUE LE BOT TOURNE:
+
+ps aux | grep AdvancedTradingBot | grep -v grep
+
+───────────────────────────────────────────────────────────────────
+
+📜 VOIR LES LOGS EN DIRECT:
+
+tail -f logs/combined.log
+
+───────────────────────────────────────────────────────────────────
+
+📈 VÉRIFIER LES POSITIONS SURVEILLÉES:
+
+tail -50 logs/combined.log | grep "Monitoring position"
+
+───────────────────────────────────────────────────────────────────
+
+💾 VÉRIFIER TRADE COUNT & P&L:
+
+sqlite3 data/trading_bot.db "SELECT COUNT(*), SUM(profit_loss) FROM trades;"
+
+───────────────────────────────────────────────────────────────────
+
+📊 RAPPORT DE MONITORING:
+
+tail -f logs/position-monitoring.log
+
+───────────────────────────────────────────────────────────────────
+
+🛑 ARRÊTER LE BOT:
+
+pkill -f "node.*AdvancedTradingBot"
+
+───────────────────────────────────────────────────────────────────
+
+🔄 MONITORING (INDÉPENDANT DU BOT):
+
+Démarrer:  ./start-monitoring.sh
+Arrêter:   ./stop-monitoring.sh
+Suivre:    tail -f logs/position-monitoring.log
+
+═══════════════════════════════════════════════════════════════════
+
+✅ COPIER-COLLER FACILE:
+
+Toutes les commandes ci-dessus peuvent être copiées et collées
+directement dans votre terminal!
+
+═══════════════════════════════════════════════════════════════════
+
+📁 AUTRES FICHIERS UTILES:
+
+• COMMANDS_RESTART_BOT.sh   → Guide interactif (./COMMANDS_RESTART_BOT.sh)
+• LIVE_STATUS_REPORT.md     → Rapport détaillé complet
+• MONITORING_GUIDE.md       → Guide du monitoring automatique
+• MONITORING_STATUS.txt     → Résumé du statut
+
+═══════════════════════════════════════════════════════════════════
+
+
+
+
+
+

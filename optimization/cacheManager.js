@@ -23,6 +23,14 @@ class CacheManager {
   }
 
   async initializeRedis() {
+    // Skip Redis if explicitly disabled
+    if (process.env.SKIP_REDIS === 'true') {
+      logger.info('ℹ️  Redis disabled - using in-memory cache only');
+      this.redis = null;
+      this.isConnected = false;
+      return;
+    }
+
     try {
       this.redis = new Redis({
         host: process.env.REDIS_HOST || 'localhost',
@@ -57,7 +65,15 @@ class CacheManager {
       logger.info('✅ Redis cache manager initialized');
 
     } catch (error) {
-      logger.warn('⚠️ Redis not available, using fallback cache:', error.message);
+      logger.info('ℹ️  Redis not available - using in-memory cache only');
+      if (this.redis) {
+        try {
+          this.redis.disconnect();
+        } catch (e) {
+          // Ignore disconnect errors
+        }
+        this.redis = null;
+      }
       this.isConnected = false;
     }
   }

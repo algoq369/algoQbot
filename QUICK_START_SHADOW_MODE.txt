@@ -1,0 +1,102 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║              👻 SHADOW MODE - QUICK START GUIDE                     ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+✅ SHADOW MODE IS ENABLED!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Your bot will NOT execute real trades.
+  All trades are simulated and recorded for analysis.
+
+
+🚀 HOW TO START
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Open terminal in bot directory
+  
+  2. Run this command:
+     npm run start-shadow
+  
+  3. Review configuration displayed
+  
+  4. Type "yes" to confirm
+  
+  5. Monitor logs for "👻 Shadow Mode Active"
+
+
+📁 FILES TO WATCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  .shadow-trades.json  → All simulated trades
+  logs/bot.log         → Bot activity logs
+  logs/error.log       → Error logs
+
+
+✅ GOOD SIGNS (Everything Working)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅ Logs show "👻 Shadow Mode Active"
+  ✅ .shadow-trades.json file created
+  ✅ No blockchain transactions in your wallet
+  ✅ Trading decisions appear in logs
+  ✅ Bot runs without errors
+
+
+🚨 BAD SIGNS (Stop Immediately!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🚨 Logs show "LIVE TRADING MODE"
+  🚨 Real transactions appearing in wallet
+  🚨 Money being spent
+  🚨 Gas fees being paid
+  
+  → Press Ctrl+C immediately to stop!
+
+
+📊 MONITORING COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Watch logs live:
+  tail -f logs/bot.log | grep Shadow
+  
+  Check shadow trades:
+  cat .shadow-trades.json | jq '.metrics'
+  
+  Count simulated trades:
+  cat .shadow-trades.json | jq '.trades | length'
+
+
+⏹️  HOW TO STOP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Press: Ctrl+C
+  
+  Bot will shut down gracefully and save all data.
+
+
+📅 TESTING TIMELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  First 30 min:  Watch closely, verify no real trades
+  First 24 hours: Check .shadow-trades.json is growing
+  Week 1-4:       Let run continuously
+  After 4 weeks:  Analyze results, decide on live trading
+
+
+📄 FULL DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Read SHADOW_MODE_ENABLED.md for complete guide
+
+
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║              YOUR BOT IS SAFE! READY TO START! 🚀                    ║
+║                                                                      ║
+║              Command: npm run start-shadow                           ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+

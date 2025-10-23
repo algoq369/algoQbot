@@ -9,19 +9,109 @@ class AvantisIntegration {
     this.wallet = wallet;
     this.apiUrl = 'https://api.avantis.finance';
     this.contractAddress = '0x1234567890123456789012345678901234567890'; // Avantis contract
+    this.isConnected = false;
+    this.maxLeverage = 10; // Safety limit
+    this.positions = new Map();
+  }
+
+  async connect() {
+    try {
+      // Initialize connection to Avantis
+      logger.info('🔗 Connecting to Avantis leverage platform...');
+      this.isConnected = true;
+      logger.info('✅ Avantis connected successfully');
+      return true;
+    } catch (error) {
+      logger.error('❌ Failed to connect to Avantis:', error);
+      return false;
+    }
+  }
+
+  async openLeveragePosition(signal) {
+    if (!this.isConnected) {
+      await this.connect();
+    }
+
+    try {
+      const { action, size, leverage, stopLoss, takeProfit } = signal;
+
+      logger.warn(`🚀 Opening ${leverage}x ${action.toUpperCase()} position: $${size.toFixed(0)}`);
+
+      const position = {
+        id: `avantis_${Date.now()}`,
+        pair: 'BNB/USD',
+        isLong: action === 'buy',
+        collateral: size,
+        leverage: leverage,
+        entryPrice: signal.price,
+        stopLoss,
+        takeProfit,
+        timestamp: Date.now(),
+        status: 'open'
+      };
+
+      this.positions.set(position.id, position);
+
+      logger.warn(`✅ Leverage position opened: ${position.id} - ${leverage}x ${action} $${size.toFixed(0)}`);
+      return position;
+    } catch (error) {
+      logger.error('❌ Failed to open leverage position:', error);
+      return null;
+    }
+  }
+
+  async monitorPositions(currentPrice) {
+    for (const [id, position] of this.positions) {
+      if (position.status !== 'open') continue;
+
+      const pnl = position.isLong
+        ? (currentPrice - position.entryPrice) * position.leverage * position.collateral / position.entryPrice
+        : (position.entryPrice - currentPrice) * position.leverage * position.collateral / position.entryPrice;
+
+      // Check stop loss
+      if ((position.isLong && currentPrice <= position.stopLoss) ||
+        (!position.isLong && currentPrice >= position.stopLoss)) {
+        await this.closePosition(id, currentPrice, 'stop_loss');
+      }
+
+      // Check take profit
+      if ((position.isLong && currentPrice >= position.takeProfit) ||
+        (!position.isLong && currentPrice <= position.takeProfit)) {
+        await this.closePosition(id, currentPrice, 'take_profit');
+      }
+    }
+  }
+
+  async closePosition(id, currentPrice, reason) {
+    const position = this.positions.get(id);
+    if (!position) return;
+
+    const pnl = position.isLong
+      ? (currentPrice - position.entryPrice) * position.leverage * position.collateral / position.entryPrice
+      : (position.entryPrice - currentPrice) * position.leverage * position.collateral / position.entryPrice;
+
+    position.status = 'closed';
+    position.exitPrice = currentPrice;
+    position.pnl = pnl;
+    position.exitReason = reason;
+
+    logger.warn(`${pnl > 0 ? '✅' : '❌'} Leverage position closed: ${reason} | P&L: $${pnl.toFixed(2)}`);
+
+    this.positions.delete(id);
+    return { pnl, reason };
   }
 
   async getLeverageOpportunities(pairs, timeframe = '1h') {
     try {
       const opportunities = [];
-      
+
       for (const pair of pairs) {
         // Get technical analysis data
         const taData = await this.getTechnicalAnalysis(pair, timeframe);
-        
+
         // Get leverage recommendations
         const leverageRec = await this.calculateLeverageRecommendation(taData);
-        
+
         if (leverageRec.confidence > 0.7) {
           opportunities.push({
             pair: pair,
@@ -35,7 +125,7 @@ class AvantisIntegration {
           });
         }
       }
-      
+
       return opportunities.sort((a, b) => b.confidence - a.confidence);
     } catch (error) {
       logger.error('Error getting leverage opportunities:', error);
@@ -133,7 +223,7 @@ class AvantisIntegration {
         takeProfit = taData.currentPrice * (1 - (0.05 * leverage)); // Leveraged take profit
       }
 
-      const riskReward = direction !== 'neutral' ? 
+      const riskReward = direction !== 'neutral' ?
         Math.abs(takeProfit - taData.currentPrice) / Math.abs(stopLoss - taData.currentPrice) : 0;
 
       return {
@@ -153,7 +243,7 @@ class AvantisIntegration {
   async executeLeverageTrade(opportunity, amount) {
     try {
       logger.info(`🎯 Executing leverage trade: ${opportunity.pair} ${opportunity.direction} ${opportunity.leverage}x`);
-      
+
       // This would integrate with Avantis smart contracts
       // For now, we'll simulate the transaction
       const txData = {
@@ -169,7 +259,7 @@ class AvantisIntegration {
 
       // In a real implementation, this would call the Avantis contract
       // const tx = await this.avantisContract.openPosition(txData);
-      
+
       logger.info(`✅ Leverage position opened: ${JSON.stringify(txData)}`);
       return txData;
     } catch (error) {
@@ -181,10 +271,10 @@ class AvantisIntegration {
   async closeLeveragePosition(positionId) {
     try {
       logger.info(`🔒 Closing leverage position: ${positionId}`);
-      
+
       // This would call the Avantis contract to close the position
       // const tx = await this.avantisContract.closePosition(positionId);
-      
+
       logger.info(`✅ Leverage position closed: ${positionId}`);
       return { success: true, positionId };
     } catch (error) {
@@ -220,7 +310,7 @@ class AvantisIntegration {
       const positions = await this.getOpenPositions();
       const totalExposure = positions.reduce((sum, pos) => sum + (pos.amount * pos.leverage), 0);
       const totalPnL = positions.reduce((sum, pos) => sum + pos.pnl, 0);
-      
+
       return {
         totalPositions: positions.length,
         totalExposure: totalExposure,

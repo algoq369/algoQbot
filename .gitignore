@@ -14,6 +14,16 @@ yarn-error.log*
 .env.local
 .env.*.local
 .env.backup
+.env.production
+
+# ✅ SECURITY: Encrypted wallet and shadow trades
+wallet.json
+.shadow-trades.json
+*.key
+*.pem
+
+# ✅ SECURITY FIX #2: Rate limiter state (persists across restarts)
+ratelimit-state.json
 
 # Database
 *.sql

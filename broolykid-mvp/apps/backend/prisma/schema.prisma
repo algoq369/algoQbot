@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  username     String    @unique
+  avatarUrl    String?   @map("avatar_url")
+  bio          String?
+  role         String    @default("member")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  proposals    Proposal[]
+  votes        Vote[]
+  enrollments  Enrollment[]
+
+  @@map("users")
+}
+
+model Proposal {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  proposerId   String   @map("proposer_id")
+  proposer     User     @relation(fields: [proposerId], references: [id])
+  status       String   @default("active")
+  votesFor     Int      @default(0) @map("votes_for")
+  votesAgainst Int      @default(0) @map("votes_against")
+  createdAt    DateTime @default(now()) @map("created_at")
+  endsAt       DateTime @map("ends_at")
+
+  votes        Vote[]
+
+  @@map("proposals")
+}
+
+model Vote {
+  id         String   @id @default(uuid())
+  proposalId String   @map("proposal_id")
+  proposal   Proposal @relation(fields: [proposalId], references: [id])
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  voteOption String   @map("vote_option")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([proposalId, userId])
+  @@map("votes")
+}
+
+model Course {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  thumbnailUrl    String?  @map("thumbnail_url")
+  videoUrl        String?  @map("video_url")
+  durationMinutes Int?     @map("duration_minutes")
+  difficulty      String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  enrollments     Enrollment[]
+
+  @@map("courses")
+}
+
+model Enrollment {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  courseId    String    @map("course_id")
+  course      Course    @relation(fields: [courseId], references: [id])
+  progress    Int       @default(0)
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+
+

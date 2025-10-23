@@ -1,732 +1,431 @@
 const logger = require('../logger');
+const { errorClassifier, ErrorTypes, ErrorSeverity } = require('../utils/errorClassifier');
 
+/**
+ * Production Risk Manager with Shadow Mode Detection
+ * Automatically adjusts limits based on trading mode
+ */
 class ProductionRiskManager {
   constructor(options = {}) {
-    this.limits = {
-      // Per-trade limits
-      maxTradeSize: options.maxTradeSize || 1000,          // $1,000 max per trade
-      minTradeSize: options.minTradeSize || 5,             // $5 minimum
-      
+    // ✅ DETECT SHADOW MODE
+    const isShadowMode = process.env.SHADOW_MODE_ENABLED === 'true';
+
+    logger.info(`🛡️  Initializing Risk Manager for ${isShadowMode ? 'SHADOW' : 'LIVE'} mode`);
+
+    // ✅ SHADOW MODE LIMITS (Conservative for testing)
+    const shadowLimits = {
+      // Trade size - smaller for testing
+      minTradeSize: 100,          // $100 minimum
+      maxTradeSize: 3000,         // $3K max (5% of $60K)
+
       // Portfolio limits
-      maxDailyLoss: options.maxDailyLoss || 5000,          // $5,000 max daily loss
-      maxDrawdown: options.maxDrawdown || 0.1,             // 10% max drawdown
-      maxPositionSize: options.maxPositionSize || 0.2,     // 20% of portfolio per position
-      
-      // Frequency limits
-      maxTradesPerHour: options.maxTradesPerHour || 100,
-      maxTradesPerDay: options.maxTradesPerDay || 1000,
-      
-      // Error limits
-      maxConsecutiveErrors: options.maxConsecutiveErrors || 5,
-      maxErrorsPerHour: options.maxErrorsPerHour || 20,
-      
-      // Slippage limits
-      maxSlippage: options.maxSlippage || 0.05,            // 5% max slippage
-      
+      maxPositionSize: 0.10,      // 10% max per position
+
+      // Loss limits - TIGHTER for testing
+      maxDailyLoss: 1500,         // $1.5K (2.5% of $60K)
+      maxDrawdown: 0.10,          // 10% max drawdown
+      maxLeverageExposure: 0,     // No leverage in shadow mode
+
+      // Rate limits - HIGHER for testing
+      maxTradesPerHour: 30,       // More trades allowed
+      maxTradesPerDay: 150,       // More trades allowed
+      maxConsecutiveErrors: 15,   // More tolerance
+      maxErrorsPerHour: 25,       // More tolerance
+
+      // Price action - MORE TOLERANT
+      maxSlippage: 0.08,          // 8% slippage ok for testing
+      maxPriceImpact: 0.05,       // 5% price impact ok
+
       // Gas limits
-      maxGasPrice: options.maxGasPrice || 50,              // 50 Gwei max
-      
-      // Market limits
-      maxPriceImpact: options.maxPriceImpact || 0.03,      // 3% max price impact
-      
+      maxGasPrice: 50,            // 50 gwei max
+
       // Time limits
-      maxTradeDuration: options.maxTradeDuration || 3600000, // 1 hour max
-      
-      // Portfolio value limits
-      minPortfolioValue: options.minPortfolioValue || 100,  // $100 minimum
-      maxPortfolioValue: options.maxPortfolioValue || 1000000, // $1M maximum
-      
+      maxTradeDuration: 3600000,  // 1 hour
+
       ...options
     };
-    
+
+    // ✅ LIVE MODE LIMITS (Professional for production)
+    const liveLimits = {
+      // Trade size - production standards
+      minTradeSize: 500,          // $500 minimum
+      maxTradeSize: 9000,         // $9K max (15% of $60K)
+
+      // Portfolio limits
+      maxPositionSize: 0.15,      // 15% max per position
+
+      // Loss limits - STRICT for live
+      maxDailyLoss: 3000,         // $3K (5% of $60K)
+      maxDrawdown: 0.15,          // 15% max drawdown
+      maxLeverageExposure: 75000, // $25K × 3x average
+
+      // Rate limits - CONSERVATIVE
+      maxTradesPerHour: 20,       // Controlled pace
+      maxTradesPerDay: 100,       // Daily limit
+      maxConsecutiveErrors: 10,   // Low tolerance
+      maxErrorsPerHour: 20,       // Low tolerance
+
+      // Price action - STRICT
+      maxSlippage: 0.05,          // 5% max slippage
+      maxPriceImpact: 0.03,       // 3% max price impact
+
+      // Gas limits
+      maxGasPrice: 50,            // 50 gwei max
+
+      // Time limits
+      maxTradeDuration: 3600000,  // 1 hour
+
+      ...options
+    };
+
+    // ✅ SELECT APPROPRIATE LIMITS
+    this.limits = isShadowMode ? shadowLimits : liveLimits;
+    this.isShadowMode = isShadowMode;
+
+    // Log active limits
+    logger.info('📊 Active Risk Limits:');
+    logger.info(`   Max Trade Size: $${this.limits.maxTradeSize}`);
+    logger.info(`   Max Daily Loss: $${this.limits.maxDailyLoss}`);
+    logger.info(`   Max Position: ${(this.limits.maxPositionSize * 100).toFixed(0)}%`);
+    logger.info(`   Max Drawdown: ${(this.limits.maxDrawdown * 100).toFixed(0)}%`);
+    logger.info(`   Trades/Hour: ${this.limits.maxTradesPerHour}`);
+    logger.info(`   Trades/Day: ${this.limits.maxTradesPerDay}`);
+
+    // ✅ INITIALIZE STATE
     this.state = {
       dailyLoss: 0,
       dailyTrades: 0,
       hourlyTrades: 0,
       consecutiveErrors: 0,
+      consecutiveLosses: 0,
       lastResetTime: Date.now(),
       lastHourReset: Date.now(),
-      portfolioValue: 0,
+      portfolioValue: 0, // Will be updated on first price check
+      peakPortfolioValue: 0,  // ✅ CRITICAL FIX: Start at 0, will be set on first update
       openPositions: new Map(),
-      tradeHistory: [],
-      errorHistory: []
+      totalTrades: 0,
+      successfulTrades: 0,
+      failedTrades: 0
     };
-    
-    // Emergency shutdown state
+
+    // ✅ EMERGENCY STATE
     this.emergencyState = {
       isShutdown: false,
       shutdownReason: null,
       shutdownTime: null,
       lastHealthCheck: Date.now()
     };
-    
-    // Monitoring and alerting
-    this.alertSystem = null;
+
+    // ✅ MONITORING
     this.monitoringInterval = null;
-    
-    // Start monitoring
-    this.startMonitoring();
-    
-    logger.info('🚀 Production Risk Manager initialized');
+
+    logger.info('✅ Risk Manager initialized successfully');
+    logger.info('🛡️  Risk Manager initialized with peak portfolio: $0 (will be set on first update)');
   }
 
-  // Set alert system
-  setAlertSystem(alertSystem) {
-    this.alertSystem = alertSystem;
-    logger.info('✅ Alert system connected to risk manager');
+  // ✅ UPDATE PORTFOLIO VALUE
+  updatePortfolioValue(newValue) {
+    if (!newValue || newValue <= 0) {
+      logger.warn(`⚠️  Invalid portfolio value: ${newValue}`);
+      return;
+    }
+
+    const oldValue = this.state.portfolioValue;
+    this.state.portfolioValue = newValue;
+
+    // ✅ FIX: Initialize peak on first update or after significant change
+    if (this.state.peakPortfolioValue === 0 || oldValue === 0) {
+      this.state.peakPortfolioValue = newValue;
+      logger.info(`📊 Peak portfolio initialized: $${newValue.toFixed(2)}`);
+    }
+
+    // Update peak value
+    if (newValue > this.state.peakPortfolioValue) {
+      this.state.peakPortfolioValue = newValue;
+    }
+
+    // Check drawdown
+    const currentDrawdown = (this.state.peakPortfolioValue - newValue) / this.state.peakPortfolioValue;
+
+    if (currentDrawdown > this.limits.maxDrawdown) {
+      logger.error(`🚨 DRAWDOWN LIMIT EXCEEDED: ${(currentDrawdown * 100).toFixed(2)}%`);
+      this.triggerEmergencyStop(`Max drawdown exceeded: ${(currentDrawdown * 100).toFixed(2)}%`);
+    }
+
+    logger.debug(`💼 Portfolio: $${newValue.toFixed(2)} | Peak: $${this.state.peakPortfolioValue.toFixed(2)} | Drawdown: ${(currentDrawdown * 100).toFixed(2)}%`);
   }
 
-  // Start continuous monitoring
+  // ✅ CHECK IF TRADE ALLOWED
+  async checkTradeAllowed(tradeAmount, reason = '') {
+    // Check emergency state
+    if (this.emergencyState.isShutdown) {
+      return {
+        allowed: false,
+        reason: `Emergency shutdown active: ${this.emergencyState.shutdownReason}`
+      };
+    }
+
+    // Check trade size
+    if (tradeAmount < this.limits.minTradeSize) {
+      return {
+        allowed: false,
+        reason: `Trade too small: $${tradeAmount.toFixed(2)} < $${this.limits.minTradeSize}`
+      };
+    }
+
+    if (tradeAmount > this.limits.maxTradeSize) {
+      return {
+        allowed: false,
+        reason: `Trade too large: $${tradeAmount.toFixed(2)} > $${this.limits.maxTradeSize}`
+      };
+    }
+
+    // Check position size
+    const positionPct = tradeAmount / this.state.portfolioValue;
+    if (positionPct > this.limits.maxPositionSize) {
+      return {
+        allowed: false,
+        reason: `Position too large: ${(positionPct * 100).toFixed(2)}% > ${(this.limits.maxPositionSize * 100).toFixed(0)}%`
+      };
+    }
+
+    // Check daily loss limit
+    if (Math.abs(this.state.dailyLoss) > this.limits.maxDailyLoss) {
+      return {
+        allowed: false,
+        reason: `Daily loss limit exceeded: $${Math.abs(this.state.dailyLoss).toFixed(2)}`
+      };
+    }
+
+    // Check hourly rate limit
+    if (this.state.hourlyTrades >= this.limits.maxTradesPerHour) {
+      return {
+        allowed: false,
+        reason: `Hourly trade limit reached: ${this.state.hourlyTrades}/${this.limits.maxTradesPerHour}`
+      };
+    }
+
+    // Check daily rate limit
+    if (this.state.dailyTrades >= this.limits.maxTradesPerDay) {
+      return {
+        allowed: false,
+        reason: `Daily trade limit reached: ${this.state.dailyTrades}/${this.limits.maxTradesPerDay}`
+      };
+    }
+
+    // All checks passed
+    logger.debug(`✅ Trade allowed: $${tradeAmount.toFixed(2)} (${reason})`);
+    return { allowed: true };
+  }
+
+  // ✅ RECORD TRADE
+  recordTrade(trade) {
+    this.state.totalTrades++;
+    this.state.dailyTrades++;
+    this.state.hourlyTrades++;
+
+    if (trade.profit) {
+      this.state.dailyLoss += trade.profit;
+
+      if (trade.profit > 0) {
+        this.state.successfulTrades++;
+        this.state.consecutiveLosses = 0;
+      } else {
+        this.state.failedTrades++;
+        this.state.consecutiveLosses++;
+      }
+    }
+
+    logger.debug(`📊 Trade recorded | Total: ${this.state.totalTrades} | Daily: ${this.state.dailyTrades}`);
+  }
+
+  // ✅ VALIDATE TRADE (before execution)
+  validateTrade(params) {
+    const { action, amount, price, portfolio } = params;
+
+    // Check if trading is halted
+    if (this.emergencyState.isShutdown) {
+      return {
+        allowed: false,
+        reason: 'Emergency shutdown active',
+        severity: 'critical'
+      };
+    }
+
+    // Check trade size limits
+    if (amount > this.limits.maxTradeSize) {
+      return {
+        allowed: false,
+        reason: `Trade size ${amount.toFixed(2)} exceeds max ${this.limits.maxTradeSize}`,
+        severity: 'high'
+      };
+    }
+
+    // Check daily loss limit
+    if (this.state.dailyLoss >= this.limits.maxDailyLoss) {
+      return {
+        allowed: false,
+        reason: `Daily loss limit reached: ${this.state.dailyLoss.toFixed(2)}`,
+        severity: 'high'
+      };
+    }
+
+    // Check rate limits
+    if (this.state.hourlyTrades >= this.limits.maxTradesPerHour) {
+      return {
+        allowed: false,
+        reason: 'Hourly trade limit reached',
+        severity: 'medium'
+      };
+    }
+
+    // All checks passed
+    return {
+      allowed: true,
+      reason: 'Trade validated successfully'
+    };
+  }
+
+  // ✅ RESET CIRCUIT BREAKERS
+  async resetCircuitBreakers(reason = 'Manual reset') {
+    logger.info(`🔄 Resetting circuit breakers: ${reason}`);
+
+    const previousState = {
+      dailyLoss: this.state.dailyLoss,
+      dailyTrades: this.state.dailyTrades
+    };
+
+    // Reset emergency state
+    this.emergencyState = {
+      isShutdown: false,
+      shutdownReason: null,
+      shutdownTime: null,
+      lastHealthCheck: Date.now()
+    };
+
+    // Reset daily/hourly counters
+    this.state.dailyLoss = 0;
+    this.state.dailyTrades = 0;
+    this.state.hourlyTrades = 0;
+    this.state.consecutiveErrors = 0;
+    this.state.consecutiveLosses = 0;
+    this.state.lastResetTime = Date.now();
+    this.state.lastHourReset = Date.now();
+
+    logger.info('✅ Circuit breakers reset');
+    logger.info(`   Previous daily loss: $${previousState.dailyLoss.toFixed(2)}`);
+    logger.info(`   Previous daily trades: ${previousState.dailyTrades}`);
+
+    return { success: true, previousState };
+  }
+
+  // ✅ CHECK DAILY RESET
+  async checkDailyReset() {
+    const now = Date.now();
+    const timeSinceReset = now - this.state.lastResetTime;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+
+    if (timeSinceReset > oneDayMs) {
+      logger.info('🌅 New day detected, auto-resetting counters');
+      await this.resetCircuitBreakers('Daily auto-reset');
+    }
+
+    // Check hourly reset
+    const timeSinceHourReset = now - this.state.lastHourReset;
+    const oneHourMs = 60 * 60 * 1000;
+
+    if (timeSinceHourReset > oneHourMs) {
+      logger.debug('🕐 Hourly reset');
+      this.state.hourlyTrades = 0;
+      this.state.lastHourReset = now;
+    }
+  }
+
+  // ✅ START MONITORING
   startMonitoring() {
-    // Monitor every 30 seconds
-    this.monitoringInterval = setInterval(() => {
-      this.performHealthCheck();
-    }, 30000);
-    
-    logger.info('✅ Risk monitoring started');
+    if (this.monitoringInterval) {
+      logger.warn('⚠️  Monitoring already started');
+      return;
+    }
+
+    logger.info('🛡️  Starting risk monitoring (60s interval)');
+
+    this.monitoringInterval = setInterval(async () => {
+      await this.checkDailyReset();
+
+      // Log current state
+      logger.debug('📊 Risk State:');
+      logger.debug(`   Daily Loss: $${this.state.dailyLoss.toFixed(2)}`);
+      logger.debug(`   Daily Trades: ${this.state.dailyTrades}/${this.limits.maxTradesPerDay}`);
+      logger.debug(`   Hourly Trades: ${this.state.hourlyTrades}/${this.limits.maxTradesPerHour}`);
+      logger.debug(`   Portfolio: $${this.state.portfolioValue.toFixed(2)}`);
+    }, 60000);
   }
 
-  // Stop monitoring
+  // ✅ STOP MONITORING
   stopMonitoring() {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
-    }
-    
-    logger.info('✅ Risk monitoring stopped');
-  }
-
-  // Validate trade before execution
-  async validateTrade(trade) {
-    try {
-      // Check if system is in emergency shutdown
-      if (this.emergencyState.isShutdown) {
-        throw new Error(`System is in emergency shutdown: ${this.emergencyState.shutdownReason}`);
-      }
-      
-      // Reset daily counters if needed
-      this.resetDailyCountersIfNeeded();
-      this.resetHourlyCountersIfNeeded();
-      
-      const validations = [
-        this.checkTradeSize(trade),
-        this.checkDailyLoss(trade),
-        this.checkPositionSize(trade),
-        this.checkTradeFrequency(),
-        this.checkSlippage(trade),
-        this.checkGasPrice(trade),
-        this.checkPriceImpact(trade),
-        this.checkPortfolioValue(),
-        this.checkConsecutiveErrors(),
-        this.checkMarketConditions(trade)
-      ];
-      
-      const results = await Promise.all(validations);
-      const failures = results.filter(r => !r.passed);
-      
-      if (failures.length > 0) {
-        const errorMsg = `Trade validation failed: ${failures.map(f => f.reason).join(', ')}`;
-        logger.warn(`⚠️ Trade validation failed:`, failures);
-        
-        // Record validation failure
-        this.recordError('VALIDATION_FAILED', errorMsg);
-        
-        throw new Error(errorMsg);
-      }
-      
-      // Record successful validation
-      this.recordTradeValidation(trade);
-      
-      return true;
-      
-    } catch (error) {
-      logger.error('❌ Trade validation error:', error);
-      throw error;
+      logger.info('✅ Risk monitoring stopped');
     }
   }
 
-  // Check trade size limits
-  checkTradeSize(trade) {
-    const amount = parseFloat(trade.amount);
-    
-    if (amount < this.limits.minTradeSize) {
-      return { passed: false, reason: `Trade size too small: $${amount} < $${this.limits.minTradeSize}` };
-    }
-    
-    if (amount > this.limits.maxTradeSize) {
-      return { passed: false, reason: `Trade size exceeds limit: $${amount} > $${this.limits.maxTradeSize}` };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check daily loss limits
-  checkDailyLoss(trade) {
-    const potentialLoss = parseFloat(trade.amount) * 0.1; // Assume 10% loss
-    
-    if (this.state.dailyLoss + potentialLoss > this.limits.maxDailyLoss) {
-      return { 
-        passed: false, 
-        reason: `Daily loss limit reached: $${this.state.dailyLoss} + $${potentialLoss} > $${this.limits.maxDailyLoss}` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check position size limits
-  checkPositionSize(trade) {
-    const positionSize = parseFloat(trade.amount) / this.state.portfolioValue;
-    
-    if (positionSize > this.limits.maxPositionSize) {
-      return { 
-        passed: false, 
-        reason: `Position size too large: ${(positionSize * 100).toFixed(2)}% > ${(this.limits.maxPositionSize * 100)}%` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check trade frequency limits
-  checkTradeFrequency() {
-    if (this.state.hourlyTrades >= this.limits.maxTradesPerHour) {
-      return { 
-        passed: false, 
-        reason: `Hourly trade limit reached: ${this.state.hourlyTrades} >= ${this.limits.maxTradesPerHour}` 
-      };
-    }
-    
-    if (this.state.dailyTrades >= this.limits.maxTradesPerDay) {
-      return { 
-        passed: false, 
-        reason: `Daily trade limit reached: ${this.state.dailyTrades} >= ${this.limits.maxTradesPerDay}` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check slippage limits
-  checkSlippage(trade) {
-    const slippage = parseFloat(trade.slippage) || 0;
-    
-    if (slippage > this.limits.maxSlippage) {
-      return { 
-        passed: false, 
-        reason: `Slippage too high: ${(slippage * 100).toFixed(2)}% > ${(this.limits.maxSlippage * 100)}%` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check gas price limits
-  checkGasPrice(trade) {
-    const gasPrice = parseFloat(trade.gasPrice) || 0;
-    
-    if (gasPrice > this.limits.maxGasPrice) {
-      return { 
-        passed: false, 
-        reason: `Gas price too high: ${gasPrice} Gwei > ${this.limits.maxGasPrice} Gwei` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check price impact limits
-  checkPriceImpact(trade) {
-    const priceImpact = parseFloat(trade.priceImpact) || 0;
-    
-    if (priceImpact > this.limits.maxPriceImpact) {
-      return { 
-        passed: false, 
-        reason: `Price impact too high: ${(priceImpact * 100).toFixed(2)}% > ${(this.limits.maxPriceImpact * 100)}%` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check portfolio value limits
-  checkPortfolioValue() {
-    if (this.state.portfolioValue < this.limits.minPortfolioValue) {
-      return { 
-        passed: false, 
-        reason: `Portfolio value too low: $${this.state.portfolioValue} < $${this.limits.minPortfolioValue}` 
-      };
-    }
-    
-    if (this.state.portfolioValue > this.limits.maxPortfolioValue) {
-      return { 
-        passed: false, 
-        reason: `Portfolio value too high: $${this.state.portfolioValue} > $${this.limits.maxPortfolioValue}` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check consecutive error limits
-  checkConsecutiveErrors() {
-    if (this.state.consecutiveErrors >= this.limits.maxConsecutiveErrors) {
-      return { 
-        passed: false, 
-        reason: `Too many consecutive errors: ${this.state.consecutiveErrors} >= ${this.limits.maxConsecutiveErrors}` 
-      };
-    }
-    
-    return { passed: true };
-  }
-
-  // Check market conditions
-  async checkMarketConditions(trade) {
-    // This would check market volatility, liquidity, etc.
-    // For now, return passed
-    return { passed: true };
-  }
-
-  // Record trade execution
-  recordTrade(trade, result) {
-    const tradeRecord = {
-      ...trade,
-      result: result,
-      timestamp: Date.now(),
-      dailyTradeNumber: this.state.dailyTrades + 1,
-      hourlyTradeNumber: this.state.hourlyTrades + 1
+  // ✅ TRIGGER EMERGENCY STOP
+  triggerEmergencyStop(reason) {
+    this.emergencyState = {
+      isShutdown: true,
+      shutdownReason: reason,
+      shutdownTime: Date.now(),
+      lastHealthCheck: Date.now()
     };
-    
-    this.state.tradeHistory.push(tradeRecord);
-    this.state.dailyTrades++;
-    this.state.hourlyTrades++;
-    
-    // Keep only recent trades
-    if (this.state.tradeHistory.length > 1000) {
-      this.state.tradeHistory = this.state.tradeHistory.slice(-1000);
-    }
-    
-    // Update portfolio value
-    if (result.profitLoss) {
-      this.state.portfolioValue += parseFloat(result.profitLoss);
-    }
-    
-    // Update daily loss
-    if (result.profitLoss && parseFloat(result.profitLoss) < 0) {
-      this.state.dailyLoss += Math.abs(parseFloat(result.profitLoss));
-    }
-    
-    // Reset consecutive errors on successful trade
-    if (result.status === 'success') {
-      this.state.consecutiveErrors = 0;
-    }
-    
-    logger.info(`✅ Trade recorded: ${trade.pair} ${trade.amount} (${result.status})`);
+
+    logger.error('🚨 EMERGENCY STOP TRIGGERED');
+    logger.error(`   Reason: ${reason}`);
   }
 
-  // Record error
-  recordError(type, message) {
-    const errorRecord = {
-      type: type,
-      message: message,
-      timestamp: Date.now(),
-      consecutiveCount: this.state.consecutiveErrors + 1
-    };
-    
-    this.state.errorHistory.push(errorRecord);
-    this.state.consecutiveErrors++;
-    
-    // Keep only recent errors
-    if (this.state.errorHistory.length > 100) {
-      this.state.errorHistory = this.state.errorHistory.slice(-100);
-    }
-    
-    logger.error(`❌ Error recorded: ${type} - ${message}`);
-  }
-
-  // Record trade validation
-  recordTradeValidation(trade) {
-    // This would log validation success for monitoring
-    logger.debug(`✅ Trade validation passed: ${trade.pair} ${trade.amount}`);
-  }
-
-  // Reset daily counters if needed
-  resetDailyCountersIfNeeded() {
-    const now = Date.now();
-    const dayInMs = 24 * 60 * 60 * 1000;
-    
-    if (now - this.state.lastResetTime > dayInMs) {
-      this.state.dailyLoss = 0;
-      this.state.dailyTrades = 0;
-      this.state.lastResetTime = now;
-      
-      logger.info('✅ Daily counters reset');
-    }
-  }
-
-  // Reset hourly counters if needed
-  resetHourlyCountersIfNeeded() {
-    const now = Date.now();
-    const hourInMs = 60 * 60 * 1000;
-    
-    if (now - this.state.lastHourReset > hourInMs) {
-      this.state.hourlyTrades = 0;
-      this.state.lastHourReset = now;
-      
-      logger.info('✅ Hourly counters reset');
-    }
-  }
-
-  // Update portfolio value
-  updatePortfolioValue(value) {
-    this.state.portfolioValue = parseFloat(value);
-    logger.debug(`✅ Portfolio value updated: $${this.state.portfolioValue}`);
-  }
-
-  // Add open position
-  addOpenPosition(position) {
-    this.state.openPositions.set(position.id, position);
-    logger.debug(`✅ Open position added: ${position.id}`);
-  }
-
-  // Remove open position
-  removeOpenPosition(positionId) {
-    this.state.openPositions.delete(positionId);
-    logger.debug(`✅ Open position removed: ${positionId}`);
-  }
-
-  // Perform health check
-  async performHealthCheck() {
-    try {
-      const now = Date.now();
-      this.emergencyState.lastHealthCheck = now;
-      
-      // Check for emergency conditions
-      const emergencyConditions = [
-        this.checkDailyLossLimit(),
-        this.checkConsecutiveErrorLimit(),
-        this.checkPortfolioValueLimit(),
-        this.checkMarketConditions()
-      ];
-      
-      const emergencies = emergencyConditions.filter(condition => condition.isEmergency);
-      
-      if (emergencies.length > 0) {
-        await this.emergencyShutdown(emergencies[0].reason);
-      }
-      
-      // Check for warning conditions
-      const warningConditions = [
-        this.checkDailyLossWarning(),
-        this.checkErrorRateWarning(),
-        this.checkTradeFrequencyWarning()
-      ];
-      
-      const warnings = warningConditions.filter(condition => condition.isWarning);
-      
-      if (warnings.length > 0) {
-        await this.sendWarning(warnings[0].reason);
-      }
-      
-    } catch (error) {
-      logger.error('❌ Health check failed:', error);
-    }
-  }
-
-  // Check daily loss limit
-  checkDailyLossLimit() {
-    const lossRatio = this.state.dailyLoss / this.state.portfolioValue;
-    
-    if (lossRatio > this.limits.maxDrawdown) {
-      return {
-        isEmergency: true,
-        reason: `Daily loss limit exceeded: $${this.state.dailyLoss} (${(lossRatio * 100).toFixed(2)}% of portfolio)`
-      };
-    }
-    
-    return { isEmergency: false };
-  }
-
-  // Check consecutive error limit
-  checkConsecutiveErrorLimit() {
-    if (this.state.consecutiveErrors >= this.limits.maxConsecutiveErrors) {
-      return {
-        isEmergency: true,
-        reason: `Too many consecutive errors: ${this.state.consecutiveErrors}`
-      };
-    }
-    
-    return { isEmergency: false };
-  }
-
-  // Check portfolio value limit
-  checkPortfolioValueLimit() {
-    if (this.state.portfolioValue < this.limits.minPortfolioValue) {
-      return {
-        isEmergency: true,
-        reason: `Portfolio value too low: $${this.state.portfolioValue}`
-      };
-    }
-    
-    return { isEmergency: false };
-  }
-
-  // Check market conditions
-  checkMarketConditions() {
-    // This would check market volatility, liquidity, etc.
-    return { isEmergency: false };
-  }
-
-  // Check daily loss warning
-  checkDailyLossWarning() {
-    const lossRatio = this.state.dailyLoss / this.state.portfolioValue;
-    
-    if (lossRatio > this.limits.maxDrawdown * 0.8) {
-      return {
-        isWarning: true,
-        reason: `Daily loss approaching limit: $${this.state.dailyLoss} (${(lossRatio * 100).toFixed(2)}% of portfolio)`
-      };
-    }
-    
-    return { isWarning: false };
-  }
-
-  // Check error rate warning
-  checkErrorRateWarning() {
-    const errorRate = this.state.errorHistory.filter(
-      error => Date.now() - error.timestamp < 3600000 // Last hour
-    ).length;
-    
-    if (errorRate > this.limits.maxErrorsPerHour * 0.8) {
-      return {
-        isWarning: true,
-        reason: `High error rate: ${errorRate} errors in last hour`
-      };
-    }
-    
-    return { isWarning: false };
-  }
-
-  // Check trade frequency warning
-  checkTradeFrequencyWarning() {
-    if (this.state.hourlyTrades > this.limits.maxTradesPerHour * 0.8) {
-      return {
-        isWarning: true,
-        reason: `High trade frequency: ${this.state.hourlyTrades} trades in last hour`
-      };
-    }
-    
-    return { isWarning: false };
-  }
-
-  // Send warning
-  async sendWarning(reason) {
-    if (this.alertSystem) {
-      await this.alertSystem.send({
-        level: 'WARNING',
-        type: 'RISK_WARNING',
-        reason: reason,
-        timestamp: Date.now(),
-        state: this.getSystemState()
-      });
-    }
-    
-    logger.warn(`⚠️ Risk warning: ${reason}`);
-  }
-
-  // Emergency shutdown
-  async emergencyShutdown(reason) {
-    try {
-      logger.error('🚨 EMERGENCY SHUTDOWN:', reason);
-      
-      // Set emergency state
-      this.emergencyState.isShutdown = true;
-      this.emergencyState.shutdownReason = reason;
-      this.emergencyState.shutdownTime = Date.now();
-      
-      // Stop all trading
-      this.stopTrading();
-      
-      // Cancel pending orders
-      await this.cancelAllOrders();
-      
-      // Close open positions (if safe)
-      await this.closePositionsSafely();
-      
-      // Alert administrators
-      if (this.alertSystem) {
-        await this.alertSystem.send({
-          level: 'CRITICAL',
-          type: 'EMERGENCY_SHUTDOWN',
-          reason: reason,
-          timestamp: Date.now(),
-          state: this.getSystemState()
-        });
-      }
-      
-      // Create incident report
-      await this.createIncidentReport(reason);
-      
-      logger.error('🚨 Emergency shutdown completed');
-      
-    } catch (error) {
-      logger.error('❌ Emergency shutdown failed:', error);
-    }
-  }
-
-  // Stop trading
-  stopTrading() {
-    // This would stop the trading bot
-    logger.error('🛑 Trading stopped due to emergency shutdown');
-  }
-
-  // Cancel all orders
-  async cancelAllOrders() {
-    // This would cancel all pending orders
-    logger.error('🛑 All orders cancelled due to emergency shutdown');
-  }
-
-  // Close positions safely
-  async closePositionsSafely() {
-    // This would close open positions if safe to do so
-    logger.error('🛑 Positions closed safely due to emergency shutdown');
-  }
-
-  // Create incident report
-  async createIncidentReport(reason) {
-    const report = {
-      incidentId: Date.now(),
-      reason: reason,
-      timestamp: Date.now(),
-      state: this.getSystemState(),
-      tradeHistory: this.state.tradeHistory.slice(-100),
-      errorHistory: this.state.errorHistory.slice(-50)
-    };
-    
-    logger.error('📋 Incident report created:', report);
-    
-    // In production, save to database
-    return report;
-  }
-
-  // Get system state
-  getSystemState() {
+  // ✅ GET STATE
+  getState() {
     return {
-      limits: this.limits,
-      state: this.state,
+      ...this.state,
       emergencyState: this.emergencyState,
-      stats: this.getStats()
+      limits: this.limits,
+      isShadowMode: this.isShadowMode
     };
   }
 
-  // Get risk manager statistics
-  getStats() {
-    const now = Date.now();
-    const last24Hours = this.state.tradeHistory.filter(
-      trade => now - trade.timestamp < 24 * 60 * 60 * 1000
-    );
-    
-    const lastHour = this.state.tradeHistory.filter(
-      trade => now - trade.timestamp < 60 * 60 * 1000
-    );
-    
-    const profitableTrades = last24Hours.filter(trade => 
-      trade.result.profitLoss && parseFloat(trade.result.profitLoss) > 0
-    );
-    
-    const losingTrades = last24Hours.filter(trade => 
-      trade.result.profitLoss && parseFloat(trade.result.profitLoss) < 0
-    );
-    
-    return {
-      portfolio: {
-        value: this.state.portfolioValue,
-        dailyLoss: this.state.dailyLoss,
-        openPositions: this.state.openPositions.size
-      },
-      trading: {
-        dailyTrades: this.state.dailyTrades,
-        hourlyTrades: this.state.hourlyTrades,
-        totalTrades: this.state.tradeHistory.length,
-        profitableTrades: profitableTrades.length,
-        losingTrades: losingTrades.length,
-        winRate: last24Hours.length > 0 ? (profitableTrades.length / last24Hours.length * 100).toFixed(2) + '%' : '0%'
-      },
-      errors: {
-        consecutiveErrors: this.state.consecutiveErrors,
-        totalErrors: this.state.errorHistory.length,
-        errorRate: this.state.tradeHistory.length > 0 ? 
-          (this.state.errorHistory.length / this.state.tradeHistory.length * 100).toFixed(2) + '%' : '0%'
-      },
-      emergency: {
-        isShutdown: this.emergencyState.isShutdown,
-        shutdownReason: this.emergencyState.shutdownReason,
-        shutdownTime: this.emergencyState.shutdownTime,
-        lastHealthCheck: this.emergencyState.lastHealthCheck
-      }
+  // ✅ RESET (for testing)
+  reset() {
+    logger.info('🔄 Full risk manager reset');
+
+    // ✅ FIX: Reset peak portfolio value on reset to prevent false drawdown
+    const currentPortfolioValue = this.state.portfolioValue;
+
+    this.state = {
+      dailyLoss: 0,
+      dailyTrades: 0,
+      hourlyTrades: 0,
+      consecutiveErrors: 0,
+      consecutiveLosses: 0,
+      lastResetTime: Date.now(),
+      lastHourReset: Date.now(),
+      portfolioValue: currentPortfolioValue,
+      peakPortfolioValue: currentPortfolioValue,  // ✅ FIX: Reset peak to current value
+      openPositions: new Map(),
+      totalTrades: 0,
+      successfulTrades: 0,
+      failedTrades: 0
     };
-  }
 
-  // Health check
-  healthCheck() {
-    const stats = this.getStats();
-    const healthy = !this.emergencyState.isShutdown && 
-                   this.state.consecutiveErrors < this.limits.maxConsecutiveErrors &&
-                   this.state.portfolioValue >= this.limits.minPortfolioValue;
-    
-    return {
-      status: healthy ? 'healthy' : 'warning',
-      stats: stats,
-      recommendations: this.getRecommendations()
+    logger.info(`📊 Peak portfolio reset to: $${currentPortfolioValue.toFixed(2)}`);
+
+    this.emergencyState = {
+      isShutdown: false,
+      shutdownReason: null,
+      shutdownTime: null,
+      lastHealthCheck: Date.now()
     };
-  }
-
-  // Get recommendations
-  getRecommendations() {
-    const recommendations = [];
-    
-    if (this.state.dailyLoss > this.limits.maxDailyLoss * 0.8) {
-      recommendations.push('Daily loss approaching limit - consider reducing position sizes');
-    }
-    
-    if (this.state.consecutiveErrors > this.limits.maxConsecutiveErrors * 0.8) {
-      recommendations.push('High consecutive error count - review error handling');
-    }
-    
-    if (this.state.hourlyTrades > this.limits.maxTradesPerHour * 0.8) {
-      recommendations.push('High trade frequency - consider rate limiting');
-    }
-    
-    if (this.state.portfolioValue < this.limits.minPortfolioValue * 1.1) {
-      recommendations.push('Portfolio value low - consider adding funds');
-    }
-    
-    return recommendations;
-  }
-
-  // Reset emergency state
-  resetEmergencyState() {
-    this.emergencyState.isShutdown = false;
-    this.emergencyState.shutdownReason = null;
-    this.emergencyState.shutdownTime = null;
-    
-    logger.info('✅ Emergency state reset');
-  }
-
-  // Graceful shutdown
-  async shutdown() {
-    try {
-      logger.info('🔄 Shutting down risk manager...');
-      
-      this.stopMonitoring();
-      
-      logger.info('✅ Risk manager shutdown completed');
-      
-    } catch (error) {
-      logger.error('❌ Error during risk manager shutdown:', error);
-    }
   }
 }
 
 module.exports = ProductionRiskManager;
-

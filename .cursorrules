@@ -1,0 +1,52 @@
+# Cursor BugBot Configuration for BSC Trading Bot
+
+## Critical Bug Detection Priorities
+
+### 1. Trading Logic Bugs (HIGHEST PRIORITY)
+- Exit condition failures (TP/SL not triggering)
+- Position monitoring failures
+- Trade execution errors
+- Price calculation errors
+- Risk management bypasses
+
+### 2. Runtime Errors
+- Async/await unhandled promises
+- Null/undefined reference errors
+- Type mismatches in trade data
+- Database connection failures
+- RPC provider errors
+
+### 3. Performance Issues
+- Memory leaks in long-running processes
+- Infinite loops in monitoring
+- Rate limiter bypasses
+- Database query inefficiencies
+- Price history persistence failures
+
+### 4. Security Vulnerabilities
+- Private key exposure risks
+- Unsigned transaction risks
+- MEV exploitation vectors
+- Rate limit bypasses
+- Input validation failures
+
+## Files to Monitor Closely
+- agents/TradingStrategyAgent.js (position monitoring)
+- AdvancedTradingBot.js (main bot logic)
+- rangingStrategy.js (entry/exit logic)
+- utils/priceHistoryManager.js (price data)
+- security/rateLimiter.js (rate limiting)
+- risk/productionRiskManager.js (risk checks)
+
+## Known Issues to Watch
+1. TP 0.8% never reached → Check exit condition logic
+2. Max hold time not enforcing → Check cron job execution
+3. position.side undefined → Check position creation logic
+4. 0 exits in 11+ hours → Monitor executeExit() calls
+
+## BugBot Alert Thresholds
+- Any logger.error() calls
+- Uncaught exceptions
+- Process crashes
+- Database write failures
+- Transaction failures

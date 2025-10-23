@@ -1,0 +1,155 @@
+═══════════════════════════════════════════════════════════════════
+🚀 COMMANDES DE DÉMARRAGE - BSC TRADING BOT
+═══════════════════════════════════════════════════════════════════
+
+📋 DÉMARRAGE COMPLET (LES DEUX BOTS)
+═══════════════════════════════════════════════════════════════════
+
+COMMANDE UNIQUE (tout en un):
+
+cd /Users/sheirraza/bsc-ranging-bot && npm start > /dev/null 2>&1 & sleep 10 && ./start-monitoring.sh
+
+───────────────────────────────────────────────────────────────────
+
+🤖 BOT PRINCIPAL SEULEMENT
+═══════════════════════════════════════════════════════════════════
+
+Démarrer:
+
+cd /Users/sheirraza/bsc-ranging-bot && npm start &
+
+Démarrer (si port occupé):
+
+lsof -ti:3001 | xargs kill -9 2>/dev/null; sleep 2 && cd /Users/sheirraza/bsc-ranging-bot && npm start &
+
+Vérifier:
+
+ps aux | grep AdvancedTradingBot | grep -v grep
+
+Voir logs:
+
+tail -f logs/combined.log
+
+Arrêter:
+
+lsof -ti:3001 | xargs kill -9
+
+───────────────────────────────────────────────────────────────────
+
+📊 MONITORING SEULEMENT
+═══════════════════════════════════════════════════════════════════
+
+Démarrer:
+
+./start-monitoring.sh
+
+Vérifier:
+
+ps aux | grep monitor-positions | grep -v grep
+
+Voir rapports:
+
+tail -f logs/position-monitoring.log
+
+Arrêter:
+
+./stop-monitoring.sh
+
+───────────────────────────────────────────────────────────────────
+
+🔄 REDÉMARRAGE COMPLET (CLEAN)
+═══════════════════════════════════════════════════════════════════
+
+lsof -ti:3001 | xargs kill -9 2>/dev/null; ./stop-monitoring.sh; sleep 3 && cd /Users/sheirraza/bsc-ranging-bot && npm start > /dev/null 2>&1 & sleep 10 && ./start-monitoring.sh
+
+───────────────────────────────────────────────────────────────────
+
+✅ VÉRIFICATION STATUS
+═══════════════════════════════════════════════════════════════════
+
+Status simple:
+
+ps aux | grep -E "AdvancedTradingBot|monitor-positions" | grep -v grep
+
+Status détaillé (one-liner):
+
+echo "Bot: $(ps aux | grep AdvancedTradingBot | grep -v grep > /dev/null && echo '✅' || echo '❌') | Monitoring: $(ps aux | grep monitor-positions | grep -v grep > /dev/null && echo '✅' || echo '❌') | Trades: $(sqlite3 data/trading_bot.db 'SELECT COUNT(*) FROM trades;' 2>/dev/null) | P&L: \$$(sqlite3 data/trading_bot.db 'SELECT ROUND(SUM(profit_loss), 2) FROM trades;' 2>/dev/null)"
+
+───────────────────────────────────────────────────────────────────
+
+📊 VÉRIFICATION P&L & TRADES
+═══════════════════════════════════════════════════════════════════
+
+Trade count:
+
+sqlite3 data/trading_bot.db "SELECT COUNT(*) FROM trades;"
+
+P&L total:
+
+sqlite3 data/trading_bot.db "SELECT SUM(profit_loss) FROM trades;"
+
+Trade count + P&L:
+
+sqlite3 data/trading_bot.db "SELECT COUNT(*), SUM(profit_loss) FROM trades;"
+
+Détails par stratégie:
+
+sqlite3 data/trading_bot.db "SELECT strategy, COUNT(*), ROUND(SUM(profit_loss), 2) FROM trades GROUP BY strategy;"
+
+───────────────────────────────────────────────────────────────────
+
+🔍 SURVEILLANCE EN TEMPS RÉEL
+═══════════════════════════════════════════════════════════════════
+
+Logs du bot (tout):
+
+tail -f logs/combined.log
+
+Logs du bot (trading seulement):
+
+tail -f logs/combined.log | grep -E "(Trading decision|Position|profit)"
+
+Logs du bot (erreurs seulement):
+
+tail -f logs/combined.log | grep -E "(ERROR|WARN)"
+
+Rapports du monitoring:
+
+tail -f logs/position-monitoring.log
+
+───────────────────────────────────────────────────────────────────
+
+🛑 ARRÊT COMPLET
+═══════════════════════════════════════════════════════════════════
+
+Arrêter les deux:
+
+lsof -ti:3001 | xargs kill -9 2>/dev/null; ./stop-monitoring.sh
+
+───────────────────────────────────────────────────────────────────
+
+⚡ COMMANDES ULTRA-RAPIDES
+═══════════════════════════════════════════════════════════════════
+
+Démarrer tout:
+npm start > /dev/null 2>&1 & sleep 10 && ./start-monitoring.sh
+
+Arrêter tout:
+lsof -ti:3001 | xargs kill -9; ./stop-monitoring.sh
+
+Redémarrer tout:
+lsof -ti:3001 | xargs kill -9; ./stop-monitoring.sh; sleep 3 && npm start > /dev/null 2>&1 & sleep 10 && ./start-monitoring.sh
+
+Status:
+ps aux | grep -E "AdvancedTradingBot|monitor-positions" | grep -v grep
+
+P&L:
+sqlite3 data/trading_bot.db "SELECT COUNT(*), SUM(profit_loss) FROM trades;"
+
+═══════════════════════════════════════════════════════════════════
+
+
+
+
+
+

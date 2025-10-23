@@ -315,6 +315,51 @@ const AgentActivity = sequelize.define('AgentActivity', {
   }
 });
 
+// Grid State Model
+const GridState = sequelize.define('GridState', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
+  token_pair: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'BNB/USDT'
+  },
+  upper_bound: {
+    type: DataTypes.DECIMAL(20, 8),
+    allowNull: false
+  },
+  lower_bound: {
+    type: DataTypes.DECIMAL(20, 8),
+    allowNull: false
+  },
+  grid_levels: {
+    type: DataTypes.JSON,
+    allowNull: false
+  },
+  last_price: {
+    type: DataTypes.DECIMAL(20, 8),
+    allowNull: true
+  },
+  created_at: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW
+  },
+  last_updated: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true
+  }
+});
+
 // Define associations
 Trade.belongsTo(StrategyPerformance, { foreignKey: 'strategy_performance_id' });
 StrategyPerformance.hasMany(Trade, { foreignKey: 'strategy_performance_id' });
@@ -328,5 +373,6 @@ module.exports = {
   StrategyPerformance,
   NewsArticle,
   Alert,
-  AgentActivity
+  AgentActivity,
+  GridState
 };

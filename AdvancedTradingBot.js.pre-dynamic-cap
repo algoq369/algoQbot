@@ -1,0 +1,2517 @@
+// ═══════════════════════════════════════════════════════════════
+// CRITICAL: Prevent EPIPE crashes from broken stdout pipe
+// ═══════════════════════════════════════════════════════════════
+process.on('uncaughtException', (error) => {
+  // EPIPE = broken pipe (stdout closed while writing)
+  if (error.code === 'EPIPE' || error.errno === -32) {
+    console.error('[EPIPE CAUGHT] Broken pipe error prevented crash - continuing...');
+    console.error('[EPIPE DETAILS]', error.message);
+    return; // Don't crash the bot
+  }
+
+  // All other uncaught exceptions should crash
+  console.error('═══════════════════════════════════════');
+  console.error('UNCAUGHT EXCEPTION - BOT STOPPING');
+  console.error('═══════════════════════════════════════');
+  console.error(error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  // EPIPE in promise rejection
+  if (reason && (reason.code === 'EPIPE' || reason.errno === -32)) {
+    console.error('[EPIPE CAUGHT] Broken pipe in promise - continuing...');
+    return; // Don't crash the bot
+  }
+
+  // All other unhandled rejections should crash
+  console.error('═══════════════════════════════════════');
+  console.error('UNHANDLED PROMISE REJECTION - BOT STOPPING');
+  console.error('═══════════════════════════════════════');
+  console.error('Rejection at:', promise);
+  console.error('Reason:', reason);
+  process.exit(1);
+});
+
+const { ethers } = require('ethers'); // ✅ FIX #1: Add missing ethers import
+const cron = require('node-cron');
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+let RateLimiterMemory;
+try {
+  RateLimiterMemory = require('rate-limiter-flexible').RateLimiterMemory;
+} catch (error) {
+  console.log('Rate limiter not available, using simple fallback');
+  RateLimiterMemory = null;
+}
+
+// Import existing modules
+const config = require('./config');
+const logger = require('./logger');
+const WalletManager = require('./walletManager');
+const RateLimiter = require('./security/rateLimiter');
+const PriceHistoryManager = require('./utils/priceHistoryManager');
+const MultiDexManager = require('./dex/multiDexManager');
+const PortfolioManager = require('./managers/PortfolioManager');
+
+// Import new $60K portfolio strategies
+const LeverageStrategy = require('./strategies/LeverageStrategy');
+const MarketMakingStrategy = require('./strategies/MarketMakingStrategy');
+const VenusYieldStrategy = require('./strategies/VenusYieldStrategy');
+const MarketMonitorAgent = require('./agents/MarketMonitorAgent');
+const MultiPairManager = require('./trading/multiPairManager');
+const AvantisIntegration = require('./leverage/avantisIntegration');
+const TechnicalAnalysis = require('./analysis/technicalAnalysis');
+const RangingStrategy = require('./rangingStrategy');
+
+// Import new AI modules
+const MarketResearchAgent = require('./agents/MarketResearchAgent');
+const TradingStrategyAgent = require('./agents/TradingStrategyAgent');
+const RAGSystem = require('./rag/RAGSystem');
+const { sequelize, Trade, MarketData, BotLog, Alert, AgentActivity, StrategyPerformance } = require('./database/models');
+
+// Import critical security and optimization modules
+const SecureKeyManager = require('./security/keyManager');
+const CircuitBreaker = require('./risk/circuitBreaker'); // ✅ EXPERT: Loss protection circuit breaker
+const ProductionRiskManager = require('./risk/productionRiskManager'); // ✅ FIX #4: Add risk manager
+const SmartRebalancer = require('./risk/smartRebalancer'); // ✅ EXPERT FIX: Smart portfolio rebalancer
+const TransactionVerifier = require('./security/transactionVerifier'); // ✅ SECURITY: Transaction verification
+const GasOptimizer = require('./optimization/gasOptimizer');
+const MetricsCollector = require('./monitoring/metricsCollector');
+const EventManager = require('./events/eventManager');
+const CacheManager = require('./optimization/cacheManager');
+const MEVProtection = require('./security/mevProtection');
+const SmartContractVerifier = require('./security/contractVerifier');
+
+// 👻 Import Shadow Mode for safe testing
+const ShadowMode = require('./testing/shadowMode');
+
+// 🐛 Import BugBot Integration for automated bug detection
+const BugBotIntegration = require('./monitoring/bugbot-integration');
+
+// 📱 Import Notification Systems
+const getTelegramAlerts = require('./monitoring/telegramAlerts');
+const getDiscordAlerts = require('./monitoring/discordWebhook');
+
+class AdvancedTradingBot {
+  constructor() {
+    this.walletManager = new WalletManager();
+    this.multiDexManager = null;
+    this.multiPairManager = null;
+    this.avantisIntegration = null;
+    this.technicalAnalysis = null;
+    this.strategy = null;
+    this.isRunning = false;
+
+    // AI Agents
+    this.marketResearchAgent = new MarketResearchAgent();
+    this.tradingStrategyAgent = null; // Will be initialized after PancakeSwap
+    this.ragSystem = new RAGSystem();
+
+    // $60K Portfolio Strategies
+    this.leverageStrategy = null; // Will be initialized after wallet setup
+    this.marketMaker = null; // Will be initialized after DEX setup
+    this.marketMonitor = null; // Will be initialized after price history setup
+
+    // Critical security and optimization components
+    this.keyManager = new SecureKeyManager();
+    this.circuitBreaker = new CircuitBreaker();
+    // ✅ FIX #4: Initialize risk manager with conservative limits
+    // Shadow mode: Relaxed limits for small portfolios
+    const isShadowMode = process.env.SHADOW_MODE_ENABLED === 'true';
+    // Let ProductionRiskManager use its own shadow mode detection and limits
+    this.riskManager = new ProductionRiskManager();
+
+    // Reset if in emergency shutdown on startup
+    if (this.riskManager.emergencyState.isShutdown) {
+      logger.warn('⚠️ Bot was in emergency shutdown, resetting for new session...');
+      this.riskManager.reset();
+    }
+
+    // 🔧 CRITICAL FIX: Set portfolio value IMMEDIATELY for shadow mode
+    if (this.shadowMode && this.shadowMode.isActive) {
+      logger.info('🔄 Setting initial portfolio value for shadow mode...');
+      const virtualBalances = this.shadowMode.getVirtualBalances();
+      this.riskManager.updatePortfolioValue(virtualBalances.usdt + (virtualBalances.bnb * 0.00078)); // Use approximate price
+      logger.info(`✅ Risk manager portfolio value set: $${this.riskManager.state.portfolioValue.toFixed(2)}`);
+    }
+    // ✅ SECURITY: Initialize transaction verifier and rate limiter
+    this.txVerifier = new TransactionVerifier();
+    this.rateLimiter = new RateLimiter({
+      maxTradesPerHour: parseInt(process.env.RATE_LIMIT_HOURLY) || 20,   // Higher for shadow mode
+      maxTradesPerDay: parseInt(process.env.RATE_LIMIT_DAILY) || 100     // Higher for shadow mode
+    });
+    this.gasOptimizer = null; // Will be initialized with provider
+    this.metricsCollector = new MetricsCollector();
+    this.eventManager = new EventManager();
+    this.priceHistoryManager = new PriceHistoryManager();
+    this.cacheManager = new CacheManager();
+    this.mevProtection = null; // Will be initialized with provider and wallet
+    this.contractVerifier = null; // Will be initialized with provider
+
+    // 🐛 BugBot Integration - Automated bug detection
+    this.bugBot = new BugBotIntegration();
+
+    // 👻 Shadow Mode - Safe testing without real trades
+    this.shadowMode = new ShadowMode(this, {
+      enabled: process.env.SHADOW_MODE_ENABLED === 'true',
+      recordToFile: process.env.SHADOW_MODE_RECORD === 'true',
+      recordPath: process.env.SHADOW_MODE_RECORD_PATH || './.shadow-trades.json',
+      maxRecords: parseInt(process.env.SHADOW_MODE_MAX_RECORDS) || 10000,
+      compareWithLive: process.env.SHADOW_MODE_COMPARE_WITH_LIVE === 'true'
+    });
+
+    // 🔧 FIX: Initialize centralized portfolio manager
+    this.portfolioManager = null; // Will be initialized after multiDexManager
+    logger.info('✅ Portfolio Manager will be initialized after DEX setup');
+
+    // ⚖️ Smart Rebalancer - Maintains 50/50 USDT/BNB split
+    this.rebalancer = new SmartRebalancer(this);
+
+    // 🔥 FIX #7: Register shadow mode globally so strategy can access virtual balances
+    global.shadowMode = this.shadowMode;
+    // 🚨 EXPERT: Register bot globally for circuit breaker access
+    global.bot = this;
+
+    // 📱 Notification Systems
+    this.telegram = getTelegramAlerts();
+    this.discord = getDiscordAlerts();
+    logger.info('✅ Notification systems initialized (Telegram & Discord)');
+
+    // API Server
+    this.app = null;
+    this.server = null;
+
+    // Note: Rate limiter already initialized above with RateLimiter class (line 75)
+    // Don't overwrite it here
+
+    this.stats = {
+      startTime: null,
+      totalTrades: 0,
+      successfulTrades: 0,
+      failedTrades: 0,
+      totalProfit: 0,
+      lastPrice: null,
+      agents: {
+        marketResearch: { executions: 0, success: 0, lastActivity: null },
+        tradingStrategy: { executions: 0, success: 0, lastActivity: null }
+      }
+    };
+
+    // Hybrid Portfolio Balancing Performance Tracking
+    this.hybridStats = {
+      scaledTrades: {
+        '1.00x': 0,
+        '0.75x': 0,
+        '0.50x': 0,
+        '0.25x': 0,
+        '0.00x': 0
+      },
+      totalOpportunityCost: 0,
+      totalVolumeTraded: 0,
+      totalTradesEvaluated: 0,
+      startTime: Date.now()
+    };
+  }
+
+  // Validate Hybrid Portfolio Balancing Configuration
+  // Ensures thresholds and multipliers are sensible before bot starts
+  validateHybridConfig() {
+    try {
+      const thresholds = config.hybrid.bnb;
+      const multipliers = config.hybrid.multipliers;
+
+      logger.info('🔍 [CONFIG VALIDATION] Validating Hybrid Portfolio Balancing configuration...');
+
+      // Validate BNB thresholds are in correct order
+      const errors = [];
+      const warnings = [];
+
+      if (thresholds.blockLow >= thresholds.scale75) {
+        errors.push(`BNB_BLOCK_LOW (${thresholds.blockLow}) must be < BNB_SCALE_75 (${thresholds.scale75})`);
+      }
+      if (thresholds.scale75 >= thresholds.scale50) {
+        errors.push(`BNB_SCALE_75 (${thresholds.scale75}) must be < BNB_SCALE_50 (${thresholds.scale50})`);
+      }
+      if (thresholds.scale50 >= thresholds.scale25) {
+        errors.push(`BNB_SCALE_50 (${thresholds.scale50}) must be < BNB_SCALE_25 (${thresholds.scale25})`);
+      }
+      if (thresholds.scale25 >= thresholds.blockHigh) {
+        errors.push(`BNB_SCALE_25 (${thresholds.scale25}) must be < BNB_BLOCK_HIGH (${thresholds.blockHigh})`);
+      }
+
+      // Validate percentage ranges (0-100)
+      Object.entries(thresholds).forEach(([key, value]) => {
+        if (value < 0 || value > 100) {
+          errors.push(`${key} (${value}) must be between 0 and 100`);
+        }
+      });
+
+      // Validate multipliers are between 0 and 1
+      Object.entries(multipliers).forEach(([key, value]) => {
+        if (value < 0 || value > 1) {
+          errors.push(`MULTIPLIER_${key.toUpperCase()} (${value}) must be between 0 and 1`);
+        }
+      });
+
+      // Validate multipliers are in correct order
+      if (multipliers.high >= multipliers.medium) {
+        errors.push(`MULTIPLIER_HIGH (${multipliers.high}) must be < MULTIPLIER_MED (${multipliers.medium})`);
+      }
+      if (multipliers.medium >= multipliers.low) {
+        errors.push(`MULTIPLIER_MED (${multipliers.medium}) must be < MULTIPLIER_LOW (${multipliers.low})`);
+      }
+
+      // Warn if thresholds are too narrow (< 5% between each)
+      const ranges = [
+        { name: 'blockLow-scale75', diff: thresholds.scale75 - thresholds.blockLow },
+        { name: 'scale75-scale50', diff: thresholds.scale50 - thresholds.scale75 },
+        { name: 'scale50-scale25', diff: thresholds.scale25 - thresholds.scale50 },
+        { name: 'scale25-blockHigh', diff: thresholds.blockHigh - thresholds.scale25 }
+      ];
+
+      ranges.forEach(range => {
+        if (range.diff < 3) {
+          warnings.push(`Range ${range.name} is very narrow (${range.diff}%). Consider >= 3% for smoother scaling.`);
+        }
+      });
+
+      // Log results
+      if (errors.length > 0) {
+        logger.error('❌ [CONFIG VALIDATION] Hybrid config validation FAILED:');
+        errors.forEach(err => logger.error(`   - ${err}`));
+        throw new Error(`Invalid hybrid portfolio balancing configuration. Please check your environment variables.`);
+      }
+
+      if (warnings.length > 0) {
+        logger.warn('⚠️ [CONFIG VALIDATION] Hybrid config warnings:');
+        warnings.forEach(warn => logger.warn(`   - ${warn}`));
+      }
+
+      logger.info('✅ [CONFIG VALIDATION] Hybrid Portfolio Balancing configuration valid');
+      logger.info(`   📊 BNB Thresholds: ${thresholds.blockLow}% ← ${thresholds.scale75}% ← ${thresholds.scale50}% ← ${thresholds.scale25}% ← ${thresholds.blockHigh}%`);
+      logger.info(`   📊 Multipliers: ${multipliers.high}x (high) / ${multipliers.medium}x (med) / ${multipliers.low}x (low)`);
+
+    } catch (error) {
+      logger.error('❌ [CONFIG VALIDATION] Error validating hybrid config:', error.message);
+      throw error;
+    }
+  }
+
+  async initialize() {
+    try {
+      logger.info('🚀 Initializing Advanced BSC Trading Bot...');
+
+      // Validate Hybrid Portfolio Balancing Configuration
+      this.validateHybridConfig();
+
+      // Initialize database
+      await sequelize.authenticate();
+      logger.info('✅ Database connected');
+
+      // Initialize database tables
+      try {
+        // Try alter mode first (safest - preserves data)
+        await sequelize.sync({ force: false, alter: true });
+        logger.info('✅ Database tables initialized (alter mode)');
+
+        // Verify tables exist
+        const tables = await sequelize.getQueryInterface().showAllTables();
+        logger.info(`📊 Database tables: ${tables.join(', ')}`);
+      } catch (alterError) {
+        logger.warn('⚠️ Database alter sync failed:', alterError.message);
+
+        try {
+          // Fallback: Try without alter mode
+          logger.info('🔄 Attempting sync without alter mode...');
+          await sequelize.sync({ force: false, alter: false });
+          logger.info('✅ Database tables initialized (no-alter mode)');
+        } catch (noAlterError) {
+          logger.warn('⚠️ No-alter sync failed:', noAlterError.message);
+
+          try {
+            // Last resort: Force sync (recreates tables)
+            logger.warn('🔄 Attempting force sync (will recreate tables)...');
+            await sequelize.sync({ force: true });
+            logger.info('✅ Database tables initialized (force mode - fresh start)');
+          } catch (forceError) {
+            // If shadow mode, database is optional
+            if (config.shadowMode?.enabled) {
+              logger.warn('⚠️ Database initialization failed, but continuing in SHADOW MODE without persistence');
+              logger.warn('   Trades will be tracked in memory only (not saved to database)');
+            } else {
+              logger.error('❌ All database sync attempts failed:', forceError.message);
+              throw new Error('Database initialization failed - please delete database/trading.db and restart');
+            }
+          }
+        }
+      }
+
+      // Initialize RAG system (optional)
+      try {
+        await this.ragSystem.initialize();
+        logger.info('✅ RAG system initialized');
+      } catch (ragError) {
+        logger.warn('⚠️ RAG system initialization failed (continuing without it):', ragError.message);
+      }
+
+      // Initialize price history manager
+      await this.priceHistoryManager.initialize();
+      logger.info('✅ Price history manager initialized');
+
+      // ✅ FIX: Connect wallet FIRST before using getProvider()
+      // Wallet connection is handled by start-with-password.js via walletManager.connect()
+      // Just verify it's connected
+      if (!this.walletManager.isConnected) {
+        // In shadow mode, we need provider and wallet for contract calls, but no real trading
+        if (this.shadowMode.options.enabled) {
+          logger.info('👻 Shadow mode - initializing provider and wallet for contract calls (no real trading)');
+          // Initialize multi-RPC provider
+          const multiRPCProvider = new (require('./providers/multiRPCProvider'))();
+          // Get the actual ethers provider (will auto-initialize)
+          const ethersProvider = await multiRPCProvider.getProvider();
+
+          this.walletManager.provider = multiRPCProvider;
+          // Add getProvider method for shadow mode
+          this.walletManager.getProvider = () => ethersProvider;
+          // Create a mock wallet for contract calls (read-only)
+          const { Wallet } = require('ethers');
+          this.walletManager.wallet = Wallet.createRandom().connect(ethersProvider);
+          this.walletManager.getWallet = () => this.walletManager.wallet;
+          this.walletManager.isConnected = true;
+        } else {
+          logger.info('🔗 Connecting wallet...');
+          await this.walletManager.connect(); // Will use encrypted wallet
+        }
+      }
+
+      if (!this.shadowMode.options.enabled) {
+        logger.info('✅ Wallet connected');
+      }
+
+      // 👻 Initialize Shadow Mode if enabled
+      if (this.shadowMode.options.enabled) {
+        await this.shadowMode.start();
+        logger.warn('⚠️  SHADOW MODE ACTIVE - NO REAL TRADES WILL BE EXECUTED');
+        logger.warn('⚠️  All trades will be simulated and recorded for analysis');
+      } else {
+        logger.info('💰 LIVE TRADING MODE - Real trades will be executed');
+      }
+
+      // Initialize security components with provider (AFTER wallet connection)
+      if (this.shadowMode.options.enabled) {
+        logger.info('👻 Shadow mode - initializing mock security components');
+        // Mock providers for shadow mode
+        this.gasOptimizer = { estimateGas: () => Promise.resolve({ gasPrice: '5000000000' }) };
+        this.mevProtection = { checkMEV: () => Promise.resolve({ safe: true }) };
+        this.contractVerifier = { verifyContract: () => Promise.resolve({ verified: true }) };
+      } else {
+        this.gasOptimizer = new GasOptimizer(this.walletManager.getProvider());
+        this.mevProtection = new MEVProtection(this.walletManager.getProvider(), this.walletManager.getWallet());
+        this.contractVerifier = new SmartContractVerifier(this.walletManager.getProvider());
+      }
+
+      // Initialize Multi-DEX Manager
+      // ✅ SECURITY FIX #3: Pass transaction verifier to MultiDexManager
+      if (this.shadowMode.options.enabled) {
+        logger.info('👻 Shadow mode - initializing MultiDexManager with real price data but mock trading');
+        // In shadow mode, use real MultiDexManager for price data but mock trading functions
+        // Need a wallet for contract calls, but we'll mock the trading functions
+        this.multiDexManager = new MultiDexManager(
+          this.walletManager.getProvider(),
+          this.walletManager.getWallet(), // Use wallet for contract calls
+          this.txVerifier
+        );
+
+        // Override trading functions to be mock while keeping price data real
+        const originalPancakeSwap = this.multiDexManager.dexs.pancakeSwap;
+
+        // Debug: Log available methods
+        logger.info(`Original PancakeSwap methods: ${Object.getOwnPropertyNames(originalPancakeSwap)}`);
+        logger.info(`Has getCurrentPrice: ${typeof originalPancakeSwap.getCurrentPrice}`);
+
+        // Preserve all original methods and add mock trading methods
+        Object.setPrototypeOf(originalPancakeSwap, originalPancakeSwap.__proto__);
+        originalPancakeSwap.getUSDTBalance = () => Promise.resolve(60000.0);
+        originalPancakeSwap.getBNBBalance = () => Promise.resolve(73.2);
+        originalPancakeSwap.buy = () => Promise.resolve({ success: true, reason: 'shadow_mode' });
+        originalPancakeSwap.sell = () => Promise.resolve({ success: true, reason: 'shadow_mode' });
+        originalPancakeSwap.getGasPrice = () => Promise.resolve('5000000000');
+        originalPancakeSwap.estimateGas = () => Promise.resolve(21000);
+
+        // Keep the original object with added mock methods
+        this.multiDexManager.dexs.pancakeSwap = originalPancakeSwap;
+      } else {
+        this.multiDexManager = new MultiDexManager(
+          this.walletManager.getProvider(),
+          this.walletManager.getWallet(),
+          this.txVerifier  // Pass transaction verifier for pre-send validation
+        );
+      }
+
+      // Initialize Multi-Pair Manager
+      this.multiPairManager = new MultiPairManager();
+
+      // Initialize Leverage Integration
+      if (this.shadowMode.options.enabled) {
+        logger.info('👻 Shadow mode - initializing mock AvantisIntegration');
+        this.avantisIntegration = {
+          getPositions: () => Promise.resolve([]),
+          openPosition: () => Promise.resolve({ success: false, reason: 'shadow_mode' })
+        };
+      } else {
+        this.avantisIntegration = new AvantisIntegration(
+          this.walletManager.getProvider(),
+          this.walletManager.getWallet()
+        );
+      }
+
+      // Initialize Technical Analysis
+      this.technicalAnalysis = new TechnicalAnalysis();
+
+      // Initialize trading strategy agent (using first DEX for compatibility)
+      this.tradingStrategyAgent = new TradingStrategyAgent(this.multiDexManager.dexs.pancakeSwap, this.priceHistoryManager);
+
+      // 🔥 FIX #2: Register trading strategy agent globally for cooldown updates
+      global.tradingStrategyAgent = this.tradingStrategyAgent;
+
+      // Initialize $60K Portfolio Strategies
+      this.leverageStrategy = new LeverageStrategy(
+        this.walletManager.getProvider(),
+        this.walletManager.getWallet()
+      );
+      this.marketMaker = new MarketMakingStrategy(
+        this.multiDexManager.dexs.pancakeSwap,
+        config.trading?.marketMaking?.allocation || 8000
+      );
+      this.venusStrategy = new VenusYieldStrategy(
+        this.walletManager.getProvider(),
+        this.walletManager.getWallet(),
+        config.trading?.yield || { enabled: false }
+      );
+      this.marketMonitor = new MarketMonitorAgent(this.priceHistoryManager);
+
+      // Initialize strategy (using first DEX for compatibility)
+      this.strategy = new RangingStrategy(this.multiDexManager.dexs.pancakeSwap);
+      await this.strategy.initialize();
+
+      // Initialize Venus yield strategy
+      if (config.trading?.yield?.enabled) {
+        await this.venusStrategy.initialize();
+        logger.info(`✅ Venus yield strategy initialized with $${config.trading.yield.allocation}`);
+      }
+
+      // 🔧 FIX: Initialize portfolio manager with dependencies
+      if (!this.portfolioManager) {
+        this.portfolioManager = new PortfolioManager(this.shadowMode, this.multiDexManager);
+        logger.info('✅ Portfolio Manager initialized');
+      }
+
+      // Initial portfolio value refresh
+      await this.portfolioManager.refresh();
+      logger.info(`💼 Initial portfolio value: $${this.portfolioManager.cachedValue.toFixed(2)}`);
+
+      // Subscribe risk manager to portfolio updates
+      this.portfolioManager.subscribe((newValue) => {
+        this.riskManager.updatePortfolioValue(newValue);
+        logger.debug(`💼 Risk manager notified of portfolio change: $${newValue.toFixed(2)}`);
+      });
+
+      // 🔧 URGENT FIX: Clear any old positions with NaN bugs
+      if (this.tradingStrategyAgent && this.tradingStrategyAgent.activePositions) {
+        const oldPositionsCount = this.tradingStrategyAgent.activePositions.size;
+        this.tradingStrategyAgent.activePositions.clear();
+        logger.info(`🧹 Cleared ${oldPositionsCount} old positions on startup (removing NaN bugs)`);
+      }
+
+      // Check initial balances
+      let usdtBalance, bnbBalance;
+      if (this.shadowMode.options.enabled) {
+        logger.info('👻 Shadow mode - using mock balances');
+        // Get balances from shadow mode's virtual portfolio
+        const shadowBalances = this.shadowMode.getVirtualBalances();
+        usdtBalance = shadowBalances.usdt;
+        bnbBalance = shadowBalances.bnb;
+
+        logger.info(`Initial Balances (SHADOW MODE):`);
+        logger.info(`USDT: ${usdtBalance.toFixed(2)}`);
+        logger.info(`BNB: ${bnbBalance.toFixed(6)}`);
+      } else {
+        usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+        bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+
+        logger.info(`Initial Balances:`);
+        logger.info(`USDT: ${usdtBalance.toFixed(2)}`);
+        logger.info(`BNB: ${bnbBalance.toFixed(6)}`);
+      }
+
+      // Get current BNB price for portfolio calculation
+      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+
+      // Store initial market data
+      await this.storeMarketData({
+        symbol: 'USDT/BNB',
+        price: currentPrice,
+        volume: 0,
+        timestamp: new Date()
+      });
+
+      // Check if we have enough balance to start
+      if (usdtBalance < config.trading.minTradeAmount && bnbBalance < 0.001) {
+        throw new Error('Insufficient balance to start trading');
+      }
+
+      // ✅ FIX: Calculate and update portfolio value for risk manager
+      // Get balances from shadow mode if active
+      let actualUsdtBalance, actualBnbBalance;
+      if (this.shadowMode && this.shadowMode.isActive) {
+        const virtualBalances = this.shadowMode.getVirtualBalances();
+        actualUsdtBalance = virtualBalances.usdt;
+        actualBnbBalance = virtualBalances.bnb;
+        logger.info('💼 Using shadow mode balances for initial portfolio value');
+      } else {
+        actualUsdtBalance = usdtBalance;
+        actualBnbBalance = bnbBalance;
+      }
+
+      // Price is BNB per USDT, so 1 BNB = 1/price USDT
+      const bnbValueInUsd = actualBnbBalance / currentPrice;
+      const totalPortfolioValue = actualUsdtBalance + bnbValueInUsd;
+      this.riskManager.updatePortfolioValue(totalPortfolioValue);
+      logger.info(`💼 Portfolio value updated: $${totalPortfolioValue.toFixed(2)} (USDT: $${actualUsdtBalance.toFixed(2)} + BNB: $${bnbValueInUsd.toFixed(2)})`);
+
+      this.stats.startTime = new Date();
+
+      // Initialize API server
+      await this.initializeAPI();
+
+      // 🔧 FIX: Full reset APRÈS l'initialisation
+      if (this.shadowMode && this.shadowMode.isActive) {
+        logger.info('🔄 Performing full shadow mode reset...');
+
+        // Full reset of shadow mode
+        this.shadowMode.fullReset();
+        logger.info('✅ Shadow mode reset completed');
+
+        // Clear activePositions
+        if (this.tradingStrategyAgent && this.tradingStrategyAgent.activePositions) {
+          this.tradingStrategyAgent.activePositions.clear();
+          logger.info('🧹 Active positions cleared');
+        }
+
+        // Update risk manager avec balances corrects
+        const virtualBalances = this.shadowMode.getVirtualBalances();
+        const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+        const totalValue = virtualBalances.usdt + (virtualBalances.bnb / currentPrice); // FIX: DIVIDE by price (price = BNB per USDT)
+        this.riskManager.updatePortfolioValue(totalValue);
+
+        logger.info(`✅ Risk manager portfolio value: $${totalValue.toFixed(2)}`);
+        logger.info('🔄 Shadow mode reset complete - fresh start ready');
+
+        // Start risk manager monitoring AFTER reset is complete
+        this.riskManager.startMonitoring();
+        logger.info('✅ Risk manager monitoring started');
+      }
+
+      logger.info('✅ Advanced Trading Bot initialized successfully!');
+      return true;
+    } catch (error) {
+      logger.error('❌ Error initializing bot:', error);
+      await this.logError('initialization', error);
+      throw error;
+    }
+  }
+
+  async initializeAPI() {
+    this.app = express();
+
+    // Middleware
+    this.app.use(helmet());
+    this.app.use(cors());
+    this.app.use(express.json());
+
+    // Rate limiting
+    if (this.rateLimiter) {
+      this.app.use(async (req, res, next) => {
+        try {
+          await this.rateLimiter.consume(req.ip);
+          next();
+        } catch (rejRes) {
+          res.status(429).json({ error: 'Too many requests' });
+        }
+      });
+    }
+
+    // API Routes
+    this.setupAPIRoutes();
+
+    // Start server
+    const PORT = process.env.API_PORT || 3001;
+    this.server = this.app.listen(PORT, () => {
+      logger.info(`🌐 API server running on port ${PORT}`);
+    });
+  }
+
+  setupAPIRoutes() {
+    // Health check
+    this.app.get('/api/health', async (req, res) => {
+      try {
+        const health = {
+          status: 'healthy',
+          timestamp: new Date(),
+          uptime: this.getUptime(),
+          bot: {
+            running: this.isRunning,
+            startTime: this.stats.startTime
+          },
+          shadowMode: {
+            enabled: this.shadowMode.options.enabled,
+            active: this.shadowMode.isActive,
+            stats: this.shadowMode.getStats()
+          },
+          agents: {
+            marketResearch: await this.marketResearchAgent.healthCheck(),
+            tradingStrategy: await this.tradingStrategyAgent.healthCheck()
+          },
+          rag: await this.ragSystem.healthCheck()
+        };
+        res.json(health);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Bot status
+    this.app.get('/api/status', async (req, res) => {
+      try {
+        const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+        const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+        const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+
+        const totalValue = usdtBalance + (bnbBalance * currentPrice);
+        const profit = totalValue - config.trading.initialBudget;
+
+        const status = {
+          status: 'healthy',
+          running: this.isRunning,
+          balances: {
+            usdt: usdtBalance,
+            bnb: bnbBalance,
+            totalValue: totalValue
+          },
+          performance: {
+            profit: profit,
+            profitPercent: (profit / config.trading.initialBudget) * 100,
+            totalTrades: this.stats.totalTrades,
+            successRate: this.stats.totalTrades > 0 ? (this.stats.successfulTrades / this.stats.totalTrades) * 100 : 0
+          },
+          currentPrice: currentPrice,
+          strategy: this.strategy.getStatus(),
+          uptime: this.getUptime()
+        };
+
+        res.json(status);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // RAG query endpoint
+    this.app.post('/api/rag/query', async (req, res) => {
+      try {
+        const { query, contextTypes } = req.body;
+
+        if (!query) {
+          return res.status(400).json({ error: 'Query is required' });
+        }
+
+        const result = await this.ragSystem.query(query, contextTypes);
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Market analysis
+    this.app.get('/api/market/analysis', async (req, res) => {
+      try {
+        const analysis = await this.marketResearchAgent.execute({
+          action: 'research',
+          query: 'BSC BNB USDT market analysis',
+          timeframe: '24h'
+        });
+
+        res.json(analysis);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // BugBot status - Critical bugs and anomalies
+    this.app.get('/api/bugbot/status', async (req, res) => {
+      try {
+        const criticalBugs = this.bugBot.getCriticalBugs();
+
+        res.json({
+          status: criticalBugs.length === 0 ? 'healthy' : 'issues_detected',
+          criticalBugsCount: criticalBugs.length,
+          criticalBugs: criticalBugs.slice(-10), // Last 10 critical bugs
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Trading logs
+    this.app.get('/api/trades', async (req, res) => {
+      try {
+        const { limit = 50, offset = 0 } = req.query;
+
+        const trades = await Trade.findAndCountAll({
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          order: [['created_at', 'DESC']]
+        });
+
+        res.json(trades);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Bot logs
+    this.app.get('/api/logs', async (req, res) => {
+      try {
+        const { level, limit = 100 } = req.query;
+
+        const where = {};
+        if (level) where.level = level;
+
+        const logs = await BotLog.findAll({
+          where,
+          limit: parseInt(limit),
+          order: [['created_at', 'DESC']]
+        });
+
+        res.json(logs);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Agent activity
+    this.app.get('/api/agents/activity', async (req, res) => {
+      try {
+        const { agent_name, limit = 50 } = req.query;
+
+        const where = {};
+        if (agent_name) where.agent_name = agent_name;
+
+        const activity = await AgentActivity.findAll({
+          where,
+          limit: parseInt(limit),
+          order: [['created_at', 'DESC']]
+        });
+
+        res.json(activity);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Control endpoints
+    this.app.post('/api/control/start', async (req, res) => {
+      try {
+        if (this.isRunning) {
+          return res.json({ message: 'Bot is already running' });
+        }
+
+        await this.start();
+        res.json({ message: 'Bot started successfully' });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/control/stop', async (req, res) => {
+      try {
+        if (!this.isRunning) {
+          return res.json({ message: 'Bot is not running' });
+        }
+
+        await this.stop();
+        res.json({ message: 'Bot stopped successfully' });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/control/emergency-stop', async (req, res) => {
+      try {
+        await this.emergencyStop();
+        res.json({ message: 'Emergency stop executed' });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // TradingView webhook endpoint
+    this.app.post('/api/webhook/tradingview', async (req, res) => {
+      try {
+        const { symbol, action, price, strategy, secret } = req.body;
+
+        // Verify webhook secret (optional but recommended)
+        const expectedSecret = process.env.TRADINGVIEW_WEBHOOK_SECRET;
+        if (expectedSecret && secret !== expectedSecret) {
+          logger.warn('⚠️ TradingView webhook: Invalid secret');
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        logger.info(`📊 TradingView signal received: ${action} ${symbol} @ ${price}`);
+        logger.info(`Strategy: ${strategy || 'N/A'}`);
+
+        // Validate signal
+        if (!action || !symbol || !price) {
+          return res.status(400).json({ error: 'Missing required fields: action, symbol, price' });
+        }
+
+        // Process signal based on action
+        if (action.toLowerCase() === 'buy' || action.toLowerCase() === 'long') {
+          // Check if we should enter a long position
+          if (this.isRunning) {
+            logger.info('🎯 TradingView: Evaluating LONG signal...');
+            // Use the existing strategy to validate and enter position
+            await this.runAdvancedStrategy();
+          } else {
+            logger.warn('⚠️ Bot is not running, ignoring TradingView signal');
+          }
+        } else if (action.toLowerCase() === 'sell' || action.toLowerCase() === 'short') {
+          // Check if we should enter a short position
+          if (this.isRunning) {
+            logger.info('🎯 TradingView: Evaluating SHORT signal...');
+            // Use the existing strategy to validate and enter position
+            await this.runAdvancedStrategy();
+          } else {
+            logger.warn('⚠️ Bot is not running, ignoring TradingView signal');
+          }
+        } else if (action.toLowerCase() === 'close' || action.toLowerCase() === 'exit') {
+          // Close existing positions
+          logger.info('🎯 TradingView: Closing positions...');
+          // The position monitoring agent will handle exits
+        }
+
+        // Send success response
+        res.json({
+          received: true,
+          action,
+          symbol,
+          price,
+          timestamp: new Date().toISOString()
+        });
+
+        // Notify via Telegram/Discord
+        if (this.telegram && this.telegram.enabled) {
+          await this.telegram.sendAlert(
+            `📊 TradingView Signal\n\nAction: ${action.toUpperCase()}\nSymbol: ${symbol}\nPrice: $${price}\nStrategy: ${strategy || 'N/A'}`,
+            { title: 'TradingView Alert' }
+          );
+        }
+
+      } catch (error) {
+        logger.error('❌ TradingView webhook error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+  }
+
+  async start() {
+    try {
+      if (this.isRunning) {
+        logger.warn('Bot is already running');
+        return;
+      }
+
+      await this.initialize();
+      this.isRunning = true;
+
+      logger.info('🚀 Starting Advanced BSC Trading Bot...');
+      logger.info(`Trading Pair: ${config.trading.pair}`);
+      logger.info(`Initial Budget: ${config.trading.initialBudget} USDT`);
+
+      // Enhanced strategy execution with AI agents
+      cron.schedule('*/30 * * * * *', async () => {
+        if (this.isRunning) {
+          await this.runAdvancedStrategy();
+        }
+      });
+
+      // Market research every 5 minutes
+      cron.schedule('*/5 * * * *', async () => {
+        if (this.isRunning) {
+          await this.performMarketResearch();
+        }
+      });
+
+      // Log status every 10 minutes
+      cron.schedule('*/10 * * * *', async () => {
+        if (this.isRunning) {
+          await this.logStatus();
+        }
+      });
+
+      // Data cleanup every hour
+      cron.schedule('0 * * * *', async () => {
+        if (this.isRunning) {
+          await this.performDataCleanup();
+        }
+      });
+
+      // $60K Portfolio - Market regime detection (hourly)
+      cron.schedule('0 * * * *', async () => {
+        if (this.isRunning && this.marketMonitor) {
+          await this.marketMonitor.detectMarketRegime();
+        }
+      });
+
+      // $60K Portfolio - Leverage position monitoring (every minute)
+      cron.schedule('* * * * *', async () => {
+        if (this.isRunning && this.leverageStrategy && this.leverageStrategy.positions.size > 0) {
+          try {
+            const price = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+            await this.leverageStrategy.monitorPositions(price);
+          } catch (error) {
+            logger.error('Error monitoring leverage positions:', error);
+          }
+        }
+      });
+
+      // $60K Portfolio - Market making (every 5 minutes)
+      cron.schedule('*/5 * * * *', async () => {
+        if (this.isRunning && this.marketMaker && config.trading?.marketMaking?.enabled) {
+          try {
+            await this.marketMaker.execute();
+          } catch (error) {
+            logger.error('Error in market making:', error);
+          }
+        }
+      });
+
+      // $60K Portfolio - Yield position check (hourly)
+      cron.schedule('0 * * * *', async () => {
+        if (this.isRunning && this.venusStrategy && config.trading?.yield?.enabled) {
+          try {
+            const performance = await this.venusStrategy.checkYieldPerformance();
+            if (performance) {
+              logger.info(`💰 Venus Performance: $${performance.currentBalance.toFixed(2)} balance, $${performance.yieldEarned.toFixed(2)} earned, ${performance.annualizedAPY.toFixed(2)}% APY`);
+            }
+          } catch (error) {
+            logger.error('Error checking yield performance:', error);
+          }
+        }
+      });
+
+      // $60K Portfolio - Market regime detection (hourly)
+      cron.schedule('0 * * * *', async () => {
+        if (this.isRunning && this.marketMonitor) {
+          try {
+            const regimeData = await this.marketMonitor.detectMarketRegime();
+            if (regimeData) {
+              logger.warn(`📊 REGIME: ${regimeData.regime} | Strategies: ${regimeData.strategies.join(', ')} | Volatility: ${(regimeData.volatility * 100).toFixed(2)}%`);
+            }
+          } catch (error) {
+            logger.error('Error in market regime detection:', error);
+          }
+        }
+      });
+
+      // 🚨 CRITICAL FIX: Position monitoring (every 30 seconds)
+      cron.schedule('*/30 * * * * *', async () => {
+        if (this.isRunning && this.tradingStrategyAgent) {
+          try {
+            logger.info('🔄 Running position monitoring cron job...');
+            await this.tradingStrategyAgent.monitorPositions();
+          } catch (error) {
+            logger.error('Error monitoring positions:', error);
+          }
+        }
+      });
+
+      // 🚨 CRITICAL FIX: Emergency kill switch (every 10 seconds)
+      cron.schedule('*/10 * * * * *', async () => {
+        if (this.isRunning) {
+          try {
+            await this.checkEmergencyStop();
+          } catch (error) {
+            logger.error('Error checking emergency stop:', error);
+          }
+        }
+      });
+
+      // Schedule every 5 minutes: BugBot metrics monitoring
+      cron.schedule('*/5 * * * *', async () => {
+        if (this.isRunning) {
+          try {
+            // Get current trading metrics
+            const trades = await Trade.findAll({
+              attributes: [
+                [sequelize.fn('COUNT', sequelize.col('id')), 'totalTrades'],
+                [sequelize.fn('SUM', sequelize.literal("CASE WHEN status = 'closed' THEN 1 ELSE 0 END")), 'exits'],
+                [sequelize.fn('SUM', sequelize.literal("CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END")), 'wins'],
+                [sequelize.fn('SUM', sequelize.literal("CASE WHEN profit_loss < 0 THEN 1 ELSE 0 END")), 'losses'],
+                [sequelize.fn('SUM', sequelize.col('profit_loss')), 'totalPnL']
+              ],
+              raw: true
+            });
+
+            const metrics = {
+              totalTrades: parseInt(trades[0].totalTrades) || 0,
+              exits: parseInt(trades[0].exits) || 0,
+              wins: parseInt(trades[0].wins) || 0,
+              losses: parseInt(trades[0].losses) || 0,
+              totalPnL: parseFloat(trades[0].totalPnL) || 0
+            };
+
+            // Monitor for anomalies
+            await this.bugBot.monitorTradingMetrics(metrics);
+          } catch (error) {
+            logger.error('Error in BugBot metrics monitoring:', error);
+          }
+        }
+      });
+
+      // ⚖️ Smart Portfolio Rebalancing (every 6 hours)
+      cron.schedule('0 */6 * * *', async () => {
+        if (this.isRunning) {
+          try {
+            logger.info('🔄 Running scheduled portfolio rebalance check...');
+            if (await this.rebalancer.shouldRebalance()) {
+              await this.rebalancer.rebalance();
+            } else {
+              logger.debug('✅ Portfolio balanced, no action needed');
+            }
+          } catch (error) {
+            logger.error(`Portfolio rebalance error: ${error.message}`);
+          }
+        }
+      });
+      logger.info('✅ Smart portfolio rebalancing scheduled (every 6 hours)');
+
+      // Initial strategy run
+      await this.runAdvancedStrategy();
+
+      logger.info('✅ Advanced Trading Bot started successfully!');
+    } catch (error) {
+      logger.error('❌ Error starting bot:', error);
+      this.isRunning = false;
+      await this.logError('startup', error);
+      throw error;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // HYBRID PORTFOLIO BALANCING: Dynamic Position Sizing
+  // Expert-recommended approach combining hard blocking with gradual scaling
+  // Fully configurable via environment variables for professional tuning
+  // ═══════════════════════════════════════════════════════════════
+  calculateDynamicPositionMultiplier(bnbPercent, action) {
+    // Validate inputs
+    if (typeof bnbPercent !== 'number' || isNaN(bnbPercent)) {
+      logger.error(`❌ Invalid bnbPercent: ${bnbPercent}, defaulting to 0 multiplier`);
+      return 0;
+    }
+
+    if (!action || typeof action !== 'string') {
+      logger.error(`❌ Invalid action: ${action}, defaulting to 0 multiplier`);
+      return 0;
+    }
+
+    const normalizedAction = action.toLowerCase().trim();
+
+    // Load thresholds and multipliers from config (configurable via env vars)
+    const thresholds = config.hybrid.bnb;
+    const multipliers = config.hybrid.multipliers;
+
+    if (normalizedAction === 'buy') {
+      // BUY Logic: Block when BNB too high, scale down as it increases
+      if (bnbPercent >= thresholds.blockHigh) return 0;                    // 🚫 HARD BLOCK - Portfolio too BNB-heavy
+      if (bnbPercent >= thresholds.scale25) return multipliers.high;       // ⚠️ 25% size - Very cautious
+      if (bnbPercent >= thresholds.scale50) return multipliers.medium;     // ⚠️ 50% size - Moderate caution
+      if (bnbPercent >= thresholds.scale75) return multipliers.low;        // ✅ 75% size - Slight caution
+      if (bnbPercent >= thresholds.blockLow) return 1.0;                   // ✅ Full size - Safe zone
+      return 1.0;                                                          // ✅ Full size - Below target, encourage buying
+    }
+
+    if (normalizedAction === 'sell') {
+      // SELL Logic: Block when BNB too low, scale down as it decreases
+      if (bnbPercent <= thresholds.blockLow) return 0;                     // 🚫 HARD BLOCK - Portfolio too USDT-heavy
+      if (bnbPercent <= thresholds.scale75) return multipliers.high;       // ⚠️ 25% size - Very cautious
+      if (bnbPercent <= thresholds.scale50) return multipliers.medium;     // ⚠️ 50% size - Moderate caution
+      if (bnbPercent <= thresholds.scale25) return multipliers.low;        // ✅ 75% size - Slight caution
+      if (bnbPercent <= thresholds.blockHigh) return 1.0;                  // ✅ Full size - Safe zone
+      return 1.0;                                                          // ✅ Full size - Above target, encourage selling
+    }
+
+    // HOLD or invalid action
+    if (normalizedAction === 'hold') {
+      return 0; // No position sizing needed for hold
+    }
+
+    logger.warn(`⚠️ Unknown action "${action}", defaulting to 0 multiplier`);
+    return 0;
+  }
+
+  async getBalance() {
+    // Use global shadow mode to ensure consistency with trading strategy
+    if (global.shadowMode && global.shadowMode.getVirtualBalances) {
+      const virtualBalances = global.shadowMode.getVirtualBalances();
+      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+      return {
+        usdt: virtualBalances.usdt,
+        bnb: virtualBalances.bnb,
+        currentPrice: currentPrice
+      };
+    } else if (this.shadowMode && this.shadowMode.isActive) {
+      const virtualBalances = this.shadowMode.getVirtualBalances();
+      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+      return {
+        usdt: virtualBalances.usdt,
+        bnb: virtualBalances.bnb,
+        currentPrice: currentPrice
+      };
+    } else {
+      const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+      const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+      return {
+        usdt: usdtBalance,
+        bnb: bnbBalance,
+        currentPrice: currentPrice
+      };
+    }
+  }
+
+  async rebalancePortfolio() {
+    try {
+      const balance = await this.getBalance();
+
+      // 🔧 FIX: Changed from 50/50 to 60/40 split (60% USDT, 40% BNB)
+      // Target: 60% USDT, 40% BNB for balanced risk/liquidity
+      const totalValueUSD = balance.usdt + (balance.bnb * balance.currentPrice);
+      const targetUSDT = totalValueUSD * 0.60;  // 60% in USDT
+      const targetBNB = (totalValueUSD * 0.40) / balance.currentPrice;  // 40% in BNB
+
+      // Safety check: if price is too low, use reasonable BNB amount
+      const maxReasonableBNB = 1000; // Max 1000 BNB for testing
+      const finalTargetBNB = Math.min(targetBNB, maxReasonableBNB);
+
+      const usdtDiff = targetUSDT - balance.usdt;
+      const bnbDiff = finalTargetBNB - balance.bnb;
+
+      // Calculate actual percentages for logging
+      const currentUSDTPercent = (balance.usdt / totalValueUSD) * 100;
+      const currentBNBPercent = (balance.bnb * balance.currentPrice / totalValueUSD) * 100;
+
+      logger.info(`💰 Portfolio Rebalance Check:`);
+      logger.info(`   Current: ${balance.usdt.toFixed(2)} USDT (${currentUSDTPercent.toFixed(1)}%), ${balance.bnb.toFixed(2)} BNB (${currentBNBPercent.toFixed(1)}%)`);
+      logger.info(`   Target: ${targetUSDT.toFixed(2)} USDT (60%), ${finalTargetBNB.toFixed(2)} BNB (40%)`);
+      logger.info(`   Diff: ${usdtDiff.toFixed(2)} USDT, ${bnbDiff.toFixed(2)} BNB`);
+
+      // 🔧 FIX: Reduced threshold from 20% to 10% for tighter control
+      const imbalancePercent = Math.abs(usdtDiff / targetUSDT);
+
+      if (imbalancePercent > 0.10) {  // Changed from 0.20 to 0.10
+        logger.warn(`⚠️ Portfolio imbalance detected: ${(imbalancePercent * 100).toFixed(1)}%`);
+
+        if (usdtDiff > 0) {
+          // Need more USDT - sell some BNB
+          const bnbToSell = Math.abs(usdtDiff) / balance.currentPrice;
+          logger.info(`📉 Rebalancing: Selling ${bnbToSell.toFixed(4)} BNB for USDT`);
+
+          if (global.shadowMode && global.shadowMode.virtualPortfolio) {
+            // Update virtual balances directly
+            global.shadowMode.virtualPortfolio.bnb -= bnbToSell;
+            global.shadowMode.virtualPortfolio.usdt += Math.abs(usdtDiff);
+            logger.info(`✅ Virtual portfolio rebalanced: ${global.shadowMode.virtualPortfolio.usdt.toFixed(2)} USDT, ${global.shadowMode.virtualPortfolio.bnb.toFixed(4)} BNB`);
+          } else {
+            await this.multiDexManager.dexs.pancakeSwap.executeTrade('sell', bnbToSell);
+          }
+        } else {
+          // Need more BNB - buy with USDT
+          const usdtToSpend = Math.abs(usdtDiff);
+          logger.info(`📈 Rebalancing: Buying BNB with ${usdtToSpend.toFixed(2)} USDT`);
+
+          if (global.shadowMode && global.shadowMode.virtualPortfolio) {
+            // Update virtual balances directly
+            const bnbToBuy = usdtToSpend / balance.currentPrice;
+            global.shadowMode.virtualPortfolio.usdt -= usdtToSpend;
+            global.shadowMode.virtualPortfolio.bnb += bnbToBuy;
+            logger.info(`✅ Virtual portfolio rebalanced: ${global.shadowMode.virtualPortfolio.usdt.toFixed(2)} USDT, ${global.shadowMode.virtualPortfolio.bnb.toFixed(4)} BNB`);
+          } else {
+            await this.multiDexManager.dexs.pancakeSwap.executeTrade('buy', usdtToSpend);
+          }
+        }
+
+        return true;
+      } else {
+        logger.debug(`✅ Portfolio balanced: ${(imbalancePercent * 100).toFixed(1)}% imbalance`);
+        return false;
+      }
+    } catch (error) {
+      logger.error(`Portfolio rebalance error: ${error.message}`);
+      return false;
+    }
+  }
+
+  async runAdvancedStrategy() {
+    try {
+      // 🚨 EXPERT: Check circuit breaker first
+      if (!this.circuitBreaker.canTrade()) {
+        logger.warn('⏸️  Trading paused by circuit breaker');
+        return;
+      }
+
+      // 🔧 DISABLED: Using smarter trade-blocking approach instead of forced rebalancing
+      // Portfolio balance is now managed by blocking trades that worsen imbalance (see lines 1184-1235)
+      // Old approach: await this.rebalancePortfolio() - could force trades at bad prices
+
+      // Get current market data
+      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+
+      // Add price to persistent history
+      if (this.priceHistoryManager) {
+        await this.priceHistoryManager.addPrice(currentPrice);
+      }
+
+      const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+      const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+
+      // Circuit Breaker: Check daily loss limit BEFORE executing strategy
+      const todayLoss = await this.calculateTodayLoss();
+      const maxDailyLoss = 0.05; // 5% max daily loss
+      if (todayLoss >= maxDailyLoss) {
+        logger.error(`🚨 Circuit breaker triggered: ${(todayLoss * 100).toFixed(1)}% loss today (limit: ${(maxDailyLoss * 100).toFixed(1)}%)`);
+        return {
+          action: 'hold',
+          confidence: 0,
+          reasoning: `Daily loss limit reached: ${(todayLoss * 100).toFixed(1)}%`,
+          position_size: 0,
+          parameters: {
+            todayLoss: todayLoss * 100,
+            maxDailyLoss: maxDailyLoss * 100,
+            circuitBreaker: true
+          }
+        };
+      }
+
+      // Store market data
+      await this.storeMarketData({
+        symbol: 'USDT/BNB',
+        price: currentPrice,
+        volume: 0, // Would be fetched from DEX API
+        timestamp: new Date()
+      });
+
+      // Select optimal strategy based on market conditions
+      const selectedStrategy = this.selectBestStrategy(currentPrice, this.priceHistoryManager.getHistory());
+
+      // Add comprehensive market diagnostics
+      try {
+        const diagnostics = this.getMarketDiagnostics(currentPrice, this.priceHistoryManager.getHistory());
+        logger.info('=== MARKET DIAGNOSTICS ===');
+        logger.info('Selected Strategy: ' + selectedStrategy);
+        logger.info('Current Price: ' + diagnostics.currentPrice);
+        logger.info('Price Change: ' + diagnostics.priceChange);
+        logger.info('Volatility: ' + diagnostics.volatility);
+        logger.info('Range: ' + diagnostics.range);
+        logger.info('Z-Score: ' + diagnostics.zScore);
+        logger.info('Ranging Met: ' + diagnostics.rangingThreshold.met);
+        logger.info('Momentum Met: ' + diagnostics.momentumThreshold.met);
+        logger.info('Mean Reversion Met: ' + diagnostics.meanReversionThreshold.met);
+        logger.info('========================');
+      } catch (error) {
+        logger.error('Diagnostic error:', error.message);
+      }
+
+      // Create immutable price snapshot for consistent analysis and strategy execution
+      const priceSnapshot = [...this.priceHistoryManager.getHistory()];
+      const marketDataSnapshot = {
+        currentPrice,
+        priceHistory: priceSnapshot,
+        timestamp: Date.now()
+      };
+
+      // Get AI-powered market analysis with immutable snapshot
+      const marketAnalysis = await this.tradingStrategyAgent.execute({
+        action: 'analyze',
+        marketData: marketDataSnapshot,
+        researchData: this.latestResearchData
+      });
+
+      // Make AI-powered trading decision with immutable snapshot
+      const tradingDecision = await this.tradingStrategyAgent.execute({
+        action: 'decide',
+        strategy: selectedStrategy,
+        marketData: marketDataSnapshot,
+        researchData: this.latestResearchData
+      });
+
+      // 🔧 FIX: Smart portfolio-based trade limits (no forced trades, only blocking)
+      // Check portfolio allocation and block trades that worsen imbalance
+      logger.info('🔍 [PORTFOLIO CHECK] Starting portfolio balance verification...');
+
+      const balance = await this.getBalance();
+
+      // 🔧 DEBUG: Log raw balance data
+      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Raw balance object: USDT=${balance.usdt}, BNB=${balance.bnb}, currentPrice=${balance.currentPrice}`);
+
+      // 🔧 FIX: Ensure we have a valid current price
+      if (!balance.currentPrice || balance.currentPrice === 0) {
+        logger.error(`🚨 [PORTFOLIO CHECK ERROR] currentPrice is ${balance.currentPrice}! Fetching fresh price...`);
+        balance.currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+        logger.info(`🔍 [PORTFOLIO CHECK] Fetched fresh price: ${balance.currentPrice}`);
+      }
+
+      // 🔧 CRITICAL FIX: currentPrice is "BNB per USDT", so we need to DIVIDE to get USD value
+      // Example: If 1 USDT = 0.0009046 BNB, then 54.8 BNB ÷ 0.0009046 = $60,556
+      const bnbValueInUSD = balance.bnb / balance.currentPrice;  // DIVIDE, not multiply!
+      const totalValueUSD = balance.usdt + bnbValueInUSD;
+      const bnbPercent = (bnbValueInUSD / totalValueUSD) * 100;
+      const usdtPercent = (balance.usdt / totalValueUSD) * 100;
+
+      // 🔧 DEBUG: Log calculation steps
+      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] currentPrice = ${balance.currentPrice} (BNB per USDT)`);
+      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] BNB value: ${balance.bnb} ÷ ${balance.currentPrice.toFixed(6)} = $${bnbValueInUSD.toFixed(2)}`);
+      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Total portfolio: $${balance.usdt.toFixed(2)} + $${bnbValueInUSD.toFixed(2)} = $${totalValueUSD.toFixed(2)}`);
+      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Percentages: USDT ${usdtPercent.toFixed(1)}%, BNB ${bnbPercent.toFixed(1)}%`);
+
+      logger.info(`🔍 [PORTFOLIO CHECK] Current balances: $${balance.usdt.toFixed(2)} USDT (${usdtPercent.toFixed(1)}%) / ${balance.bnb.toFixed(2)} BNB (${bnbPercent.toFixed(1)}%)`);
+      logger.info(`🔍 [PORTFOLIO CHECK] AI Decision: ${tradingDecision.action.toUpperCase()} with ${(tradingDecision.confidence * 100).toFixed(0)}% confidence`);
+      logger.info(`🔍 [PORTFOLIO CHECK] Thresholds: Block BUY if BNB > 45%, Block SELL if BNB < 35%`);
+
+      // Track last emergency rebalance time
+      if (!this.lastEmergencyRebalance) {
+        this.lastEmergencyRebalance = 0;
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // HYBRID PORTFOLIO BALANCING: Apply Dynamic Position Sizing
+      // Expert-recommended: Hard blocking at extremes + gradual scaling in middle ranges
+      // ═══════════════════════════════════════════════════════════════
+
+      // Safety check: Ensure tradingDecision has required properties
+      if (!tradingDecision || !tradingDecision.action) {
+        logger.error(`❌ Invalid tradingDecision object: ${JSON.stringify(tradingDecision)}`);
+        tradingDecision = {
+          action: 'hold',
+          confidence: 0,
+          reasoning: 'Invalid trading decision object',
+          position_size: 0
+        };
+      }
+
+      const action = tradingDecision.action;
+      const multiplier = this.calculateDynamicPositionMultiplier(bnbPercent, action);
+
+      // Apply Hybrid Decision Logic
+      if (multiplier === 0) {
+        // HARD BLOCK: Portfolio at extreme imbalance
+        // Only log if action wasn't already 'hold' (prevents duplicate R:R blocking messages)
+        if (tradingDecision.action !== 'hold') {
+          logger.warn(`⛔ [PORTFOLIO BLOCK] ${action.toUpperCase()} blocked due to ${bnbPercent.toFixed(1)}% BNB imbalance.`);
+          logger.warn(`⛔ [PORTFOLIO BLOCK] Original decision: ${action.toUpperCase()} with ${(tradingDecision.confidence * 100).toFixed(0)}% confidence`);
+          logger.warn(`⛔ [PORTFOLIO BLOCK] New decision: HOLD (blocked by hybrid system)`);
+        }
+        tradingDecision.action = 'hold';
+        tradingDecision.confidence = 0.5;
+        tradingDecision.reasoning = `🚫 BLOCKED: ${bnbPercent.toFixed(1)}% BNB. ${action.toUpperCase()} exceeds portfolio thresholds (${action === 'buy' ? '≥55%' : '≤45%'}).`;
+      } else if (multiplier < 1.0) {
+        // DYNAMIC SCALING: Reduce position size proportionally
+        const originalSize = tradingDecision.position_size || 0;
+
+        // Safety check: Warn if position_size is missing
+        if (!tradingDecision.position_size || tradingDecision.position_size === 0) {
+          logger.warn(`⚠️ [HYBRID WARNING] tradingDecision.position_size is ${tradingDecision.position_size}. Multiplier will have no effect.`);
+        }
+
+        logger.warn(`⚠️ [DYNAMIC SIZING] ${action.toUpperCase()} scaled to ${Math.round(multiplier * 100)}% due to ${bnbPercent.toFixed(1)}% BNB.`);
+        logger.info(`📊 [HYBRID BALANCE] Original position size: ${originalSize.toFixed(2)}, Multiplier: ${multiplier.toFixed(2)}x`);
+
+        tradingDecision.positionSizeMultiplier = multiplier;
+        tradingDecision.position_size = originalSize * multiplier; // Apply multiplier to position size
+
+        tradingDecision.reasoning += ` (Dynamically scaled to ${Math.round(multiplier * 100)}% due to BNB portfolio weight: ${bnbPercent.toFixed(1)}%)`;
+        logger.info(`📊 [HYBRID BALANCE] Final position size: ${tradingDecision.position_size.toFixed(2)}`);
+      } else {
+        // NORMAL TRADE: Portfolio within safe range
+        logger.info(`✅ [NORMAL TRADE] ${action.toUpperCase()} allowed at full size (BNB: ${bnbPercent.toFixed(1)}%).`);
+        tradingDecision.positionSizeMultiplier = 1.0;
+      }
+
+      // 🔧 DEBUG: Log hybrid decision outcome
+      logger.info(`🔍 [HYBRID DEBUG] Final action: ${tradingDecision.action.toUpperCase()}, Multiplier: ${tradingDecision.positionSizeMultiplier || 0}, Position Size: ${tradingDecision.position_size || 0}, BNB%: ${bnbPercent.toFixed(1)}%`);
+
+      // ═══════════════════════════════════════════════════════════════
+      // HYBRID PERFORMANCE TRACKING
+      // Track how effective the hybrid portfolio system is
+      // Only track actual trading decisions (BUY/SELL), not HOLD
+      // ═══════════════════════════════════════════════════════════════
+      if (action === 'buy' || action === 'sell') {
+        const multiplierLabel = `${multiplier.toFixed(2)}x`;
+        this.hybridStats.totalTradesEvaluated++;
+
+        if (this.hybridStats.scaledTrades[multiplierLabel] !== undefined) {
+          this.hybridStats.scaledTrades[multiplierLabel]++;
+        }
+
+        // Calculate missed volume based on what we would have traded vs what we actually will trade
+        let unscaledSize, actualVolume, missedVolume;
+
+        if (multiplier === 0) {
+          // Blocked: position_size is still original, we trade nothing
+          unscaledSize = tradingDecision.position_size || 0;
+          actualVolume = 0;
+          missedVolume = unscaledSize;
+        } else if (multiplier < 1.0) {
+          // Scaled: position_size has been scaled down, calculate original
+          actualVolume = tradingDecision.position_size || 0;
+          unscaledSize = actualVolume / multiplier;
+          missedVolume = unscaledSize - actualVolume;
+        } else {
+          // Full size: no scaling, trade everything
+          unscaledSize = tradingDecision.position_size || 0;
+          actualVolume = unscaledSize;
+          missedVolume = 0;
+        }
+
+        this.hybridStats.totalOpportunityCost += missedVolume;
+        this.hybridStats.totalVolumeTraded += actualVolume;
+
+        logger.info(`📊 [HYBRID TRACKING] Multiplier: ${multiplierLabel}, Missed: $${missedVolume.toFixed(2)}, Total Missed: $${this.hybridStats.totalOpportunityCost.toFixed(2)}`);
+
+        // Summary every 10 trades
+        if (this.hybridStats.totalTradesEvaluated % 10 === 0) {
+          const runtime = ((Date.now() - this.hybridStats.startTime) / 3600000).toFixed(1);
+          logger.info(`
+═══════════════════════════════════════════════════════════
+📊 HYBRID PERFORMANCE SUMMARY (${this.hybridStats.totalTradesEvaluated} trades)
+═══════════════════════════════════════════════════════════
+Runtime: ${runtime} hours
+
+Multiplier Distribution:
+  Full Size (1.00x): ${this.hybridStats.scaledTrades['1.00x']}
+  75% Size (0.75x):  ${this.hybridStats.scaledTrades['0.75x']}
+  50% Size (0.50x):  ${this.hybridStats.scaledTrades['0.50x']}
+  25% Size (0.25x):  ${this.hybridStats.scaledTrades['0.25x']}
+  Blocked (0.00x):   ${this.hybridStats.scaledTrades['0.00x']}
+
+Volume Analysis:
+  Total Traded:      $${this.hybridStats.totalVolumeTraded.toFixed(2)}
+  Opportunity Cost:  $${this.hybridStats.totalOpportunityCost.toFixed(2)}
+  Cost per Trade:    $${(this.hybridStats.totalOpportunityCost / this.hybridStats.totalTradesEvaluated).toFixed(2)}
+  Risk Reduction:    ${(this.hybridStats.totalOpportunityCost / (this.hybridStats.totalOpportunityCost + this.hybridStats.totalVolumeTraded) * 100).toFixed(1)}%
+═══════════════════════════════════════════════════════════
+`);
+        }
+      }
+
+      // Emergency: Force ONE trade per hour only in extreme cases
+      // Note: Emergency trades bypass hybrid sizing and execute at full size
+      if (bnbPercent > 65 && tradingDecision.action !== 'sell') {
+        const hoursSinceLastEmergency = (Date.now() - this.lastEmergencyRebalance) / (1000 * 60 * 60);
+        if (hoursSinceLastEmergency >= 1) {
+          logger.error(`🚨 EMERGENCY REBALANCE: BNB ${bnbPercent.toFixed(1)}% > 65%! Forcing SELL trade.`);
+          tradingDecision.action = 'sell';
+          tradingDecision.confidence = 0.95;
+          tradingDecision.positionSizeMultiplier = 1.0; // Emergency trades at full size
+          tradingDecision.reasoning = `EMERGENCY: Portfolio critically imbalanced at ${bnbPercent.toFixed(1)}% BNB (max 65%). Forcing SELL.`;
+          this.lastEmergencyRebalance = Date.now();
+        } else {
+          logger.warn(`⏱️ Emergency rebalance on cooldown (${(1 - hoursSinceLastEmergency).toFixed(1)}h remaining)`);
+        }
+      } else if (bnbPercent < 25 && tradingDecision.action !== 'buy' && balance.usdt > 1000) {
+        const hoursSinceLastEmergency = (Date.now() - this.lastEmergencyRebalance) / (1000 * 60 * 60);
+        if (hoursSinceLastEmergency >= 1) {
+          logger.error(`🚨 EMERGENCY REBALANCE: BNB ${bnbPercent.toFixed(1)}% < 25%! Forcing BUY trade.`);
+          tradingDecision.action = 'buy';
+          tradingDecision.confidence = 0.95;
+          tradingDecision.positionSizeMultiplier = 1.0; // Emergency trades at full size
+          tradingDecision.reasoning = `EMERGENCY: Portfolio critically imbalanced at ${bnbPercent.toFixed(1)}% BNB (min 25%). Forcing BUY.`;
+          this.lastEmergencyRebalance = Date.now();
+        } else {
+          logger.warn(`⏱️ Emergency rebalance on cooldown (${(1 - hoursSinceLastEmergency).toFixed(1)}h remaining)`);
+        }
+      }
+
+      // Log portfolio status
+      if (bnbPercent >= 35 && bnbPercent <= 45) {
+        logger.info(`✅ Portfolio balanced: ${bnbPercent.toFixed(1)}% BNB (target 35-45%)`);
+      }
+
+      // Execute decision based on mode
+      // Shadow mode: Execute all decisions (no risk)
+      // Live mode: Only execute high-confidence decisions (> 70%)
+      // 🔧 FIX: Raised shadow mode threshold from 50% to 70% to prevent weak signal trades
+      const minConfidence = (this.shadowMode && this.shadowMode.isActive) ? 0.7 : 0.7;
+
+      if (tradingDecision.confidence >= minConfidence) {
+        await this.executeTradingDecision(tradingDecision, selectedStrategy);
+      } else {
+        logger.debug(`⏭️ Skipping trade - confidence ${(tradingDecision.confidence * 100).toFixed(0)}% below minimum ${(minConfidence * 100).toFixed(0)}%`);
+      }
+
+      // Store trading log in RAG system
+      await this.ragSystem.storeTradingLog({
+        action: tradingDecision.action,
+        pair: 'USDT/BNB',
+        amount: tradingDecision.position_size || 0,
+        price: currentPrice,
+        timestamp: new Date(),
+        reasoning: tradingDecision.reasoning,
+        success: tradingDecision.action !== 'hold'
+      });
+
+      this.stats.lastPrice = currentPrice;
+
+      logger.info(`🧠 AI Strategy executed - Action: ${tradingDecision.action}, Confidence: ${(tradingDecision.confidence * 100).toFixed(1)}%, Reasoning: ${tradingDecision.reasoning}`);
+
+    } catch (error) {
+      logger.error('❌ Error running advanced strategy:', error);
+      this.stats.failedTrades++;
+      await this.logError('strategy_execution', error);
+    }
+  }
+
+  async executeTradingDecision(decision, strategy = 'unknown') {
+    try {
+      const { action, position_size, parameters } = decision;
+
+      if (action === 'hold') {
+        return;
+      }
+
+      // ✅ SECURITY: Check rate limit FIRST (if available)
+      if (this.rateLimiter) {
+        try {
+          await this.rateLimiter.checkLimit();
+        } catch (rateLimitError) {
+          logger.warn('🚦 Trade blocked by rate limiter:', rateLimitError.message);
+          throw rateLimitError;
+        }
+      } else {
+        logger.debug('⚠️ Rate limiter not available, skipping check');
+      }
+
+      // 🚀 OPTIMIZATION #3: Add balance validation for shadow mode
+      if (position_size && parameters && parameters.currentPrice && action !== 'hold') {
+        // Get current balances
+        let usdtBalance, bnbBalance;
+        if (global.shadowMode && global.shadowMode.getVirtualBalances) {
+          const virtualBalances = global.shadowMode.getVirtualBalances();
+          usdtBalance = virtualBalances.usdt;
+          bnbBalance = virtualBalances.bnb;
+        } else {
+          usdtBalance = await this.pancakeSwap.getUSDTBalance();
+          bnbBalance = await this.pancakeSwap.getBNBBalance();
+        }
+
+        // 🔍 DEBUG: Log all values before calculation
+        logger.info(`🔍 DEBUG BNB CALC:
+  position_size (USD): ${position_size}
+  currentPrice from params: ${parameters.currentPrice}
+  Expected unit: BNB/USD (should be ~0.0007)
+  BNB balance: ${bnbBalance}
+`);
+
+        // 🔧 FIX: Ensure currentPrice is valid and in correct unit (BNB/USD)
+        let currentPrice = parameters.currentPrice;
+
+        // If currentPrice is invalid, fetch real price
+        if (!currentPrice || currentPrice === 1.0 || currentPrice > 0.01) {
+          logger.warn(`⚠️ Invalid currentPrice: ${currentPrice}, fetching real price`);
+
+          // Get real market price
+          currentPrice = await this.getCurrentPrice();
+
+          logger.info(`✅ Using market price: ${currentPrice}`);
+        }
+
+        // Verify it's in BNB/USD (should be ~0.0007)
+        if (currentPrice > 0.01) {
+          // It's probably USD/BNB, invert it
+          currentPrice = 1 / currentPrice;
+          logger.warn(`⚠️ Price was inverted, corrected to: ${currentPrice}`);
+        }
+
+        logger.info(`📊 Final currentPrice for BNB calc: ${currentPrice}`);
+
+        // Validate balance for sell orders
+        // 🔧 FIX: Convert position_size (USD) to BNB for comparison
+        const bnbRequired = position_size * currentPrice; // USD * (BNB/USD) = BNB
+
+        logger.info(`🔍 BNB Required calculation: ${position_size} USD × ${currentPrice} BNB/USD = ${bnbRequired.toFixed(6)} BNB`);
+
+        if (action === 'sell' && bnbBalance < bnbRequired) {
+          logger.warn(`🚫 Insufficient BNB: need ${bnbRequired.toFixed(6)} but have ${bnbBalance.toFixed(6)}`);
+          return { success: false, reason: 'insufficient_bnb', required: bnbRequired, available: bnbBalance };
+        }
+
+        // Validate balance for buy orders
+        if (action === 'buy' && usdtBalance < position_size) {
+          logger.warn(`🚫 Insufficient USDT: need ${Number(position_size).toFixed(2)} but have ${usdtBalance.toFixed(2)}`);
+          return { success: false, reason: 'insufficient_usdt', required: position_size, available: usdtBalance };
+        }
+
+        logger.debug(`✅ Balance validation passed: ${action} $${Number(position_size).toFixed(2)}`);
+      }
+
+      // ✅ FIX #6: Validate trade against risk limits BEFORE execution
+      // Only validate if we have required parameters for actual trades
+      if (position_size && parameters && parameters.currentPrice) {
+        try {
+          // 🔧 FIX: Use centralized portfolio manager
+          const portfolioValue = await this.portfolioManager.getValue(true); // Force refresh for trade validation
+          logger.debug(`💼 Portfolio value for validation: $${portfolioValue.toFixed(2)}`);
+
+          await this.riskManager.validateTrade({
+            action,
+            amount: position_size,
+            price: parameters.currentPrice,
+            pair: 'USDT/BNB'
+          });
+          logger.debug('✅ Trade passed risk validation', {
+            action,
+            amount: position_size,
+            price: parameters.currentPrice
+          });
+        } catch (riskError) {
+          logger.warn('⚠️ Trade rejected by risk manager:', {
+            reason: riskError.message,
+            action,
+            amount: position_size,
+            price: parameters.currentPrice
+          });
+          throw new Error(`Risk validation failed: ${riskError.message}`);
+        }
+      } else {
+        logger.debug('⚠️ Skipping risk validation - missing required parameters', {
+          action,
+          hasPositionSize: !!position_size,
+          hasParameters: !!parameters,
+          hasPrice: !!(parameters && parameters.currentPrice)
+        });
+      }
+
+      // 👻 Shadow Mode Check - Simulate instead of execute
+      if (this.shadowMode && this.shadowMode.isActive) {
+        logger.info('👻 Shadow Mode: Simulating trade instead of executing');
+
+        const shadowTrade = await this.shadowMode.executeShadowTrade({
+          action,
+          pair: 'USDT/BNB',
+          amount: position_size,
+          targetPrice: parameters.currentPrice,
+          confidence: decision.confidence,
+          reasoning: decision.reasoning
+        });
+
+        logger.info(`👻 Shadow Trade: ${action} ${position_size} at ${parameters.currentPrice}`);
+        logger.info(`👻 Estimated Profit: ${shadowTrade?.estimatedProfit || 0} USDT`);
+        logger.info(`👻 Would Execute: ${shadowTrade?.wouldExecute ? 'YES' : 'NO'}`);
+
+        // 🔥 FIX #4: Create position for monitoring if trade would execute
+        if (shadowTrade?.wouldExecute && action !== 'hold') {
+          const positionId = `pos_${Date.now()}`;
+          this.tradingStrategyAgent.activePositions.set(positionId, {
+            id: positionId,
+            action,
+            entryPrice: parameters.currentPrice,
+            size: position_size,
+            entryTime: Date.now(),
+            stopLoss: action === 'buy' ? parameters.currentPrice * 0.97 : parameters.currentPrice * 1.03,
+            entryZScore: parameters.zScore || 0,
+            strategy,
+            confidence: decision.confidence
+          });
+          logger.info(`📊 Position ${positionId} created: ${action} $${position_size} @ ${parameters.currentPrice}`);
+        }
+
+        // Track strategy performance for shadow trades
+        await this.recordStrategyPerformance(strategy, decision, {
+          success: true,
+          tradeId: `shadow_${Date.now()}`,
+          profit: shadowTrade?.estimatedProfit || 0,
+          executionTime: Date.now(),
+          isShadow: true
+        });
+
+        // ✅ FIX: Update portfolio value after shadow trade (for risk manager)
+        await this.updatePortfolioValue();
+
+        return shadowTrade;
+      }
+
+      // 💰 Live Trading Mode - Execute real trades
+      let receipt = null;
+
+      // $60K Portfolio - Try leverage trading first
+      if (this.leverageStrategy && action !== 'hold') {
+        try {
+          const marketData = {
+            currentPrice: parameters.currentPrice,
+            parameters: {
+              zScore: parameters.zScore || 0,
+              rsi: parameters.rsi || 50
+            }
+          };
+
+          const leveragePosition = await this.leverageStrategy.openLeveragedPosition(decision, marketData);
+          if (leveragePosition) {
+            logger.info(`✅ Leveraged position opened: ${leveragePosition.id}`);
+            return leveragePosition;
+          }
+        } catch (leverageError) {
+          logger.error('❌ Leverage trading failed:', leverageError);
+          // Continue to spot trading as fallback
+        }
+      }
+
+      // ✅ FIX #5: Add proper error handling around trade execution
+      if (action === 'buy' && position_size > 0) {
+        try {
+          const minBnbAmount = ethers.parseEther((position_size / parameters.currentPrice * 0.995).toString());
+          receipt = await this.multiDexManager.dexs.pancakeSwap.swapUSDTForBNB(position_size, minBnbAmount);
+          logger.info(`✅ Buy trade executed: ${position_size} USDT for BNB`);
+        } catch (tradeError) {
+          logger.error('❌ Buy trade execution failed:', {
+            error: tradeError.message,
+            stack: tradeError.stack,
+            positionSize: position_size,
+            price: parameters.currentPrice
+          });
+          throw new Error(`Failed to execute buy trade: ${tradeError.message}`);
+        }
+      } else if (action === 'sell' && position_size > 0) {
+        try {
+          const minUsdtAmount = ethers.parseEther((position_size * parameters.currentPrice * 0.995).toString());
+          receipt = await this.multiDexManager.dexs.pancakeSwap.swapBNBForUSDT(position_size, minUsdtAmount);
+          logger.info(`✅ Sell trade executed: ${position_size} BNB for USDT`);
+        } catch (tradeError) {
+          logger.error('❌ Sell trade execution failed:', {
+            error: tradeError.message,
+            stack: tradeError.stack,
+            positionSize: position_size,
+            price: parameters.currentPrice
+          });
+          throw new Error(`Failed to execute sell trade: ${tradeError.message}`);
+        }
+      }
+
+      if (receipt && receipt.transactionHash) {
+        // Store trade in database
+        const trade = await Trade.create({
+          type: action,
+          token_pair: 'USDT/BNB',
+          amount_in: position_size,
+          amount_out: action === 'buy' ? position_size / parameters.currentPrice : position_size * parameters.currentPrice,
+          price: parameters.currentPrice,
+          transaction_hash: receipt.transactionHash,
+          status: 'completed',
+          strategy: decision.reasoning,
+          profit_loss: 0 // Would calculate based on previous trades
+        });
+
+        // Track strategy performance
+        await this.recordStrategyPerformance(strategy, decision, {
+          success: true,
+          tradeId: trade.id,
+          profit: 0, // Will be calculated later
+          executionTime: Date.now()
+        });
+
+        this.stats.totalTrades++;
+        this.stats.successfulTrades++;
+
+        // Create success alert
+        await Alert.create({
+          type: 'trade',
+          severity: 'medium',
+          title: `Trade Executed: ${action.toUpperCase()}`,
+          message: `Successfully executed ${action} order for ${position_size} USDT/BNB at ${parameters.currentPrice}`,
+          triggered_by: 'AI Strategy Agent',
+          acknowledged: false
+        });
+
+        logger.info(`✅ Trade executed successfully: ${receipt.transactionHash}`);
+      }
+
+    } catch (error) {
+      logger.error('❌ Error executing trading decision:', error);
+      this.stats.failedTrades++;
+
+      // Create error alert
+      await Alert.create({
+        type: 'trade',
+        severity: 'high',
+        title: `Trade Execution Failed: ${decision.action.toUpperCase()}`,
+        message: `Failed to execute ${decision.action} order: ${error.message}`,
+        triggered_by: 'AI Strategy Agent',
+        acknowledged: false
+      });
+
+      throw error;
+    }
+  }
+
+  async performMarketResearch() {
+    try {
+      logger.info('🔍 Performing market research...');
+
+      const research = await this.marketResearchAgent.execute({
+        action: 'research',
+        query: 'BSC BNB USDT',
+        timeframe: '24h'
+      });
+
+      this.latestResearchData = research;
+      this.stats.agents.marketResearch.executions++;
+      this.stats.agents.marketResearch.success++;
+      this.stats.agents.marketResearch.lastActivity = new Date();
+
+      // Store news articles in RAG system
+      if (research.news && research.news.length > 0) {
+        for (const article of research.news.slice(0, 5)) {
+          await this.ragSystem.storeNewsArticle(article);
+        }
+      }
+
+      logger.info(`✅ Market research completed - Found ${research.news?.length || 0} articles, Sentiment: ${research.sentiment?.sentiment || 'neutral'}`);
+
+    } catch (error) {
+      logger.error('❌ Error performing market research:', error);
+      this.stats.agents.marketResearch.executions++;
+      await this.logError('market_research', error);
+    }
+  }
+
+  async storeMarketData(data) {
+    try {
+      await MarketData.create({
+        token_pair: data.symbol,
+        price: data.price,
+        volume_24h: data.volume,
+        source: 'pancakeswap',
+        price_change_24h: 0 // Would calculate from historical data
+      });
+
+      await this.ragSystem.storeMarketData(data);
+    } catch (error) {
+      logger.error('Error storing market data:', error);
+    }
+  }
+
+  async getPriceHistory(limit = 100) {
+    try {
+      const marketData = await MarketData.findAll({
+        limit,
+        order: [['created_at', 'DESC']]
+      });
+
+      return marketData.map(data => ({
+        timestamp: data.created_at,
+        price: parseFloat(data.price)
+      }));
+    } catch (error) {
+      logger.error('Error getting price history:', error);
+      return [];
+    }
+  }
+
+  async logStatus() {
+    try {
+      const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+      const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+
+      const totalValue = usdtBalance + (bnbBalance * currentPrice);
+      const profit = totalValue - config.trading.initialBudget;
+
+      this.stats.totalProfit = profit;
+
+      const status = {
+        uptime: this.getUptime(),
+        currentPrice: currentPrice.toFixed(6),
+        usdtBalance: usdtBalance.toFixed(2),
+        bnbBalance: bnbBalance.toFixed(6),
+        totalValue: totalValue.toFixed(2),
+        profit: profit.toFixed(2),
+        profitPercent: ((profit / config.trading.initialBudget) * 100).toFixed(2),
+        totalTrades: this.stats.totalTrades,
+        successfulTrades: this.stats.successfulTrades,
+        failedTrades: this.stats.failedTrades,
+        agents: this.stats.agents
+      };
+
+      logger.info('=== ADVANCED BOT STATUS ===');
+      logger.info(`Uptime: ${status.uptime}`);
+      logger.info(`Current Price: ${status.currentPrice} BNB per USDT`);
+      logger.info(`USDT Balance: ${status.usdtBalance}`);
+      logger.info(`BNB Balance: ${status.bnbBalance}`);
+      logger.info(`Total Value: ${status.totalValue} USDT`);
+      logger.info(`Profit/Loss: ${status.profit} USDT (${status.profitPercent}%)`);
+      logger.info(`Total Trades: ${status.totalTrades}`);
+      logger.info(`Success Rate: ${this.stats.totalTrades > 0 ? ((this.stats.successfulTrades / this.stats.totalTrades) * 100).toFixed(1) : 0}%`);
+      logger.info('==========================');
+
+      // Store status in database
+      await BotLog.create({
+        level: 'info',
+        message: 'Bot status logged',
+        component: 'status_logger',
+        action: 'log_status',
+        metadata: status
+      });
+
+    } catch (error) {
+      logger.error('❌ Error logging status:', error);
+    }
+  }
+
+  async performDataCleanup() {
+    try {
+      logger.info('🧹 Performing data cleanup...');
+
+      // Clean old logs (keep last 10000)
+      const oldLogs = await BotLog.findAll({
+        order: [['created_at', 'DESC']],
+        offset: 10000
+      });
+
+      if (oldLogs.length > 0) {
+        await BotLog.destroy({
+          where: {
+            id: oldLogs.map(log => log.id)
+          }
+        });
+        logger.info(`Cleaned up ${oldLogs.length} old log entries`);
+      }
+
+      // Clean old market data (keep last 7 days)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      await MarketData.destroy({
+        where: {
+          created_at: {
+            [sequelize.Sequelize.Op.lt]: sevenDaysAgo
+          }
+        }
+      });
+
+      logger.info('✅ Data cleanup completed');
+
+    } catch (error) {
+      logger.error('❌ Error during data cleanup:', error);
+    }
+  }
+
+  async logError(component, error) {
+    try {
+      await BotLog.create({
+        level: 'error',
+        message: error.message,
+        component: component,
+        action: 'error_handling',
+        metadata: {
+          stack: error.stack,
+          timestamp: new Date()
+        },
+        error_stack: error.stack
+      });
+
+      await Alert.create({
+        type: 'system',
+        severity: 'high',
+        title: `Error in ${component}`,
+        message: error.message,
+        triggered_by: component,
+        acknowledged: false
+      });
+    } catch (logError) {
+      logger.error('Failed to log error:', logError);
+    }
+  }
+
+  getUptime() {
+    if (!this.stats.startTime) return '0s';
+
+    const uptime = Date.now() - this.stats.startTime.getTime();
+    const hours = Math.floor(uptime / (1000 * 60 * 60));
+    const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((uptime % (1000 * 60)) / 1000);
+
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  // 🚨 CRITICAL FIX: Emergency kill switch
+  async checkEmergencyStop() {
+    try {
+      const fs = require('fs');
+      if (fs.existsSync('./EMERGENCY_STOP')) {
+        logger.error('🚨 EMERGENCY STOP ACTIVATED - Shutting down immediately!');
+        await this.emergencyShutdown();
+        process.exit(0);
+      }
+    } catch (error) {
+      // Ignore file system errors
+    }
+  }
+
+  async emergencyShutdown() {
+    logger.error('🚨 EMERGENCY SHUTDOWN INITIATED');
+    this.isRunning = false;
+
+    // Close all active positions immediately
+    if (this.tradingStrategyAgent && this.tradingStrategyAgent.activePositions) {
+      for (const [id, position] of this.tradingStrategyAgent.activePositions) {
+        try {
+          await this.tradingStrategyAgent.executeStopLoss(id, 'emergency_shutdown');
+        } catch (error) {
+          logger.error(`Error closing position ${id} during emergency:`, error);
+        }
+      }
+    }
+
+    // Stop all tasks
+    if (this.task) {
+      this.task.stop();
+    }
+
+    logger.error('🚨 EMERGENCY SHUTDOWN COMPLETE');
+  }
+
+  async stop() {
+    try {
+      this.isRunning = false;
+      logger.info('🛑 Stopping Advanced Trading Bot...');
+
+      // Log final status
+      await this.logStatus();
+
+      // Close API server
+      if (this.server) {
+        this.server.close();
+        logger.info('🌐 API server stopped');
+      }
+
+      // Close RAG system
+      await this.ragSystem.close();
+
+      // Disconnect wallet
+      this.walletManager.disconnect();
+
+      logger.info('✅ Advanced Trading Bot stopped successfully!');
+    } catch (error) {
+      logger.error('❌ Error stopping bot:', error);
+    }
+  }
+
+  async emergencyStop() {
+    try {
+      logger.warn('🚨 EMERGENCY STOP INITIATED!');
+      this.isRunning = false;
+
+      // Log emergency status
+      await this.logStatus();
+
+      // Create emergency alert
+      await Alert.create({
+        type: 'system',
+        severity: 'critical',
+        title: 'Emergency Stop Executed',
+        message: 'Trading bot has been emergency stopped',
+        triggered_by: 'emergency_stop',
+        acknowledged: false
+      });
+
+      logger.warn('🚨 Emergency stop completed!');
+    } catch (error) {
+      logger.error('❌ Error in emergency stop:', error);
+    }
+  }
+
+  // ✅ FIX: Helper method to update portfolio value
+  // ✅ FIX: Use centralized portfolio manager
+  async updatePortfolioValue() {
+    try {
+      const totalPortfolioValue = await this.portfolioManager.getValue(true);
+      logger.debug(`💼 Portfolio updated via manager: $${totalPortfolioValue.toFixed(2)}`);
+      return totalPortfolioValue;
+    } catch (error) {
+      logger.error('❌ Error updating portfolio value:', error.message);
+      return this.portfolioManager.cachedValue; // Return cached value on error
+    }
+  }
+
+  /**
+   * Count direction changes in price data to detect choppy markets
+   * @param {Array} prices - Array of price values
+   * @returns {number} - Number of direction changes
+   */
+  _countDirectionChanges(prices) {
+    let changes = 0;
+    for (let i = 2; i < prices.length; i++) {
+      const prevDirection = prices[i - 1] > prices[i - 2];
+      const currDirection = prices[i] > prices[i - 1];
+      if (prevDirection !== currDirection) {
+        changes++;
+      }
+    }
+    return changes;
+  }
+
+  getMarketDiagnostics(currentPrice, priceHistory) {
+    if (priceHistory.length < 100) return { error: 'Insufficient data - need 100+ points for reliable diagnostics' };
+
+    const recentPrices = priceHistory.slice(-288).map(p => p.price);
+    const last50 = priceHistory.slice(-50).map(p => p.price);
+
+    const priceChange = ((currentPrice - recentPrices[0]) / recentPrices[0]) * 100;
+    const mean = recentPrices.reduce((a, b) => a + b) / recentPrices.length;
+    const variance = recentPrices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / recentPrices.length;
+    const volatility = (Math.sqrt(variance) / mean) * 100;
+
+    const high = Math.max(...recentPrices);
+    const low = Math.min(...recentPrices);
+    const range = ((high - low) / low) * 100;
+
+    // Calculate z-score for mean reversion
+    const mean50 = last50.reduce((a, b) => a + b) / last50.length;
+    const variance50 = last50.reduce((a, b) => a + Math.pow(b - mean50, 2), 0) / last50.length;
+    const stdDev = Math.sqrt(variance50);
+    const zScore = (currentPrice - mean50) / stdDev;
+
+    return {
+      currentPrice: currentPrice.toFixed(8),
+      priceChange: priceChange.toFixed(2) + '%',
+      volatility: volatility.toFixed(2) + '%',
+      range: range.toFixed(2) + '%',
+      zScore: zScore.toFixed(2),
+      dataPoints: priceHistory.length,
+
+      // Strategy thresholds check
+      rangingThreshold: { need: '2-6%', have: range.toFixed(2) + '%', met: range > 2 && range < 6 },
+      momentumThreshold: { need: '>3% change + >2% vol', change: priceChange.toFixed(2) + '%', vol: volatility.toFixed(2) + '%', met: Math.abs(priceChange) > 3 && volatility > 2 },
+      breakoutNearLevel: this._checkNearLevel(currentPrice, recentPrices),
+      meanReversionThreshold: { need: 'z-score < -1.5 or > 1.5', have: zScore.toFixed(2), met: Math.abs(zScore) > 1.5 }
+    };
+  }
+
+  _checkNearLevel(currentPrice, prices) {
+    const high = Math.max(...prices);
+    const low = Math.min(...prices);
+    const distToHigh = Math.abs((high - currentPrice) / currentPrice);
+    const distToLow = Math.abs((currentPrice - low) / currentPrice);
+    const nearLevel = Math.min(distToHigh, distToLow) < 0.01;
+    return {
+      need: '< 1% from high/low',
+      distToHigh: (distToHigh * 100).toFixed(2) + '%',
+      distToLow: (distToLow * 100).toFixed(2) + '%',
+      met: nearLevel
+    };
+  }
+
+  /**
+   * Select the best trading strategy based on current market conditions
+   * @param {number} currentPrice - Current market price
+   * @param {Array} priceHistory - Array of price history data
+   * @returns {string} - Strategy name ('ranging', 'momentum', 'mean_reversion', 'breakout', 'gridTrading', 'vwap', 'ichimoku')
+   */
+  selectBestStrategy(currentPrice, priceHistory) {
+    // 🚨 CRITICAL FIX: Use market monitor recommendations if available
+    if (this.marketMonitor?.currentRegime?.strategies) {
+      const strategies = this.marketMonitor.currentRegime.strategies;
+      // Rotate hourly through recommended strategies
+      const hour = new Date().getHours();
+      const index = hour % strategies.length;
+      logger.info(`📊 Regime: ${this.marketMonitor.currentRegime.regime} → Using ${strategies[index]}`);
+      return strategies[index];
+    }
+
+    // Fallback: calculate manually with strategy rotation
+    if (priceHistory.length < 50) {
+      console.log('Insufficient data, using ranging strategy');
+      return 'ranging';
+    }
+
+    // 🚀 OPTIMIZATION: Force strategy rotation every hour (VWAP removed - too tight thresholds)
+    const hour = new Date().getHours();
+    const strategies = ['ranging', 'mean_reversion', 'momentum']; // VWAP removed - causing holds
+    const strategyIndex = hour % strategies.length;
+    const selectedStrategy = strategies[strategyIndex];
+
+    logger.info(`🔄 Strategy rotation: Hour ${hour} → Using ${selectedStrategy}`);
+
+    const last288 = priceHistory.slice(-288).map(p => p.price);
+    const volatility = this.calculateVolatility(last288);
+    const trend = this.calculateTrend(last288);
+
+    logger.debug(`Market: vol=${(volatility * 100).toFixed(2)}%, trend=${(trend * 100).toFixed(2)}%`);
+
+    // Use rotated strategy unless market conditions strongly favor another
+    if (volatility > 0.025 && Math.abs(trend) > 0.02) {
+      return Math.random() > 0.3 ? selectedStrategy : 'momentum'; // 70% use rotation, 30% momentum
+    }
+    if (volatility < 0.015 && Math.abs(trend) < 0.01) {
+      return Math.random() > 0.3 ? selectedStrategy : 'ranging'; // 70% use rotation, 30% ranging
+    }
+    return selectedStrategy; // Always use rotation for default case
+  }
+
+  // 🚨 CRITICAL FIX: Add calculation methods for strategy selection
+  // Updated to match TradingStrategyAgent.js with 288-period lookback support
+  calculateVolatility(prices) {
+    // Validate input
+    if (!Array.isArray(prices) || prices.length === 0) {
+      logger.warn('⚠️ Invalid prices array for volatility calculation, using default 3.0%');
+      return 0.03; // 3.0% fallback
+    }
+
+    // Need minimum data for reliable calculation
+    if (prices.length < 12) {
+      logger.warn(`⚠️ Insufficient data (${prices.length} points), using default 3.0%`);
+      return 0.03; // 3.0% fallback
+    }
+
+    // Calculate returns (percentage changes)
+    const returns = [];
+    for (let i = 1; i < prices.length; i++) {
+      const ret = (prices[i] - prices[i - 1]) / prices[i - 1];
+      if (!isNaN(ret) && isFinite(ret)) {
+        returns.push(ret);
+      }
+    }
+
+    if (returns.length === 0) {
+      logger.warn('⚠️ No valid returns calculated, using default 3.0%');
+      return 0.03; // 3.0% fallback
+    }
+
+    // Calculate standard deviation of returns
+    const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
+    const volatility = Math.sqrt(variance);
+
+    // Validate result
+    if (isNaN(volatility) || !isFinite(volatility)) {
+      logger.warn('⚠️ Invalid volatility calculation, using default 3.0%');
+      return 0.03; // 3.0% fallback
+    }
+
+    // Apply floor (0.1%) and cap (5.0%)
+    const cappedVolatility = Math.min(Math.max(volatility, 0.001), 0.05);
+
+    return cappedVolatility;
+  }
+
+  calculateTrend(prices) {
+    return (prices[prices.length - 1] - prices[0]) / prices[0];
+  }
+
+  async calculateTodayLoss() {
+    try {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      // Get trades from today
+      const todayTrades = await Trade.findAll({
+        where: {
+          created_at: {
+            [require('sequelize').Op.gte]: startOfDay
+          }
+        },
+        order: [['created_at', 'ASC']]
+      });
+
+      if (todayTrades.length === 0) {
+        return 0; // No trades today, no loss
+      }
+
+      // Calculate starting balance (from first trade or current balance)
+      let startBalance;
+      if (todayTrades.length > 0) {
+        // For simplicity, use current balance as starting point
+        // In a real implementation, you'd track daily starting balance
+        const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+        const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+        const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+        startBalance = usdtBalance + (bnbBalance * currentPrice);
+      } else {
+        return 0;
+      }
+
+      // Calculate current balance
+      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+      const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+      const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+      const currentBalance = usdtBalance + (bnbBalance * currentPrice);
+
+      // Calculate loss percentage
+      const loss = (startBalance - currentBalance) / startBalance;
+
+      logger.debug(`Daily loss calculation: Start: $${startBalance.toFixed(2)}, Current: $${currentBalance.toFixed(2)}, Loss: ${(loss * 100).toFixed(2)}%`);
+
+      return Math.max(0, loss); // Return 0 if profit (no loss)
+    } catch (error) {
+      logger.error('Error calculating today loss:', error);
+      return 0; // Return 0 on error to avoid blocking trading
+    }
+  }
+
+  async recordStrategyPerformance(strategy, decision, executionResult) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Find or create today's performance record
+      let performance = await StrategyPerformance.findOne({
+        where: {
+          strategy_name: strategy,
+          period_start: today,
+          period_end: tomorrow
+        }
+      });
+
+      if (!performance) {
+        performance = await StrategyPerformance.create({
+          strategy_name: strategy,
+          period_start: today,
+          period_end: tomorrow,
+          total_trades: 0,
+          successful_trades: 0,
+          failed_trades: 0,
+          total_profit: 0,
+          total_volume: 0,
+          win_rate: 0
+        });
+      }
+
+      // Update performance metrics
+      const updates = {
+        total_trades: performance.total_trades + 1,
+        total_volume: performance.total_volume + (executionResult.profit || 0)
+      };
+
+      if (executionResult.success) {
+        updates.successful_trades = performance.successful_trades + 1;
+        updates.total_profit = performance.total_profit + (executionResult.profit || 0);
+      } else {
+        updates.failed_trades = performance.failed_trades + 1;
+      }
+
+      // Calculate win rate
+      updates.win_rate = updates.successful_trades / updates.total_trades;
+
+      await performance.update(updates);
+
+      // Log performance stats
+      const stats = await this.getStrategyStats(strategy);
+      logger.info(`${strategy} performance: ${stats.winRate}% win rate, ${stats.avgProfit} avg profit, ${stats.totalTrades} total trades`);
+
+    } catch (error) {
+      logger.error('Error recording strategy performance:', error);
+      // Don't throw - performance tracking shouldn't block trading
+    }
+  }
+
+  async getStrategyStats(strategy) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const performance = await StrategyPerformance.findOne({
+        where: {
+          strategy_name: strategy,
+          period_start: today,
+          period_end: tomorrow
+        }
+      });
+
+      if (!performance) {
+        return {
+          winRate: 0,
+          avgProfit: 0,
+          totalTrades: 0
+        };
+      }
+
+      return {
+        winRate: (performance.win_rate * 100).toFixed(1),
+        avgProfit: performance.total_trades > 0 ? (performance.total_profit / performance.total_trades).toFixed(2) : 0,
+        totalTrades: performance.total_trades
+      };
+    } catch (error) {
+      logger.error('Error getting strategy stats:', error);
+      return {
+        winRate: 0,
+        avgProfit: 0,
+        totalTrades: 0
+      };
+    }
+  }
+}
+
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT, shutting down gracefully...');
+  if (global.bot) {
+    await global.bot.stop();
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM, shutting down gracefully...');
+  if (global.bot) {
+    await global.bot.stop();
+  }
+  process.exit(0);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', async (error) => {
+  logger.error('Uncaught Exception:', error);
+  if (global.bot) {
+    await global.bot.emergencyStop();
+  }
+  process.exit(1);
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  if (global.bot) {
+    await global.bot.emergencyStop();
+  }
+  process.exit(1);
+});
+
+// Start the bot
+async function main() {
+  try {
+    global.bot = new AdvancedTradingBot();
+    await global.bot.start();
+  } catch (error) {
+    logger.error('Failed to start advanced bot:', error);
+    process.exit(1);
+  }
+}
+
+// Only start if this file is run directly
+if (require.main === module) {
+  main();
+}
+
+module.exports = AdvancedTradingBot;

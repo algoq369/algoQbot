@@ -1,0 +1,1164 @@
+[
+  {
+    "timestamp": "2025-10-20T20:24:00.941Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1354.7660719716787,
+    "targetPrice": 0.000908646895370044,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -3.96, RSI 0.7, reversion strength 62% (Dynamically scaled to 75% due to BNB portfolio weight: 40.2%)",
+    "balances": {
+      "usdt": 34645.23392802832,
+      "bnb": 23.231003985249735
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:24:30.643Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1355.0149623697912,
+    "targetPrice": 0.000908253924756235,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -3.39, RSI 0.7, reversion strength 60% (Dynamically scaled to 75% due to BNB portfolio weight: 42.5%)",
+    "balances": {
+      "usdt": 33290.218965658525,
+      "bnb": 24.46170164292552
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:25:30.961Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1354.8772426896476,
+    "targetPrice": 0.000908460386742136,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -2.71, RSI 0.7, reversion strength 56% (Dynamically scaled to 75% due to BNB portfolio weight: 44.7%)",
+    "balances": {
+      "usdt": 31935.34172296888,
+      "bnb": 25.692553946807475
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:27:00.872Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 903.5298080156618,
+    "targetPrice": 0.000907864776790929,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -2.13, RSI 0.7, reversion strength 54% (Dynamically scaled to 50% due to BNB portfolio weight: 47.0%)",
+    "balances": {
+      "usdt": 31031.811914953218,
+      "bnb": 26.512836834285565
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:28:01.215Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 903.5439535867077,
+    "targetPrice": 0.000907835461018912,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.88, RSI 0.7, reversion strength 50% (Dynamically scaled to 50% due to BNB portfolio weight: 48.5%)",
+    "balances": {
+      "usdt": 30128.26796136651,
+      "bnb": 27.333106075940805
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:28:30.956Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 903.7201423698897,
+    "targetPrice": 0.000907481428708581,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.78, RSI 0.7, reversion strength 49% (Dynamically scaled to 50% due to BNB portfolio weight: 50.0%)",
+    "balances": {
+      "usdt": 29224.54781899662,
+      "bnb": 28.153215321891356
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:29:31.172Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 451.87010609375125,
+    "targetPrice": 0.000907442292303811,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.60, RSI 0.7, reversion strength 45% (Dynamically scaled to 25% due to BNB portfolio weight: 51.5%)",
+    "balances": {
+      "usdt": 28772.677712902867,
+      "bnb": 28.563261366788634
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:30:01.288Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 451.8748578804558,
+    "targetPrice": 0.000907424027409162,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.53, RSI 0.7, reversion strength 44% (Dynamically scaled to 25% due to BNB portfolio weight: 52.2%)",
+    "balances": {
+      "usdt": 28320.80285502241,
+      "bnb": 28.97330347021146
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:32:31.342Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 451.70513088712926,
+    "targetPrice": 0.000908067633447574,
+    "confidence": 0.8481256197171582,
+    "reasoning": "Mean reversion strong buy: z-score -1.22, RSI 0.7, reversion strength 38% (Dynamically scaled to 25% due to BNB portfolio weight: 53.0%)",
+    "balances": {
+      "usdt": 27869.09772413528,
+      "bnb": 29.38348227943226
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:33:31.595Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 451.84927512812527,
+    "targetPrice": 0.000907528605493767,
+    "confidence": 0.8338118913823768,
+    "reasoning": "Mean reversion strong buy: z-score -1.13, RSI 0.7, reversion strength 35% (Dynamically scaled to 25% due to BNB portfolio weight: 53.7%)",
+    "balances": {
+      "usdt": 27417.248449007155,
+      "bnb": 29.79354842198266
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:34:30.981Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 452.03737882873895,
+    "targetPrice": 0.000906835813545475,
+    "confidence": 0.8241642225140801,
+    "reasoning": "Mean reversion strong buy: z-score -1.08, RSI 0.7, reversion strength 33% (Dynamically scaled to 25% due to BNB portfolio weight: 54.5%)",
+    "balances": {
+      "usdt": 26965.211070178415,
+      "bnb": 30.203472106165783
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:54:01.356Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 903.6593443152393,
+    "targetPrice": 0.000907442652467465,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong sell: z-score 0.77, RSI 62.3, reversion strength 71% (Dynamically scaled to 50% due to BNB portfolio weight: 40.2%)",
+    "balances": {
+      "usdt": 36899.141047593665,
+      "bnb": 21.179980967667568
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:54:31.171Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 451.7954836180665,
+    "targetPrice": 0.000907444214434307,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong sell: z-score 0.82, RSI 62.2, reversion strength 71% (Dynamically scaled to 25% due to BNB portfolio weight: 38.7%)",
+    "balances": {
+      "usdt": 37348.67755379364,
+      "bnb": 20.770001769950802
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:55:01.234Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 451.73169320366145,
+    "targetPrice": 0.000907691929513808,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong sell: z-score 1.58, RSI 68.1, reversion strength 71% (Dynamically scaled to 25% due to BNB portfolio weight: 38.0%)",
+    "balances": {
+      "usdt": 37798.15058853129,
+      "bnb": 20.35996855772423
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:55:31.218Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 451.7245056337114,
+    "targetPrice": 0.000907639312825387,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong sell: z-score 1.46, RSI 66.5, reversion strength 71% (Dynamically scaled to 25% due to BNB portfolio weight: 37.2%)",
+    "balances": {
+      "usdt": 38247.61647163683,
+      "bnb": 19.94996563784446
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:56:01.284Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 451.70326904697623,
+    "targetPrice": 0.000907662971561741,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong sell: z-score 1.50, RSI 67.0, reversion strength 70% (Dynamically scaled to 25% due to BNB portfolio weight: 36.5%)",
+    "balances": {
+      "usdt": 38697.06122433857,
+      "bnb": 19.53997130639713
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T20:56:31.324Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 451.69302453893675,
+    "targetPrice": 0.000907625339725984,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong sell: z-score 1.36, RSI 64.7, reversion strength 71% (Dynamically scaled to 25% due to BNB portfolio weight: 35.7%)",
+    "balances": {
+      "usdt": 39146.49578375481,
+      "bnb": 19.130003271548123
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-20T21:03:36.354Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1356.0051815806287,
+    "targetPrice": 0.000906584803036165,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.73, RSI 29.9, reversion strength 70% (Dynamically scaled to 75% due to BNB portfolio weight: 40.3%)",
+    "balances": {
+      "usdt": 34643.99481841937,
+      "bnb": 23.229333690459292
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T10:02:31.296Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1058.2790398578668,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: gridTrading",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1142963.3630464962
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T11:13:00.744Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1065.6647471078934,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: gridTrading",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1150939.926876525
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T11:20:00.521Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1067.8619502311726,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: gridTrading",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1153312.9062496664
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T11:20:00.526Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1067.8619502311726,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: gridTrading",
+    "balances": {
+      "usdt": 33840,
+      "bnb": 2306603.8124993327
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:05:36.057Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1077.35266252241,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 6/10: 1077.576708",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1163562.8755242026
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:07:05.339Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1076.0550555967543,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 5/10: 1076.488689",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1162161.4600444946
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:08:05.200Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1075.0457512517519,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 4/10: 1075.400669",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1161071.411351892
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:12:36.236Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1073.1235482591405,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 2/10: 1073.224631",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1158995.4321198717
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:32:35.103Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1064.9964076014037,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 2/10: 1065.683586",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1150218.120209516
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:49:00.931Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1072.9082653959736,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: gridTrading",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1158762.9266276516
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:49:30.988Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1073.9786099768685,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: gridTrading",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1159918.898775018
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:56:30.689Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1076.4004896946149,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: gridTrading",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1162534.528870184
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T14:56:30.702Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1076.4004896946149,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: gridTrading",
+    "balances": {
+      "usdt": 33840,
+      "bnb": 2325047.057740368
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:04:34.926Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1076.2522933743996,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 7/10: 1076.506724",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1162374.4768443515
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:20:35.021Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1073.5627524474994,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 7/10: 1073.777481",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 1159469.7726432993
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:26:04.943Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1071.9312019788454,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 6/10: 1072.104895",
+    "balances": {
+      "usdt": 34920,
+      "bnb": 23.007527346910194
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:30:05.432Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1047,
+    "targetPrice": 1069.821632100387,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 5/10: 1070.432310",
+    "balances": {
+      "usdt": 33873,
+      "bnb": 23.986195162725828
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:34:05.688Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1072.6344871517945,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid sell at level 6/10: 1072.104895",
+    "balances": {
+      "usdt": 37074.6,
+      "bnb": 20.99313325001533
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:35:35.188Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1112,
+    "targetPrice": 1073.874817074269,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid sell at level 7/10: 1073.777481",
+    "balances": {
+      "usdt": 38181.04,
+      "bnb": 19.957630803808794
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:40:34.929Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1076.144488105813,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid sell at level 8/10: 1075.450066",
+    "balances": {
+      "usdt": 37074.6,
+      "bnb": 20.996417291602754
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:42:37.531Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1112,
+    "targetPrice": 1077.4397211551084,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid sell at level 9/10: 1077.122651",
+    "balances": {
+      "usdt": 38181.04,
+      "bnb": 19.9643409924221
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:50:35.128Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1145,
+    "targetPrice": 1076.5367597018515,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 9/10: 1077.122651",
+    "balances": {
+      "usdt": 37036.04,
+      "bnb": 21.027936814563006
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T15:57:05.361Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1111,
+    "targetPrice": 1077.4858618189305,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid sell at level 9/10: 1077.122651",
+    "balances": {
+      "usdt": 38141.485,
+      "bnb": 19.996832797917726
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:02:34.973Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1080,
+    "targetPrice": 1077.3043322066976,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid sell at level 9/10: 1077.122651",
+    "balances": {
+      "usdt": 37074.6,
+      "bnb": 20.9974977657541
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:08:05.196Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1112,
+    "targetPrice": 1077.6604282902276,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid sell at level 9/10: 1077.122651",
+    "balances": {
+      "usdt": 38181.04,
+      "bnb": 19.965632837982508
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:13:35.059Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1145,
+    "targetPrice": 1076.8639875923134,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 9/10: 1077.122651",
+    "balances": {
+      "usdt": 37036.04,
+      "bnb": 21.02890546404555
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:19:05.407Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1111,
+    "targetPrice": 1077.1215577095882,
+    "confidence": 0.7200000000000001,
+    "reasoning": "Grid buy at level 9/10: 1077.122651",
+    "balances": {
+      "usdt": 35925.04,
+      "bnb": 22.060358220745037
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:23:35.232Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926204187750946,
+    "confidence": 0.95,
+    "reasoning": "EMERGENCY: Portfolio critically imbalanced at 0.0% BNB (min 25%). Forcing BUY.",
+    "balances": {
+      "usdt": 30623,
+      "bnb": 5805437.340494943
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:24:05.322Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926219814556418,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-239.541868), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:24:35.046Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5378,
+    "targetPrice": 0.000926140709394467,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-265.857522), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:25:35.500Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926448298597643,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-293.995080), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:26:04.834Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5376,
+    "targetPrice": 0.000926597264996128,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-298.910061), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:26:35.262Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5376,
+    "targetPrice": 0.000926686310338163,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-299.354447), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:27:05.094Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5376,
+    "targetPrice": 0.000926797496158347,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-296.291165), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:27:35.625Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926545413404214,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-290.514621), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:28:05.043Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926342991801029,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-282.678131), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:28:35.413Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926302230094248,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-273.317028), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:29:06.372Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926274352377501,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-262.868106), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:29:44.242Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 5377,
+    "targetPrice": 0.000926262605335242,
+    "confidence": 0.95,
+    "reasoning": "EMERGENCY: Portfolio critically imbalanced at 0.0% BNB (min 25%). Forcing BUY.",
+    "balances": {
+      "usdt": 30623,
+      "bnb": 5805071.204219903
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:30:34.694Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5378,
+    "targetPrice": 0.000925986117671353,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-216.327603), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:31:05.816Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5374,
+    "targetPrice": 0.00092718385745862,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-204.552761), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:31:35.910Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5372,
+    "targetPrice": 0.000928417351326832,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-192.996372), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:32:06.611Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5372,
+    "targetPrice": 0.000928264456512418,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-181.742832), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:32:36.105Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5375,
+    "targetPrice": 0.000928884189425781,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-170.854813), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:33:06.248Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5372,
+    "targetPrice": 0.000927964618218313,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-160.377250), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:33:35.535Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5371,
+    "targetPrice": 0.000928875015543743,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-150.340672), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:34:07.998Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5371,
+    "targetPrice": 0.000929125318883801,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-140.763973), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:34:28.185Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 5370,
+    "targetPrice": 0.000929238669382344,
+    "confidence": 0.95,
+    "reasoning": "EMERGENCY: Portfolio critically imbalanced at 0.0% BNB (min 25%). Forcing BUY.",
+    "balances": {
+      "usdt": 30630,
+      "bnb": 5778946.3785661515
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:34:35.762Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5370,
+    "targetPrice": 0.000929265118950197,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-123.021033), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:35:05.568Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5372,
+    "targetPrice": 0.000928601898535272,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-114.853239), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:35:36.051Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5372,
+    "targetPrice": 0.000928652304376797,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-107.145101), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:36:04.943Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5370,
+    "targetPrice": 0.000929328360887737,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-99.884934), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:36:35.511Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5370,
+    "targetPrice": 0.000928996636058474,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-93.058480), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:37:05.217Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5370,
+    "targetPrice": 0.000929180925598879,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-86.649623), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:37:35.197Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5370,
+    "targetPrice": 0.000929260293853364,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-80.640978), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:38:05.671Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5369,
+    "targetPrice": 0.000930194742206005,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-75.014365), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:38:35.512Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5369,
+    "targetPrice": 0.000929946475184368,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-69.751186), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:39:05.354Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5370,
+    "targetPrice": 0.000929521927694899,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-64.832727), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:40:06.278Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5372,
+    "targetPrice": 0.000928399647193522,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-55.955921), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-22T16:40:36.154Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 5372,
+    "targetPrice": 0.000928478243748034,
+    "confidence": 0.7150000000000001,
+    "reasoning": "🔻 Downtrend active: Price below EMAs, MACD negative (-51.961462), RSI 0.2",
+    "balances": {
+      "usdt": 36000,
+      "bnb": 22
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-23T08:27:05.129Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 5463,
+    "targetPrice": 0.000890607351460596,
+    "confidence": 0.8250000000000001,
+    "reasoning": "💎 Oversold bounce: RSI 9.9 (oversold), MACD turning bullish, potential reversal",
+    "balances": {
+      "usdt": 30537,
+      "bnb": 6134038.28791934
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-23T09:58:31.007Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 4371,
+    "targetPrice": 0.0009055369938021,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: momentum",
+    "balances": {
+      "usdt": 31629,
+      "bnb": 4826992.107148662
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-23T10:00:30.385Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 5464,
+    "targetPrice": 0.000908471891588952,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: momentum",
+    "balances": {
+      "usdt": 30536,
+      "bnb": 6014517.385700108
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-23T10:00:30.403Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 5464,
+    "targetPrice": 0.000908471891588952,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: momentum",
+    "balances": {
+      "usdt": 25072,
+      "bnb": 12029012.771400215
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-23T10:00:30.415Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 4371,
+    "targetPrice": 0.000908471891588952,
+    "confidence": 0.95,
+    "reasoning": "Exit stop_loss: momentum",
+    "balances": {
+      "usdt": 20701,
+      "bnb": 16840388.93005599
+    },
+    "shadowMode": true
+  }
+]

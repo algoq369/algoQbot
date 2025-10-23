@@ -82,10 +82,10 @@ class RangingStrategy {
       logger.info(`Executing BUY: ${tradeAmount.toFixed(2)} USDT for BNB at ${currentPrice.toFixed(6)}`);
 
       const receipt = await this.pancakeSwap.swapUSDTForBNB(tradeAmount, minBnbAmount);
-      
+
       this.position = 'long';
       this.lastRebalancePrice = currentPrice;
-      
+
       logger.info(`Buy order executed successfully: ${receipt.transactionHash}`);
       return receipt;
     } catch (error) {
@@ -108,10 +108,10 @@ class RangingStrategy {
       logger.info(`Executing SELL: ${tradeAmount.toFixed(6)} BNB for USDT at ${currentPrice.toFixed(6)}`);
 
       const receipt = await this.pancakeSwap.swapBNBForUSDT(tradeAmount, minUsdtAmount);
-      
+
       this.position = 'short';
       this.lastRebalancePrice = currentPrice;
-      
+
       logger.info(`Sell order executed successfully: ${receipt.transactionHash}`);
       return receipt;
     } catch (error) {
@@ -123,7 +123,7 @@ class RangingStrategy {
 
   shouldRebalance(currentPrice) {
     if (!this.lastRebalancePrice) return false;
-    
+
     const priceChange = Math.abs(currentPrice - this.lastRebalancePrice) / this.lastRebalancePrice;
     return priceChange >= config.strategy.rebalanceThreshold;
   }
@@ -141,7 +141,7 @@ class RangingStrategy {
           // Too much USDT, buy BNB
           const tradeAmount = Math.min(usdtDifference, config.trading.maxTradeAmount);
           const minBnbAmount = ethers.parseEther((tradeAmount / currentPrice * 0.995).toFixed(18));
-          
+
           logger.info(`Rebalancing: Buying ${tradeAmount.toFixed(2)} USDT worth of BNB`);
           const receipt = await this.pancakeSwap.swapUSDTForBNB(tradeAmount, minBnbAmount);
           if (receipt) {
@@ -152,7 +152,7 @@ class RangingStrategy {
           // Too little USDT, sell BNB
           const bnbToSell = Math.min(Math.abs(usdtDifference) / currentPrice, bnbBalance * 0.5);
           const minUsdtAmount = ethers.parseEther((bnbToSell * currentPrice * 0.995).toFixed(18));
-          
+
           logger.info(`Rebalancing: Selling ${bnbToSell.toFixed(6)} BNB for USDT`);
           const receipt = await this.pancakeSwap.swapBNBForUSDT(bnbToSell, minUsdtAmount);
           if (receipt) {
@@ -171,7 +171,7 @@ class RangingStrategy {
     this.basePrice = newBasePrice;
     this.lowerBound = this.basePrice * config.strategy.lowerBoundPercent;
     this.upperBound = this.basePrice * config.strategy.upperBoundPercent;
-    
+
     logger.info(`Bounds updated:`);
     logger.info(`New Base Price: ${this.basePrice.toFixed(6)} BNB per USDT`);
     logger.info(`New Lower Bound: ${this.lowerBound.toFixed(6)} BNB per USDT`);
@@ -186,6 +186,36 @@ class RangingStrategy {
       position: this.position,
       lastRebalancePrice: this.lastRebalancePrice
     };
+  }
+
+  /**
+   * Detect breakout from ranging zone to protect positions
+   * @param {number} currentPrice - Current market price
+   * @param {Array} priceHistory - Recent price history
+   * @returns {string|boolean} - 'upward', 'downward', or false
+   */
+  detectBreakout(currentPrice, priceHistory) {
+    if (!priceHistory || priceHistory.length < 50) return false;
+
+    const prices = priceHistory.slice(-50).map(p => p.price);
+    const upperBound = Math.max(...prices);
+    const lowerBound = Math.min(...prices);
+    const range = upperBound - lowerBound;
+
+    // Breakout threshold: 5% beyond the recent range
+    const breakoutThreshold = range * 0.05;
+
+    if (currentPrice > upperBound + breakoutThreshold) {
+      logger.warn(`🚀 UPWARD BREAKOUT: ${currentPrice.toFixed(6)} > ${upperBound.toFixed(6)}`);
+      return 'upward';
+    }
+
+    if (currentPrice < lowerBound - breakoutThreshold) {
+      logger.warn(`📉 DOWNWARD BREAKOUT: ${currentPrice.toFixed(6)} < ${lowerBound.toFixed(6)}`);
+      return 'downward';
+    }
+
+    return false;
   }
 }
 

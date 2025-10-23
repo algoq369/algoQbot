@@ -1,0 +1,916 @@
+{
+  "trades": [
+    {
+      "id": "shadow_1759684802363_s8ifr9eeu",
+      "timestamp": 1759684802363,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963677359744,
+        "targetPrice": 0.000854766491520184,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402615011974,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996367738,
+        "estimatedPriceImpact": 0.0005001874998183869,
+        "reason": "Profitable trade",
+        "timestamp": 1759684802363
+      },
+      "estimatedProfit": 0.003001402615011974,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996367738,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759684830488_uop6vfexp",
+      "timestamp": 1759684830488,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963667082516,
+        "targetPrice": 0.000855008341587561,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.00300140261398283,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996366708,
+        "estimatedPriceImpact": 0.0005001874998183354,
+        "reason": "Profitable trade",
+        "timestamp": 1759684830488
+      },
+      "estimatedProfit": 0.00300140261398283,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996366708,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759684860569_x5ijm1yij",
+      "timestamp": 1759684860569,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963660849236,
+        "targetPrice": 0.000855155026922048,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402613359333,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996366086,
+        "estimatedPriceImpact": 0.0005001874998183043,
+        "reason": "Profitable trade",
+        "timestamp": 1759684860569
+      },
+      "estimatedProfit": 0.003001402613359333,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996366086,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759684890709_bnl2kgfvy",
+      "timestamp": 1759684890709,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996366557392,
+        "targetPrice": 0.000855043842739917,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026138319508,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996366558,
+        "estimatedPriceImpact": 0.0005001874998183279,
+        "reason": "Profitable trade",
+        "timestamp": 1759684890709
+      },
+      "estimatedProfit": 0.0030014026138319508,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996366558,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759684920662_o17dlzwte",
+      "timestamp": 1759684920662,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963655613757,
+        "targetPrice": 0.000855278231413238,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026128357017,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.001000374999636556,
+        "estimatedPriceImpact": 0.000500187499818278,
+        "reason": "Profitable trade",
+        "timestamp": 1759684920662
+      },
+      "estimatedProfit": 0.0030014026128357017,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.001000374999636556,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759684971947_46qjy2fbj",
+      "timestamp": 1759684971947,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996366553477,
+        "targetPrice": 0.000855044764091122,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402613828188,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996366554,
+        "estimatedPriceImpact": 0.0005001874998183277,
+        "reason": "Profitable trade",
+        "timestamp": 1759684971947
+      },
+      "estimatedProfit": 0.003001402613828188,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996366554,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759684981055_0p25og3ln",
+      "timestamp": 1759684981055,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963667216822,
+        "targetPrice": 0.000855005180940675,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001236876728189,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996366723,
+        "estimatedPriceImpact": 0.0005001874998183362,
+        "reason": "Profitable trade",
+        "timestamp": 1759684981055
+      },
+      "estimatedProfit": 0.003001236876728189,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996366723,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685011161_t0tue0t8p",
+      "timestamp": 1759685011161,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996367012492,
+        "targetPrice": 0.000854936745862723,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026142881085,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996367014,
+        "estimatedPriceImpact": 0.0005001874998183507,
+        "reason": "Profitable trade",
+        "timestamp": 1759685011161
+      },
+      "estimatedProfit": 0.0030014026142881085,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996367014,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685041189_u51vof4b8",
+      "timestamp": 1759685041189,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.74999636746101,
+        "targetPrice": 0.000854831197881716,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0029956160067788323,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996367463,
+        "estimatedPriceImpact": 0.0005001874998183731,
+        "reason": "Profitable trade",
+        "timestamp": 1759685041189
+      },
+      "estimatedProfit": 0.0029956160067788323,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996367463,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685071240_bfw88zjni",
+      "timestamp": 1759685071240,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996366324682,
+        "targetPrice": 0.000855098605522211,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402613599031,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996366324,
+        "estimatedPriceImpact": 0.0005001874998183162,
+        "reason": "Profitable trade",
+        "timestamp": 1759685071240
+      },
+      "estimatedProfit": 0.003001402613599031,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996366324,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685101349_qaqonmckr",
+      "timestamp": 1759685101349,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963654911754,
+        "targetPrice": 0.000855294751330366,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402612765409,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996365492,
+        "estimatedPriceImpact": 0.0005001874998182746,
+        "reason": "Profitable trade",
+        "timestamp": 1759685101349
+      },
+      "estimatedProfit": 0.003001402612765409,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996365492,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685130375_hq5uzj77a",
+      "timestamp": 1759685130375,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996361465274,
+        "targetPrice": 0.000856242151003467,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0031055446062821937,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996361467,
+        "estimatedPriceImpact": 0.0005001874998180734,
+        "reason": "Profitable trade",
+        "timestamp": 1759685130375
+      },
+      "estimatedProfit": 0.0031055446062821937,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996361467,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685160504_3n4h03a3x",
+      "timestamp": 1759685160504,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963595795442,
+        "targetPrice": 0.000856685912339952,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014014691078054,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996359578,
+        "estimatedPriceImpact": 0.0005001874998179789,
+        "reason": "Profitable trade",
+        "timestamp": 1759685160504
+      },
+      "estimatedProfit": 0.0030014014691078054,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996359578,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685472238_lpty7v75b",
+      "timestamp": 1759685472238,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996364107288,
+        "targetPrice": 0.000855620416104759,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402611379959,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996364106,
+        "estimatedPriceImpact": 0.0005001874998182053,
+        "reason": "Profitable trade",
+        "timestamp": 1759685472238
+      },
+      "estimatedProfit": 0.003001402611379959,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996364106,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685490312_m2nhuj755",
+      "timestamp": 1759685490312,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996365228345,
+        "targetPrice": 0.000855356602257915,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030238604751043497,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996365227,
+        "estimatedPriceImpact": 0.0005001874998182614,
+        "reason": "Profitable trade",
+        "timestamp": 1759685490312
+      },
+      "estimatedProfit": 0.0030238604751043497,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996365227,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685520412_il5p0iujy",
+      "timestamp": 1759685520412,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963607391638,
+        "targetPrice": 0.000856413023674332,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0029962363072044643,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.001000374999636074,
+        "estimatedPriceImpact": 0.000500187499818037,
+        "reason": "Profitable trade",
+        "timestamp": 1759685520412
+      },
+      "estimatedProfit": 0.0029962363072044643,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.001000374999636074,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685617808_uils6djk4",
+      "timestamp": 1759685617808,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996365305869,
+        "targetPrice": 0.000855338358732281,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.002821244200270889,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996365305,
+        "estimatedPriceImpact": 0.0005001874998182653,
+        "reason": "Profitable trade",
+        "timestamp": 1759685617809
+      },
+      "estimatedProfit": 0.002821244200270889,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996365305,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685640941_e6jks8db2",
+      "timestamp": 1759685640941,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963650367065,
+        "targetPrice": 0.0008554016997331,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026123107015,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996365036,
+        "estimatedPriceImpact": 0.0005001874998182518,
+        "reason": "Profitable trade",
+        "timestamp": 1759685640941
+      },
+      "estimatedProfit": 0.0030014026123107015,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996365036,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685671006_8levhpn8u",
+      "timestamp": 1759685671006,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996360064723,
+        "targetPrice": 0.000856571737232761,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402607334145,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996360066,
+        "estimatedPriceImpact": 0.0005001874998180033,
+        "reason": "Profitable trade",
+        "timestamp": 1759685671006
+      },
+      "estimatedProfit": 0.003001402607334145,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996360066,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685701081_twwt1pntj",
+      "timestamp": 1759685701081,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963610834253,
+        "targetPrice": 0.000856332009892615,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026083542656,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996361085,
+        "estimatedPriceImpact": 0.0005001874998180543,
+        "reason": "Profitable trade",
+        "timestamp": 1759685701081
+      },
+      "estimatedProfit": 0.0030014026083542656,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996361085,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685731048_wfziuhhj5",
+      "timestamp": 1759685731048,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963609301603,
+        "targetPrice": 0.000856368077190788,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.002949999898791229,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996360931,
+        "estimatedPriceImpact": 0.0005001874998180466,
+        "reason": "Profitable trade",
+        "timestamp": 1759685731048
+      },
+      "estimatedProfit": 0.002949999898791229,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996360931,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685761264_87f69pnko",
+      "timestamp": 1759685761264,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996357006096,
+        "targetPrice": 0.000857291511865532,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402604273765,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996357007,
+        "estimatedPriceImpact": 0.0005001874998178503,
+        "reason": "Profitable trade",
+        "timestamp": 1759685761264
+      },
+      "estimatedProfit": 0.003001402604273765,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996357007,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685791305_gufm9l4pr",
+      "timestamp": 1759685791305,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963546767967,
+        "targetPrice": 0.000857839656825563,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.002992117594091918,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996354676,
+        "estimatedPriceImpact": 0.0005001874998177338,
+        "reason": "Profitable trade",
+        "timestamp": 1759685791305
+      },
+      "estimatedProfit": 0.002992117594091918,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996354676,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685820369_07mutblet",
+      "timestamp": 1759685820369,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996354814821,
+        "targetPrice": 0.000857807176105791,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402602080979,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996354814,
+        "estimatedPriceImpact": 0.0005001874998177407,
+        "reason": "Profitable trade",
+        "timestamp": 1759685820369
+      },
+      "estimatedProfit": 0.003001402602080979,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996354814,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685850412_gwvzv8ova",
+      "timestamp": 1759685850412,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963557927405,
+        "targetPrice": 0.000857577046096117,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402603060121,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996355792,
+        "estimatedPriceImpact": 0.0005001874998177896,
+        "reason": "Profitable trade",
+        "timestamp": 1759685850412
+      },
+      "estimatedProfit": 0.003001402603060121,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996355792,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685880462_3rozadusx",
+      "timestamp": 1759685880462,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996356386753,
+        "targetPrice": 0.000857437259452919,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402603654172,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996356386,
+        "estimatedPriceImpact": 0.0005001874998178193,
+        "reason": "Profitable trade",
+        "timestamp": 1759685880462
+      },
+      "estimatedProfit": 0.003001402603654172,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996356386,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685910461_9c23wb2rh",
+      "timestamp": 1759685910461,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963563552976,
+        "targetPrice": 0.000857444661714392,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.002815776908791993,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996356354,
+        "estimatedPriceImpact": 0.0005001874998178177,
+        "reason": "Profitable trade",
+        "timestamp": 1759685910461
+      },
+      "estimatedProfit": 0.002815776908791993,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996356354,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685940574_51s10fsqz",
+      "timestamp": 1759685940574,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996358203193,
+        "targetPrice": 0.000857009803723857,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026054720963,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996358201,
+        "estimatedPriceImpact": 0.0005001874998179101,
+        "reason": "Profitable trade",
+        "timestamp": 1759685940574
+      },
+      "estimatedProfit": 0.0030014026054720963,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996358201,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759685970651_whf45x75i",
+      "timestamp": 1759685970651,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963583560207,
+        "targetPrice": 0.000856973839425204,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402605625191,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996358355,
+        "estimatedPriceImpact": 0.0005001874998179178,
+        "reason": "Profitable trade",
+        "timestamp": 1759685970651
+      },
+      "estimatedProfit": 0.003001402605625191,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996358355,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759686000615_bpq2i7zg8",
+      "timestamp": 1759686000615,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.749996356842902,
+        "targetPrice": 0.000857329915730833,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.003001402604110452,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996356844,
+        "estimatedPriceImpact": 0.0005001874998178422,
+        "reason": "Profitable trade",
+        "timestamp": 1759686000615
+      },
+      "estimatedProfit": 0.003001402604110452,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996356844,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759686030687_hxyurhieu",
+      "timestamp": 1759686030687,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963574861006,
+        "targetPrice": 0.000857178554305937,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026047538262,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996357488,
+        "estimatedPriceImpact": 0.0005001874998178744,
+        "reason": "Profitable trade",
+        "timestamp": 1759686030687
+      },
+      "estimatedProfit": 0.0030014026047538262,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996357488,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    },
+    {
+      "id": "shadow_1759686060886_zuwv4uk1a",
+      "timestamp": 1759686060886,
+      "params": {
+        "action": "rebalance",
+        "pair": "USDT/BNB",
+        "amount": 3.7499963568571535,
+        "targetPrice": 0.00085732656199413,
+        "confidence": 0.6,
+        "reasoning": "Portfolio rebalancing opportunity detected"
+      },
+      "type": "shadow",
+      "status": "simulated",
+      "simulation": {
+        "wouldExecute": true,
+        "estimatedProfit": 0.0030014026041247565,
+        "estimatedGasCost": 0.00075,
+        "estimatedSlippage": 0.0010003749996356857,
+        "estimatedPriceImpact": 0.0005001874998178428,
+        "reason": "Profitable trade",
+        "timestamp": 1759686060886
+      },
+      "estimatedProfit": 0.0030014026041247565,
+      "estimatedGasCost": 0.00075,
+      "estimatedSlippage": 0.0010003749996356857,
+      "wouldExecute": true,
+      "reason": "Profitable trade"
+    }
+  ],
+  "metrics": {
+    "totalTrades": 32,
+    "successfulTrades": 32,
+    "failedTrades": 0,
+    "totalProfit": 0.0957338917431888,
+    "totalLoss": 0,
+    "netProfit": 0.0957338917431888,
+    "winRate": "100.00",
+    "avgProfit": 0.00299168411697465,
+    "avgLoss": 0,
+    "sharpeRatio": 0,
+    "maxDrawdown": 0,
+    "startTime": 1759684801950,
+    "endTime": null
+  },
+  "savedAt": 1759686060921
+}

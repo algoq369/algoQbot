@@ -1,6 +1,8 @@
 const { ethers } = require('ethers');
 const config = require('./config');
 const logger = require('./logger');
+const EncryptedKeyManager = require('./security/encryptedKeyManager');
+const MultiRPCProvider = require('./providers/multiRPCProvider');
 
 class WalletManager {
   constructor() {
@@ -11,18 +13,30 @@ class WalletManager {
 
   async connect(privateKey = null) {
     try {
-      // Initialize provider
-      this.provider = new ethers.JsonRpcProvider(config.network.rpcUrl);
+      // Initialize multi-RPC provider for better reliability
+      this.provider = new MultiRPCProvider();
       
-      // Check if we have a private key
-      const key = privateKey || config.wallet.privateKey;
+      // Try encrypted wallet first (RECOMMENDED)
+      const keyManager = new EncryptedKeyManager();
+      const hasEncrypted = await keyManager.hasEncryptedWallet();
       
-      if (!key || key === 'your_private_key_here') {
-        throw new Error('Private key not provided. Please set PRIVATE_KEY in .env file or pass it as parameter.');
+      if (hasEncrypted && process.env.WALLET_PASSWORD) {
+        logger.info('🔐 Loading encrypted wallet...');
+        const decryptedWallet = await keyManager.loadEncryptedWallet(process.env.WALLET_PASSWORD);
+        this.wallet = decryptedWallet.connect(this.provider.getCurrentProvider());
+      } 
+      // Fallback to plaintext private key (ONLY for initial setup/testing)
+      else {
+        const key = privateKey || config.wallet.privateKey;
+        
+        if (!key || key === 'your_private_key_here') {
+          throw new Error('❌ No wallet configured. Run: node scripts/setup-encrypted-wallet.js');
+        }
+        
+        logger.warn('⚠️  Using plaintext private key - INSECURE!');
+        logger.warn('⚠️  Run: node scripts/setup-encrypted-wallet.js to encrypt your key');
+        this.wallet = new ethers.Wallet(key, this.provider.getCurrentProvider());
       }
-
-      // Create wallet
-      this.wallet = new ethers.Wallet(key, this.provider);
       
       // Verify wallet address matches
       if (this.wallet.address.toLowerCase() !== config.wallet.address.toLowerCase()) {

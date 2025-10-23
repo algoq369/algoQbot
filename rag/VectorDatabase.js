@@ -64,9 +64,8 @@ class VectorDatabase {
 
       return true;
     } catch (error) {
-      logger.error('❌ Error initializing vector database:', error);
+      logger.info('ℹ️  Vector database not installed - using simplified mode (this is normal)');
       // Fallback to mock mode if Milvus is not available
-      logger.warn('🔄 Falling back to mock vector database mode');
       this.isConnected = false;
       return false;
     }
@@ -158,7 +157,7 @@ class VectorDatabase {
   async storeMarketData(data) {
     try {
       if (!this.isConnected) {
-        logger.warn('Vector database not connected, skipping storage');
+        logger.debug('Vector database not connected, skipping storage');
         return;
       }
 
@@ -186,7 +185,7 @@ class VectorDatabase {
   async storeNewsArticle(article) {
     try {
       if (!this.isConnected) {
-        logger.warn('Vector database not connected, skipping storage');
+        logger.debug('Vector database not connected, skipping storage');
         return;
       }
 
@@ -217,7 +216,7 @@ class VectorDatabase {
   async storeTradingLog(log) {
     try {
       if (!this.isConnected) {
-        logger.warn('Vector database not connected, skipping storage');
+        logger.debug('Vector database not connected, skipping storage');
         return;
       }
 

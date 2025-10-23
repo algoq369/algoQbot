@@ -1,0 +1,576 @@
+[
+  {
+    "timestamp": "2025-10-18T16:32:30.943Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1796.2256339779974,
+    "targetPrice": 0.000921497316892005,
+    "confidence": 0.9,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $3.04 (range: 0.00%)",
+    "balances": {
+      "usdt": 37787.24450580811,
+      "bnb": 20.344782897756634
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:33:00.994Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1796.3931580123206,
+    "targetPrice": 0.000920889787921265,
+    "confidence": 0.9,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $1.86 (range: 0.00%)",
+    "balances": {
+      "usdt": 39574.655698030365,
+      "bnb": 18.690502783451457
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:33:30.975Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1796.3533290058779,
+    "targetPrice": 0.000920542621363678,
+    "confidence": 0.859013189226894,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $1.19 (range: 0.00%)",
+    "balances": {
+      "usdt": 41362.027260391216,
+      "bnb": 17.036882981073017
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:36:01.185Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1796.0623568092976,
+    "targetPrice": 0.000920578300908556,
+    "confidence": 0.8650297002184351,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $1.26 (range: 0.00%)",
+    "balances": {
+      "usdt": 43149.10930541647,
+      "bnb": 15.383466948315696
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:40:00.436Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1795.5494709404459,
+    "targetPrice": 0.000921025616507405,
+    "confidence": 0.9,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $2.12 (range: 0.00%)",
+    "balances": {
+      "usdt": 44935.68102900221,
+      "bnb": 13.729719889873227
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:40:30.499Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1795.278477616697,
+    "targetPrice": 0.000921029037139748,
+    "confidence": 0.9,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $2.13 (range: 0.00%)",
+    "balances": {
+      "usdt": 46721.983114230825,
+      "bnb": 12.076216282236208
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:41:00.496Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1794.8586242873928,
+    "targetPrice": 0.000921381712299991,
+    "confidence": 0.9,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $2.81 (range: 0.00%)",
+    "balances": {
+      "usdt": 48507.86744539678,
+      "bnb": 10.422466369653884
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:41:30.574Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1794.6099600113748,
+    "targetPrice": 0.000921325880757212,
+    "confidence": 0.9,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $2.70 (range: 0.00%)",
+    "balances": {
+      "usdt": 50293.5043556081,
+      "bnb": 8.76904576763074
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:42:00.611Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1794.3235447930842,
+    "targetPrice": 0.000921381459179357,
+    "confidence": 0.9,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $2.81 (range: 0.00%)",
+    "balances": {
+      "usdt": 52078.85628267722,
+      "bnb": 7.1157893216894115
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:42:30.632Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1794.2327272358195,
+    "targetPrice": 0.000920672816612731,
+    "confidence": 0.880967537289658,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $1.44 (range: 0.00%)",
+    "balances": {
+      "usdt": 53864.11784627686,
+      "bnb": 5.463888023046468
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:43:00.626Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1794.0027919219153,
+    "targetPrice": 0.00092047015403199,
+    "confidence": 0.8467932884653171,
+    "reasoning": "🟢 SELL at top: price 0.000920 near upper 0.000921, expected profit: $1.04 (range: 0.00%)",
+    "balances": {
+      "usdt": 55649.15062423916,
+      "bnb": 3.812561996832282
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:43:30.724Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1793.7239409484641,
+    "targetPrice": 0.000920542388529278,
+    "confidence": 0.8589739272146829,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $1.18 (range: 0.00%)",
+    "balances": {
+      "usdt": 57433.90594548288,
+      "bnb": 2.161363075869433
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:44:00.746Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1793.4551938068453,
+    "targetPrice": 0.00092053831824867,
+    "confidence": 0.858287570701437,
+    "reasoning": "🟢 SELL at top: price 0.000921 near upper 0.000921, expected profit: $1.18 (range: 0.00%)",
+    "balances": {
+      "usdt": 59218.39386332069,
+      "bnb": 0.5104188479081373
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:49:01.010Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1796.2256339779974,
+    "targetPrice": 0.000918728795373984,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 57422.16822934269,
+      "bnb": 2.160663060832613
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:49:31.325Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1794.8586242873928,
+    "targetPrice": 0.000918353719550987,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 55627.3096050553,
+      "bnb": 3.808978154515108
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:49:31.350Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1794.6099600113748,
+    "targetPrice": 0.000918353719550987,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 53832.699645043926,
+      "bnb": 5.457064886434802
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:49:31.357Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1794.3235447930842,
+    "targetPrice": 0.000918353719550987,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 52038.37610025084,
+      "bnb": 7.104888587873443
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.369Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1796.3931580123206,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 50241.98294223852,
+      "bnb": 8.753270283440571
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.376Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1796.3533290058779,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 48445.629613232646,
+      "bnb": 10.4016154316601
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.380Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1796.0623568092976,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 46649.56725642335,
+      "bnb": 12.049693581956248
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.385Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1795.5494709404459,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 44854.0177854829,
+      "bnb": 13.697301104943246
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.388Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1795.278477616697,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 43058.739307866206,
+      "bnb": 15.344659962746626
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.391Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1794.2327272358195,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 41264.50658063039,
+      "bnb": 16.99105923340268
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.394Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1794.0027919219153,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 39470.503788708476,
+      "bnb": 18.63724751396399
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.397Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1793.7239409484641,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 37676.779847760015,
+      "bnb": 20.283179919112744
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T16:50:30.399Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1793.4551938068453,
+    "targetPrice": 0.000917606309184029,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: ranging",
+    "balances": {
+      "usdt": 35883.32465395317,
+      "bnb": 21.92886572018877
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:03:28.352Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1799.9133563842722,
+    "targetPrice": 0.00091677699010172,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.93, RSI 21.4, reversion strength 69%",
+    "balances": {
+      "usdt": 34200.08664361573,
+      "bnb": 23.65011914930986
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:03:31.272Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1799.8650944148362,
+    "targetPrice": 0.000916834164940087,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.92, RSI 22.3, reversion strength 67%",
+    "balances": {
+      "usdt": 32400.221549200895,
+      "bnb": 25.300296960152497
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:04:01.344Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1799.9416223419391,
+    "targetPrice": 0.000916749419857218,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.98, RSI 22.2, reversion strength 66%",
+    "balances": {
+      "usdt": 30600.279926858955,
+      "bnb": 26.95039239821133
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:04:31.391Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1799.6277436758735,
+    "targetPrice": 0.000917075805713392,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.77, RSI 27.9, reversion strength 66%",
+    "balances": {
+      "usdt": 28800.652183183083,
+      "bnb": 28.600787461227057
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:05:30.753Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1800.1076112547937,
+    "targetPrice": 0.000916605684394604,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -2.07, RSI 25.7, reversion strength 66%",
+    "balances": {
+      "usdt": 27000.54457192829,
+      "bnb": 30.250776330225193
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:06:00.539Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1800.2308225809315,
+    "targetPrice": 0.000916491632132612,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -2.13, RSI 24.7, reversion strength 64%",
+    "balances": {
+      "usdt": 25200.31374934736,
+      "bnb": 31.900672815027825
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:06:30.574Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1800.9367011782626,
+    "targetPrice": 0.000915872515534976,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -2.44, RSI 21.3, reversion strength 63%",
+    "balances": {
+      "usdt": 23399.377048169095,
+      "bnb": 33.550101241855224
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:07:30.901Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1800.0731029688593,
+    "targetPrice": 0.000916592806744293,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.83, RSI 32.0, reversion strength 63%",
+    "balances": {
+      "usdt": 21599.303945200238,
+      "bnb": 35.20003529965036
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:08:00.669Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1799.7214277126402,
+    "targetPrice": 0.00091687268099007,
+    "confidence": 0.85,
+    "reasoning": "Mean reversion strong buy: z-score -1.59, RSI 35.9, reversion strength 63%",
+    "balances": {
+      "usdt": 19799.582517487597,
+      "bnb": 36.85015071011252
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:08:30.371Z",
+    "action": "sell",
+    "pair": "USDT/BNB",
+    "amount": 1800.9367011782626,
+    "targetPrice": 0.000918769670813802,
+    "confidence": 0.95,
+    "reasoning": "Exit take_profit: mean_reversion",
+    "balances": {
+      "usdt": 21591.514535159968,
+      "bnb": 35.195504690014474
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:10:30.877Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1541.8780653123945,
+    "targetPrice": 0.000917256408826688,
+    "confidence": 0.6,
+    "reasoning": "🟠 WEAK BUY: Price 0.000917 slightly below mean 0.000919 (z-score: -1.19, RSI: 42.3)",
+    "balances": {
+      "usdt": 20049.636469847574,
+      "bnb": 36.60980222705156
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:11:00.968Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1542.068036340907,
+    "targetPrice": 0.000917086656140472,
+    "confidence": 0.6,
+    "reasoning": "🟠 WEAK BUY: Price 0.000917 slightly below mean 0.000919 (z-score: -1.24, RSI: 41.2)",
+    "balances": {
+      "usdt": 18507.568433506665,
+      "bnb": 38.02401224604055
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:11:31.137Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1541.837342410207,
+    "targetPrice": 0.000917285136936735,
+    "confidence": 0.6,
+    "reasoning": "🟠 WEAK BUY: Price 0.000917 slightly below mean 0.000919 (z-score: -1.08, RSI: 43.7)",
+    "balances": {
+      "usdt": 16965.73109109646,
+      "bnb": 39.43831672380747
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:12:01.073Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1542.004315815175,
+    "targetPrice": 0.000917146621685136,
+    "confidence": 0.6,
+    "reasoning": "🟠 WEAK BUY: Price 0.000917 slightly below mean 0.000919 (z-score: -1.12, RSI: 42.7)",
+    "balances": {
+      "usdt": 15423.726775281284,
+      "bnb": 40.85256077268126
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-10-18T17:12:31.189Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 1542.1272133202108,
+    "targetPrice": 0.000917048225046686,
+    "confidence": 0.6,
+    "reasoning": "🟠 WEAK BUY: Price 0.000917 slightly below mean 0.000919 (z-score: -1.13, RSI: 41.9)",
+    "balances": {
+      "usdt": 13881.599561961073,
+      "bnb": 42.26676579645275
+    },
+    "shadowMode": true
+  }
+]

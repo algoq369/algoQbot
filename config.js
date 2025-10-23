@@ -2,76 +2,175 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 module.exports = {
-  // Network Configuration
   network: {
     rpcUrl: process.env.BSC_RPC_URL || 'https://bsc-dataseed1.binance.org/',
     chainId: parseInt(process.env.BSC_CHAIN_ID) || 56,
     name: 'BSC Mainnet'
   },
 
-  // Risk Management Configuration
+  wallet: {
+    address: process.env.WALLET_ADDRESS || '0xADE6c794FB40dD136cbCcABfb64494D6CEC8333E',
+    privateKey: process.env.PRIVATE_KEY,
+  },
+
+  trading: {
+    totalPortfolio: 60000,
+
+    // Spot trading: $20k (reduced from $25k)
+    spotTrading: {
+      enabled: true,
+      allocation: 20000,
+      pairs: [
+        { symbol: 'BNB/USDT', allocation: 10000, strategies: ['mean_reversion', 'ranging', 'momentum'] },
+        { symbol: 'ETH/USDT', allocation: 6000, strategies: ['momentum', 'breakout'] },
+        { symbol: 'BTCB/USDT', allocation: 4000, strategies: ['mean_reversion'] }
+      ]
+    },
+
+    // Leverage: $25k (increased from $21k)
+    leverageTrading: {
+      enabled: true,
+      allocation: 25000,
+      tiers: [
+        { minConfidence: 0.88, leverage: 5, zScore: -2.0, rsi: 25, allocation: 10000 },
+        { minConfidence: 0.83, leverage: 3, zScore: -1.6, rsi: 30, allocation: 10000 },
+        { minConfidence: 0.78, leverage: 2, zScore: -1.3, rsi: 35, allocation: 5000 }
+      ],
+      maxDailyTrades: 5,
+      stopLossPercent: 0.06,
+      minHoldTime: 14400000  // 4 hours
+    },
+
+    // Market making: $8k (increased from $4k)
+    marketMaking: {
+      enabled: true,
+      allocation: 8000,
+      spread: 0.002,  // 0.2% spread
+      orderSize: 800,  // $800 per order
+      pairs: ['BNB/USDT', 'ETH/USDT'],
+      refreshInterval: 300000  // 5 minutes
+    },
+
+    // Yield: $7k (reduced from $10k)
+    yield: {
+      enabled: true,
+      allocation: 7000,
+      protocols: [
+        {
+          name: 'venus',
+          asset: 'USDT',
+          allocation: 7000,
+          expectedAPY: 0.10
+        }
+      ]
+    }
+  },
+
+  positionSizing: {
+    extreme: 0.30,    // 30% = $18,000 - extreme conviction
+    veryHigh: 0.25,   // 25% = $15,000 - very high conviction (+5% vs old 20%)
+    high: 0.15,       // 15% = $9,000 - high conviction (+5% vs old 10%)
+    medium: 0.08,     // 8% = $4,800 - medium conviction (+3% vs old 5%)
+    low: 0.05         // 5% = $3,000 - low conviction
+  },
+
+  // Risk Management Configuration - OPTIMIZED FOR $60K PORTFOLIO
   risk: {
-    dailyLossLimit: parseFloat(process.env.DAILY_LOSS_LIMIT) || 50, // 50 USDT
-    maxPositionSize: parseFloat(process.env.MAX_POSITION_SIZE) || 0.1, // 10% of portfolio
+    dailyLossLimit: parseFloat(process.env.DAILY_LOSS_LIMIT) || 3000, // $3,000 (5% of $60k)
+    maxPositionSize: parseFloat(process.env.MAX_POSITION_SIZE) || 0.35, // 35% of portfolio ($21k max)
     maxConsecutiveLosses: parseInt(process.env.MAX_CONSECUTIVE_LOSSES) || 5,
-    emergencyStopThreshold: parseFloat(process.env.EMERGENCY_STOP_THRESHOLD) || 100, // 100 USDT
+    emergencyStopThreshold: parseFloat(process.env.EMERGENCY_STOP_THRESHOLD) || 9000, // $9,000 (15% drawdown)
     volatilityThreshold: parseFloat(process.env.VOLATILITY_THRESHOLD) || 0.05, // 5%
-    maxDrawdown: parseFloat(process.env.MAX_DRAWDOWN) || 0.2 // 20%
+    maxDrawdown: parseFloat(process.env.MAX_DRAWDOWN) || 0.15, // 15% max drawdown
+    maxTradeSize: parseFloat(process.env.MAX_TRADE_SIZE) || 10500, // $10.5k max per trade
+    maxDailyLoss: parseFloat(process.env.MAX_DAILY_LOSS) || 3000, // $3k daily loss limit
+    maxDrawdown: parseFloat(process.env.MAX_DRAWDOWN) || 9000 // $9k total drawdown
+  },
+
+  // Hybrid Portfolio Balancing Configuration
+  // Expert-recommended dynamic position sizing based on portfolio allocation
+  // Enables gradual scaling in middle ranges while maintaining hard blocks at extremes
+  hybrid: {
+    bnb: {
+      // BNB percentage thresholds for position sizing decisions
+      blockHigh: parseFloat(process.env.BNB_BLOCK_HIGH) || 55,    // Block BUY if BNB >= 55%
+      scale25: parseFloat(process.env.BNB_SCALE_25) || 50,        // 25% size if BNB >= 50%
+      scale50: parseFloat(process.env.BNB_SCALE_50) || 45,        // 50% size if BNB >= 45%
+      scale75: parseFloat(process.env.BNB_SCALE_75) || 40,        // 75% size if BNB >= 40%
+      blockLow: parseFloat(process.env.BNB_BLOCK_LOW) || 35,      // Block SELL if BNB <= 35%
+    },
+    multipliers: {
+      // Position size multipliers for gradual scaling
+      high: parseFloat(process.env.MULTIPLIER_HIGH) || 0.25,     // 25% of base position
+      medium: parseFloat(process.env.MULTIPLIER_MED) || 0.5,     // 50% of base position
+      low: parseFloat(process.env.MULTIPLIER_LOW) || 0.75,       // 75% of base position
+    }
+  },
+
+  monitoring: {
+    enabled: true,
+    strategyReviewInterval: 900000,
+    disableThreshold: 0.48,
+    minTradesBeforeDisable: 15,
+    reenableThreshold: 0.55
+  },
+
+  cooldowns: {
+    spotTrading: 60000, // 1 minute
+    leverageTrading: 300000 // 5 minutes
   },
 
   // Gas Optimization Configuration
   gas: {
     maxGasPrice: parseFloat(process.env.MAX_GAS_PRICE) || 20, // 20 gwei
     minGasPrice: parseFloat(process.env.MIN_GAS_PRICE) || 1, // 1 gwei
-    gasPriceMultiplier: parseFloat(process.env.GAS_PRICE_MULTIPLIER) || 1.1,
-    maxGasLimit: parseInt(process.env.MAX_GAS_LIMIT) || 500000,
-    retryAttempts: parseInt(process.env.GAS_RETRY_ATTEMPTS) || 3
+    gasLimit: parseInt(process.env.GAS_LIMIT) || 300000
   },
 
-  // Performance Configuration
-  performance: {
-    parallelDexQueries: process.env.PARALLEL_DEX_QUERIES === 'true',
-    maxLatency: parseInt(process.env.MAX_LATENCY) || 5000, // 5 seconds
-    cacheTimeout: parseInt(process.env.CACHE_TIMEOUT) || 5, // 5 seconds
-    websocketReconnectAttempts: parseInt(process.env.WS_RECONNECT_ATTEMPTS) || 10
-  },
-
-  // Wallet Configuration
-  wallet: {
-    address: process.env.WALLET_ADDRESS || '0xA358571F3b4CFe228B97983C2C7De2d788DB8FF0',
-    privateKey: process.env.PRIVATE_KEY,
-  },
-
-  // Trading Configuration
+  // Trading Configuration - OPTIMIZED FOR $60K PORTFOLIO
   trading: {
     pair: process.env.TRADING_PAIR || 'USDT/BNB',
-    initialBudget: parseFloat(process.env.INITIAL_BUDGET) || 99,
-    minTradeAmount: parseFloat(process.env.MIN_TRADE_AMOUNT) || 5,
-    maxTradeAmount: parseFloat(process.env.MAX_TRADE_AMOUNT) || 20,
+    initialBudget: parseFloat(process.env.INITIAL_BUDGET) || 60000, // $60k portfolio
+    minTradeAmount: parseFloat(process.env.MIN_TRADE_AMOUNT) || 100, // $100 minimum
+    maxTradeAmount: parseFloat(process.env.MAX_TRADE_AMOUNT) || 10500, // $10.5k maximum (35%)
   },
 
   // Ranging Strategy
   strategy: {
     lowerBoundPercent: parseFloat(process.env.LOWER_BOUND_PERCENT) || 0.98,
     upperBoundPercent: parseFloat(process.env.UPPER_BOUND_PERCENT) || 1.02,
-    rebalanceThreshold: parseFloat(process.env.REBALANCE_THRESHOLD) || 0.005,
+    rangeMin: parseFloat(process.env.RANGE_MIN) || 0.04, // 4% - filters noise
+    rangeMax: parseFloat(process.env.RANGE_MAX) || 0.12, // 12% - catches real ranges
+    trendThreshold: parseFloat(process.env.TREND_THRESHOLD) || 0.01,
+    boundsThreshold: parseFloat(process.env.BOUNDS_THRESHOLD) || 0.10, // 10% - more aggressive entries
+    minProfit: parseFloat(process.env.MIN_PROFIT) || 5.00, // $5.00 - OPTIMIZED FOR $60K
+    cooldownMs: parseFloat(process.env.COOLDOWN_MS) || 60000, // 1 minute - OPTIMIZED FOR $60K
   },
 
-  // DEX Configuration
   dex: {
-    router: process.env.PANCAKESWAP_ROUTER || '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+    router: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
     factory: '0xcA143Ce0Fe65960E6Aa4D42C8d3cE161c2B6604f',
   },
 
-  // Token Addresses (BSC Mainnet)
   tokens: {
     USDT: '0x55d398326f99059fF775485246999027B3197955',
     BNB: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
     WBNB: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
   },
 
-  // Logging
+  // AI Configuration
+  ai: {
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    model: process.env.AI_MODEL || 'gpt-4',
+    temperature: parseFloat(process.env.AI_TEMPERATURE) || 0.2
+  },
+
+  // Logging Configuration
   logging: {
     level: process.env.LOG_LEVEL || 'info',
-  },
+    file: process.env.LOG_FILE || 'logs/bot.log',
+    maxSize: process.env.LOG_MAX_SIZE || '10m',
+    maxFiles: parseInt(process.env.LOG_MAX_FILES) || 5
+  }
 };

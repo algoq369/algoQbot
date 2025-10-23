@@ -1,0 +1,8 @@
+{
+  "timestamp": "2025-10-20T21-29-21",
+  "backupDir": "./backups/shadow-reset-2025-10-20T21-29-21",
+  "createdAt": "2025-10-20T21:29:23.182Z",
+  "expiresAt": "2025-11-19T21:29:23.182Z",
+  "purpose": "Shadow mode reset - safe backup before clearing data",
+  "restoreCommand": "bash ./backups/shadow-reset-2025-10-20T21-29-21/restore.sh"
+}
