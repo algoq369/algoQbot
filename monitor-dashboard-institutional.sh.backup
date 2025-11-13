@@ -54,8 +54,8 @@ echo ""
 echo -e "${CYAN}${BOLD}[2] PORTFOLIO STATUS${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-PORTFOLIO=$(grep "Portfolio value updated" "$LOGFILE" 2>/dev/null | tail -1 | sed 's/.*updated: //' | sed 's/ .*//')
-DISTRIBUTION=$(tail -200 "$LOGFILE" 2>/dev/null | grep "PORTFOLIO CHECK DEBUG.*Percentages" | tail -1 | sed 's/.*Percentages: //' | sed 's/".*//')
+PORTFOLIO=$(tail -100 "$LOGFILE" 2>/dev/null | grep "Portfolio value updated" | tail -1 | sed 's/.*→ //' | sed 's/,.*//')
+DISTRIBUTION=$(tail -100 "$LOGFILE" 2>/dev/null | grep "PORTFOLIO CHECK DEBUG.*Percentages" | tail -1 | sed 's/.*Percentages: //')
 
 if [ ! -z "$PORTFOLIO" ]; then
     echo -e "  Total Value: ${GREEN}$PORTFOLIO${NC}"
@@ -71,9 +71,9 @@ echo ""
 echo -e "${CYAN}${BOLD}[3] MARKET CONDITIONS${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-PRICE=$(tail -200 "$LOGFILE" 2>/dev/null | grep "Current Price:" | tail -1 | sed 's/.*Current Price: //' | sed 's/".*//')
-VOL_4H=$(tail -200 "$LOGFILE" 2>/dev/null | grep "4h Volatility:" | tail -1 | sed 's/.*4h Volatility: //' | sed 's/".*//')
-REGIME=$(tail -200 "$LOGFILE" 2>/dev/null | grep "REGIME.*Detected:" | tail -1 | sed 's/.*Detected: //' | sed 's/".*//')
+PRICE=$(tail -100 "$LOGFILE" 2>/dev/null | grep "Current Price:" | tail -1 | awk '{print $NF}')
+VOL_4H=$(tail -100 "$LOGFILE" 2>/dev/null | grep "Volatility.*4h" | tail -1 | sed 's/.*4h Volatility: //' | awk '{print $1}')
+REGIME=$(tail -100 "$LOGFILE" 2>/dev/null | grep "REGIME.*Detected:" | tail -1 | awk '{print $NF}' | tr -d '",')
 
 if [ ! -z "$PRICE" ]; then
     echo -e "  Price:       ${BLUE}$PRICE BNB/USDT${NC}"
@@ -217,7 +217,7 @@ echo ""
 echo -e "${CYAN}${BOLD}[5] RECENT TRADING ACTIVITY${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-TRADES_TODAY=$(grep "👻 Shadow Trade:" "$LOGFILE" 2>/dev/null | wc -l | xargs)
+TRADES_TODAY=$(grep "Shadow Trade:" "$LOGFILE" 2>/dev/null | wc -l | xargs)
 LAST_DECISION=$(tail -100 "$LOGFILE" 2>/dev/null | grep "Trading decision made" | tail -1)
 
 echo -e "  Trades Today: ${BLUE}$TRADES_TODAY${NC}"
@@ -250,23 +250,19 @@ echo ""
 echo -e "${CYAN}${BOLD}[6] LAST 3 TRADES${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-LAST_TRADES=$(grep "👻 Shadow Trade:" "$LOGFILE" 2>/dev/null | tail -3)
+LAST_TRADES=$(tail -500 "$LOGFILE" 2>/dev/null | grep "Shadow Trade:" | tail -3)
 if [ ! -z "$LAST_TRADES" ]; then
     echo "$LAST_TRADES" | while read line; do
-        TRADE=$(echo "$line" | sed 's/.*Shadow Trade: //' | sed 's/".*//')
-        ACTION=$(echo "$TRADE" | grep -o 'buy\|sell\|HOLD' | head -1)
+        ACTION=$(echo "$line" | grep -o 'buy\|sell' | head -1)
         case "$ACTION" in
-            "buy"|"BUY")
-                echo -e "  ${GREEN}$TRADE${NC}"
+            "buy")
+                echo -e "  ${GREEN}$line${NC}" | sed 's/.*Shadow Trade: //'
                 ;;
-            "sell"|"SELL")
-                echo -e "  ${RED}$TRADE${NC}"
-                ;;
-            "HOLD")
-                echo -e "  ${YELLOW}$TRADE${NC}"
+            "sell")
+                echo -e "  ${RED}$line${NC}" | sed 's/.*Shadow Trade: //'
                 ;;
             *)
-                echo -e "  ${BLUE}$TRADE${NC}"
+                echo -e "  ${BLUE}$line${NC}" | sed 's/.*Shadow Trade: //'
                 ;;
         esac
     done
@@ -281,13 +277,9 @@ echo ""
 echo -e "${CYAN}${BOLD}[7] ACTIVE POSITIONS${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-ACTIVE_POS=$(tail -200 "$LOGFILE" 2>/dev/null | grep "activePositions size:" | tail -1 | sed 's/.*size: //' | sed 's/".*//')
+ACTIVE_POS=$(tail -100 "$LOGFILE" 2>/dev/null | grep "activePositions size:" | tail -1 | awk '{print $NF}')
 if [ ! -z "$ACTIVE_POS" ]; then
-    if [ "$ACTIVE_POS" = "0" ]; then
-        echo -e "  Active: ${YELLOW}0${NC} (No open positions)"
-    else
-        echo -e "  Active: ${GREEN}$ACTIVE_POS${NC}"
-    fi
+    echo -e "  Active: ${BLUE}$ACTIVE_POS${NC}"
 else
     echo -e "  ${YELLOW}No position data${NC}"
 fi
