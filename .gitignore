@@ -30,6 +30,8 @@ ratelimit-state.json
 *.dump
 *.db
 *.sqlite
+*.db.backup*
+data/*.backup*
 
 # OS files
 .DS_Store
@@ -77,6 +79,9 @@ pids/
 # Misc
 *.bak
 *.tmp
+*.tar.gz
+*.jar
+logs_backup_*
 
 # Nested project directories (duplicates)
 bsc-ranging-bot/

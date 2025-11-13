@@ -214,3 +214,5 @@ ROI/jour = (Trades/jour × E(gain)) / Portfolio
 
 
 
+
+

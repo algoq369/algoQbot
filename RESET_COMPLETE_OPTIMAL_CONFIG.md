@@ -384,3 +384,5 @@ tail -f logs/combined.log | grep -E "(Position.*exited|PnL|profit)"
 
 
 
+
+

@@ -16,63 +16,87 @@ module.exports = {
   trading: {
     totalPortfolio: 60000,
 
-    // Spot trading: $20k (reduced from $25k)
-    spotTrading: {
+    // Grid Trading: $18k - Automated grid trading across support/resistance levels
+    gridTrading: {
       enabled: true,
-      allocation: 20000,
+      allocation: 18000,
       pairs: [
-        { symbol: 'BNB/USDT', allocation: 10000, strategies: ['mean_reversion', 'ranging', 'momentum'] },
-        { symbol: 'ETH/USDT', allocation: 6000, strategies: ['momentum', 'breakout'] },
-        { symbol: 'BTCB/USDT', allocation: 4000, strategies: ['mean_reversion'] }
+        { symbol: 'BNB/USDT', allocation: 12600, gridLevels: 15, gridSpacing: 0.018 },  // 70% to BNB
+        { symbol: 'ETH/USDT', allocation: 5400, gridLevels: 18, gridSpacing: 0.020 }    // 30% to ETH
       ]
     },
 
-    // Leverage: $25k (increased from $21k)
-    leverageTrading: {
+    // Momentum Trading: $15k - Trend-following strategy with RSI/EMA signals
+    momentum: {
       enabled: true,
-      allocation: 25000,
+      allocation: 15000,
+      pairs: [
+        { symbol: 'BNB/USDT', allocation: 10500 },  // 70% to BNB
+        { symbol: 'ETH/USDT', allocation: 4500 }    // 30% to ETH
+      ]
+    },
+
+    // Mean Reversion: $15k - Buy oversold, sell overbought conditions
+    meanReversion: {
+      enabled: true,
+      allocation: 15000,
+      pairs: [
+        { symbol: 'BNB/USDT', allocation: 10500 },  // 70% to BNB
+        { symbol: 'ETH/USDT', allocation: 4500 }    // 30% to ETH
+      ]
+    },
+
+    // Arbitrage: $12k - Cross-DEX price differences
+    arbitrage: {
+      enabled: true,
+      allocation: 12000,
+      minSpread: 0.015  // Minimum 1.5% spread to execute
+    },
+
+    // DISABLED STRATEGIES (set to false, allocation: 0)
+    leverageTrading: {
+      enabled: false,
+      allocation: 0,
       tiers: [
-        { minConfidence: 0.88, leverage: 5, zScore: -2.0, rsi: 25, allocation: 10000 },
-        { minConfidence: 0.83, leverage: 3, zScore: -1.6, rsi: 30, allocation: 10000 },
-        { minConfidence: 0.78, leverage: 2, zScore: -1.3, rsi: 35, allocation: 5000 }
+        { minConfidence: 0.88, leverage: 5, zScore: -2.0, rsi: 25, allocation: 0 },
+        { minConfidence: 0.83, leverage: 3, zScore: -1.6, rsi: 30, allocation: 0 },
+        { minConfidence: 0.78, leverage: 2, zScore: -1.3, rsi: 35, allocation: 0 }
       ],
       maxDailyTrades: 5,
       stopLossPercent: 0.06,
       minHoldTime: 14400000  // 4 hours
     },
 
-    // Market making: $8k (increased from $4k)
     marketMaking: {
-      enabled: true,
-      allocation: 8000,
+      enabled: false,
+      allocation: 0,
       spread: 0.002,  // 0.2% spread
-      orderSize: 800,  // $800 per order
+      orderSize: 0,
       pairs: ['BNB/USDT', 'ETH/USDT'],
       refreshInterval: 300000  // 5 minutes
     },
 
-    // Yield: $7k (reduced from $10k)
     yield: {
-      enabled: true,
-      allocation: 7000,
+      enabled: false,
+      allocation: 0,
       protocols: [
         {
           name: 'venus',
           asset: 'USDT',
-          allocation: 7000,
+          allocation: 0,
           expectedAPY: 0.10
         }
       ]
     }
   },
 
-  positionSizing: {
-    extreme: 0.30,    // 30% = $18,000 - extreme conviction
-    veryHigh: 0.25,   // 25% = $15,000 - very high conviction (+5% vs old 20%)
-    high: 0.15,       // 15% = $9,000 - high conviction (+5% vs old 10%)
-    medium: 0.08,     // 8% = $4,800 - medium conviction (+3% vs old 5%)
-    low: 0.05         // 5% = $3,000 - low conviction
-  },
+  // DEPRECATED: positionSizing: {
+  // DEPRECATED:   extreme: 0.30,    // 30% = $18,000 - extreme conviction
+  // DEPRECATED:   veryHigh: 0.25,   // 25% = $15,000 - very high conviction (+5% vs old 20%)
+  // DEPRECATED:   high: 0.15,       // 15% = $9,000 - high conviction (+5% vs old 10%)
+  // DEPRECATED:   medium: 0.08,     // 8% = $4,800 - medium conviction (+3% vs old 5%)
+  // DEPRECATED:   low: 0.05         // 5% = $3,000 - low conviction
+  // DEPRECATED: },
 
   // Risk Management Configuration - OPTIMIZED FOR $60K PORTFOLIO
   risk: {
@@ -107,6 +131,50 @@ module.exports = {
     }
   },
 
+  // Professional Indicator Weighting System (8-Indicator Confidence Calculation)
+  indicators: {
+    // Hard caps for individual indicators
+    maxWeight: parseFloat(process.env.INDICATOR_MAX_WEIGHT) || 0.30,  // Max 30% per indicator
+    minWeight: parseFloat(process.env.INDICATOR_MIN_WEIGHT) || 0.05,  // Min 5% per indicator (or exclude)
+
+    // Current weight allocation (must sum to 100%)
+    weights: {
+      vwap: parseFloat(process.env.WEIGHT_VWAP) || 0.164,                    // 18% - VWAP (Institutional benchmark)
+      atr: parseFloat(process.env.WEIGHT_ATR) || 0.182,                      // 20% - ATR (Risk management)
+      multiTimeframe: parseFloat(process.env.WEIGHT_MULTI_TF) || 0.182,      // 20% - Multi-TF (Signal confirmation)
+      volume: parseFloat(process.env.WEIGHT_VOLUME) || 0.164,                // 18% - Volume (Trade confirmation)
+      rsi: parseFloat(process.env.WEIGHT_RSI) || 0.109,                      // 12% - RSI (Momentum) - REDUCED from 45%
+      regime: parseFloat(process.env.WEIGHT_REGIME) || 0.109,                // 12% - Market regime detection
+      ema: parseFloat(process.env.WEIGHT_EMA) || 0.090                       // 9% - EMA (Trend direction)
+    },
+
+    // Time-of-day position sizing multipliers
+    timeFactors: {
+      peakHours: parseFloat(process.env.TIME_FACTOR_PEAK) || 1.0,    // 1.0x during 8am-4pm GMT (peak trading hours)
+      offHours: parseFloat(process.env.TIME_FACTOR_OFF) || 0.6       // 0.6x during off-peak hours
+    },
+
+    // VWAP configuration
+    vwap: {
+      lookbackHours: parseInt(process.env.VWAP_LOOKBACK_HOURS) || 24,          // 24-hour VWAP calculation
+      deviationThreshold: parseFloat(process.env.VWAP_DEVIATION_THRESHOLD) || 0.02  // 2% deviation threshold for signals
+    },
+
+    // ATR configuration
+    atr: {
+      period: parseInt(process.env.ATR_PERIOD) || 14,                          // 14-period ATR
+      lowVolatilityThreshold: parseFloat(process.env.ATR_LOW_THRESHOLD) || 2,  // <2% ATR = low volatility
+      highVolatilityThreshold: parseFloat(process.env.ATR_HIGH_THRESHOLD) || 5 // >5% ATR = high volatility
+    },
+
+    // Volume configuration
+    volume: {
+      lookbackPeriod: parseInt(process.env.VOLUME_LOOKBACK_PERIOD) || 20,      // 20-period volume average
+      highVolumeRatio: parseFloat(process.env.VOLUME_HIGH_RATIO) || 1.5,       // >1.5x average = high volume
+      lowVolumeRatio: parseFloat(process.env.VOLUME_LOW_RATIO) || 0.7          // <0.7x average = low volume
+    }
+  },
+
   monitoring: {
     enabled: true,
     strategyReviewInterval: 900000,
@@ -128,7 +196,7 @@ module.exports = {
   },
 
   // Trading Configuration - OPTIMIZED FOR $60K PORTFOLIO
-  trading: {
+  tradingExecution: {
     pair: process.env.TRADING_PAIR || 'USDT/BNB',
     initialBudget: parseFloat(process.env.INITIAL_BUDGET) || 60000, // $60k portfolio
     minTradeAmount: parseFloat(process.env.MIN_TRADE_AMOUNT) || 100, // $100 minimum
@@ -149,7 +217,7 @@ module.exports = {
 
   dex: {
     router: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
-    factory: '0xcA143Ce0Fe65960E6Aa4D42C8d3cE161c2B6604f',
+    factory: '0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73', // PancakeSwap V2 Factory (checksummed)
   },
 
   tokens: {

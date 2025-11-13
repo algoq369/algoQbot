@@ -1,0 +1,203 @@
+#!/bin/bash
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Get bot PID
+BOT_PID=$(pgrep -f "node.*start-shadow" | head -1)
+
+# Get log files (most recent 5)
+LOG_FILES=$(ls -t logs/combined-*.log 2>/dev/null | head -5)
+
+# BULLETPROOF: Universal number cleaner
+clean_num() {
+    local raw="$1"
+    # Remove ALL whitespace and extract ONLY digits
+    local cleaned=$(echo "$raw" | tr -d '\n\r\t ' | grep -o '[0-9]*' | head -1)
+    # Default to 0 if empty
+    [ -z "$cleaned" ] && cleaned=0
+    echo "$cleaned"
+}
+
+while true; do
+    clear
+
+    # ═══════════════════════════════════════════════════════════
+    # PORTFOLIO CALCULATION
+    # ═══════════════════════════════════════════════════════════
+
+    # Defaults
+    USDT=36000
+    BNB=22
+    PRICE=1150
+
+    # Get balances from JSON
+    if [ -f data/virtual_balances.json ]; then
+        USDT=$(grep -o '"usdt"[[:space:]]*:[[:space:]]*[0-9.]*' data/virtual_balances.json | grep -o '[0-9.]*' | head -1)
+        BNB=$(grep -o '"bnb"[[:space:]]*:[[:space:]]*[0-9.]*' data/virtual_balances.json | grep -o '[0-9.]*' | head -1)
+        [ -z "$USDT" ] && USDT=36000
+        [ -z "$BNB" ] && BNB=22
+    fi
+
+    # Get current price from logs
+    if [ -n "$LOG_FILES" ]; then
+        RAW_PRICE=$(cat $LOG_FILES | grep "currentPrice" | tail -1 | grep -o "0\.[0-9]*" | head -1)
+        if [ -n "$RAW_PRICE" ] && [ "$RAW_PRICE" != "0" ]; then
+            # Convert BNB/USDT to USDT/BNB
+            PRICE=$(echo "1 / $RAW_PRICE" | bc -l | xargs printf "%.0f")
+            # Sanity check: BNB price should be $100-$10,000
+            [ "$PRICE" -lt 100 ] && PRICE=1150
+            [ "$PRICE" -gt 10000 ] && PRICE=1150
+        fi
+    fi
+
+    # Calculate portfolio values
+    BNB_VALUE=$(echo "$BNB * $PRICE" | bc | xargs printf "%.0f")
+    TOTAL=$(echo "$USDT + $BNB_VALUE" | bc | xargs printf "%.0f")
+    BNB_PCT=$(echo "scale=1; ($BNB_VALUE * 100) / $TOTAL" | bc)
+    USDT_PCT=$(echo "100 - $BNB_PCT" | bc)
+
+    # Calculate P&L
+    INITIAL=60000
+    PNL=$(echo "$TOTAL - $INITIAL" | bc | xargs printf "%.0f")
+    PNL_PCT=$(echo "scale=2; ($PNL * 100) / $INITIAL" | bc)
+
+    # ═══════════════════════════════════════════════════════════
+    # TRADING STATS - BULLETPROOF CLEANING
+    # ═══════════════════════════════════════════════════════════
+
+    DECISIONS=0
+    ENTRIES=0
+    COMPLETED=0
+    WINS=0
+
+    # Total decisions from logs
+    if [ -n "$LOG_FILES" ]; then
+        RAW_DEC=$(cat $LOG_FILES | grep -c "Trading decision" 2>/dev/null || echo "0")
+        DECISIONS=$(clean_num "$RAW_DEC")
+    fi
+
+    # Shadow entries from JSON
+    if [ -f data/shadow_trades.json ] && [ -s data/shadow_trades.json ]; then
+        RAW_ENT=$(grep -c '"action"' data/shadow_trades.json 2>/dev/null || echo "0")
+        ENTRIES=$(clean_num "$RAW_ENT")
+
+        # Completed trades
+        RAW_COMP=$(grep -c '"status":"closed"' data/shadow_trades.json 2>/dev/null || echo "0")
+        COMPLETED=$(clean_num "$RAW_COMP")
+
+        # Wins (profit > 0)
+        RAW_WINS=$(grep '"status":"closed"' data/shadow_trades.json 2>/dev/null | grep -c '"profit":[1-9]' || echo "0")
+        WINS=$(clean_num "$RAW_WINS")
+    fi
+
+    # Calculate losses (SAFE - all numbers cleaned)
+    LOSSES=$((COMPLETED - WINS))
+    [ $LOSSES -lt 0 ] && LOSSES=0
+
+    # Calculate win rate
+    WIN_RATE="0.0"
+    if [ $COMPLETED -gt 0 ]; then
+        WIN_RATE=$(echo "scale=1; ($WINS * 100) / $COMPLETED" | bc)
+    fi
+
+    # Active positions (from logs)
+    ACTIVE=1
+    if [ -n "$LOG_FILES" ]; then
+        POS_COUNT=$(cat $LOG_FILES | grep "active position" | tail -1 | grep -o "[0-9]* active" | grep -o "[0-9]*" | head -1)
+        [ -n "$POS_COUNT" ] && ACTIVE=$(clean_num "$POS_COUNT")
+    fi
+
+    # ═══════════════════════════════════════════════════════════
+    # MARKET CONDITIONS
+    # ═══════════════════════════════════════════════════════════
+
+    REGIME="UNKNOWN"
+    VOL="0.00"
+
+    if [ -n "$LOG_FILES" ]; then
+        REGIME=$(cat $LOG_FILES | grep "REGIME.*Detected" | tail -1 | grep -o "LOW\|MEDIUM\|HIGH\|VERY_LOW\|VERY_HIGH" | head -1)
+        VOL=$(cat $LOG_FILES | grep "Volatility:" | tail -1 | grep -o "[0-9]\.[0-9]*" | head -1)
+    fi
+
+    [ -z "$REGIME" ] && REGIME="UNKNOWN"
+    [ -z "$VOL" ] && VOL="0.00"
+
+    # ═══════════════════════════════════════════════════════════
+    # P&L COLOR
+    # ═══════════════════════════════════════════════════════════
+
+    PNL_COLOR=$RED
+    PNL_SYM=""
+    if [ $(echo "$PNL > 0" | bc) -eq 1 ]; then
+        PNL_COLOR=$GREEN
+        PNL_SYM="+"
+    fi
+
+    # ═══════════════════════════════════════════════════════════
+    # DISPLAY DASHBOARD
+    # ═══════════════════════════════════════════════════════════
+
+    echo "════════════════════════════════════════════════════════════════"
+    echo "          BSC TRADING BOT - ENHANCED DASHBOARD"
+    echo "════════════════════════════════════════════════════════════════"
+    date '+%Y-%m-%d %H:%M:%S'
+    echo ""
+
+    echo "[1] BOT STATUS"
+    echo "────────────────────────────────────────────────────────────────"
+    if [ -n "$BOT_PID" ]; then
+        echo "  Status:      ● RUNNING"
+        echo "  PID:         $BOT_PID"
+        echo "  Uptime:      $(ps -p $BOT_PID -o etime= 2>/dev/null | tr -d ' ')"
+        echo "  Memory:      $(ps -p $BOT_PID -o rss= 2>/dev/null | awk '{printf "%.1fMB", $1/1024}')"
+    else
+        echo "  Status:      ○ STOPPED"
+    fi
+    echo ""
+
+    echo "[2] PORTFOLIO & P&L"
+    echo "────────────────────────────────────────────────────────────────"
+    echo "  Total Value:  \$$TOTAL"
+    echo -e "  P&L:          ${PNL_COLOR}\$${PNL_SYM}$PNL (${PNL_SYM}${PNL_PCT}%)${NC}"
+    echo "  USDT:         \$$USDT (${USDT_PCT}%)"
+    echo "  BNB:          $BNB (\$$BNB_VALUE - ${BNB_PCT}%)"
+    echo "  BNB Price:    \$$PRICE"
+    echo ""
+
+    echo "[3] TRADING ACTIVITY"
+    echo "────────────────────────────────────────────────────────────────"
+    echo "  Total Decisions:  $DECISIONS"
+    echo "  Shadow Entries:   $ENTRIES"
+    echo "  Active Positions: $ACTIVE"
+    echo "  Completed Trades: $COMPLETED"
+    echo "  ├─ Wins:          $WINS"
+    echo "  ├─ Losses:        $LOSSES"
+    echo "  └─ Win Rate:      ${WIN_RATE}%"
+    echo ""
+
+    echo "[4] MARKET CONDITIONS"
+    echo "────────────────────────────────────────────────────────────────"
+    echo "  Regime:      $REGIME"
+    echo "  Volatility:  ${VOL}%"
+    echo "  Mode:        👻 Shadow Trading"
+    echo ""
+
+    echo "[5] ENHANCEMENTS"
+    echo "────────────────────────────────────────────────────────────────"
+    if [ -n "$LOG_FILES" ] && cat $LOG_FILES | grep -q "DYNAMIC-THRESHOLD"; then
+        echo "  Dynamic Thresholds: ✅ ACTIVE"
+    else
+        echo "  Dynamic Thresholds: ⏳ Waiting"
+    fi
+    echo "  Virtual Balance:    ✅ Fixed"
+    echo ""
+
+    echo "════════════════════════════════════════════════════════════════"
+    echo "Dashboard: Enhanced | Bot: ${BOT_PID:-Stopped} | Refresh: 30s"
+    echo "════════════════════════════════════════════════════════════════"
+
+    sleep 30
+done

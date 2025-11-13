@@ -229,3 +229,5 @@ tail -f logs/combined.log | grep --line-buffered -E "(Position.*created|profit|E
 
 
 
+
+

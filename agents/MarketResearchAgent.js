@@ -23,19 +23,19 @@ class MarketResearchAgent extends BaseAgent {
       {
         name: 'CoinDesk',
         url: 'https://www.coindesk.com/',
-        selector: '.at-headline',
+        selector: 'h2 a, .headline, .at-headline',  // Updated: More generic selectors first
         type: 'crypto_news'
       },
       {
         name: 'CoinTelegraph',
         url: 'https://cointelegraph.com/',
-        selector: '.post-card-inline__title-link',
+        selector: '.post-card__title-link, .post-card-inline__title, h3 a',  // Updated: Multiple selectors
         type: 'crypto_news'
       },
       {
         name: 'DeFiPulse',
         url: 'https://defipulse.com/',
-        selector: '.defi-pulse-card',
+        selector: '.protocol-card, .defi-card, .protocol-name',  // Updated: More generic selectors
         type: 'defi_data'
       }
     ];
@@ -120,7 +120,7 @@ class MarketResearchAgent extends BaseAgent {
         });
 
         const $ = cheerio.load(response.data);
-        const newsItems = $(source.selector).slice(0, 10);
+        let newsItems = $(source.selector).slice(0, 10);  // Changed to 'let' to allow reassignment
 
         if (newsItems.length === 0) {
           logger.warn(`No articles found with selector "${source.selector}" from ${source.name}`);
@@ -130,7 +130,7 @@ class MarketResearchAgent extends BaseAgent {
             const altItems = $(altSelector).slice(0, 10);
             if (altItems.length > 0) {
               logger.info(`Using alternative selector "${altSelector}" for ${source.name}`);
-              newsItems = altItems;
+              newsItems = altItems;  // Now this works since newsItems is 'let' not 'const'
               break;
             }
           }
@@ -478,6 +478,140 @@ class MarketResearchAgent extends BaseAgent {
     return mockArticles.filter(article =>
       this.isRelevantToQuery(article.title, query)
     );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 🚀 ENHANCEMENT #6: Liquidity Depth Filter (2025)
+  // Penalizes confidence when on-chain liquidity is too low
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Check if sufficient liquidity exists for trade execution
+   * @param {Object} pancakeSwap - PancakeSwap instance
+   * @param {string} pairAddress - Token pair address
+   * @returns {Object} { liquidityUSD, sufficient, confidencePenalty }
+   */
+  async checkLiquidityDepth(pancakeSwap, pairAddress) {
+    try {
+      const MIN_LIQUIDITY_USD = parseFloat(process.env.MIN_LIQUIDITY_USD) || 500000; // $500K default
+
+      // Fetch pair reserves from PancakeSwap
+      const pairContract = new ethers.Contract(
+        pairAddress,
+        ['function getReserves() view returns (uint112, uint112, uint32)'],
+        pancakeSwap.provider
+      );
+
+      const [reserve0, reserve1] = await pairContract.getReserves();
+
+      // Assuming reserve1 is USDT/BUSD (stablecoin), calculate total liquidity
+      const liquidityUSD = parseFloat(ethers.utils.formatUnits(reserve1, 18)) * 2;
+
+      const sufficient = liquidityUSD >= MIN_LIQUIDITY_USD;
+      const confidencePenalty = sufficient ? 1.0 : 0.6; // 40% penalty if below threshold
+
+      if (!sufficient) {
+        logger.warn(`⚠️ [LIQUIDITY] Low liquidity: $${liquidityUSD.toFixed(0)} < $${MIN_LIQUIDITY_USD.toFixed(0)} (confidence × ${confidencePenalty})`);
+      } else {
+        logger.debug(`✅ [LIQUIDITY] Sufficient: $${liquidityUSD.toFixed(0)} ≥ $${MIN_LIQUIDITY_USD.toFixed(0)}`);
+      }
+
+      return {
+        liquidityUSD,
+        sufficient,
+        confidencePenalty,
+        threshold: MIN_LIQUIDITY_USD
+      };
+
+    } catch (error) {
+      logger.error('❌ Error checking liquidity depth:', error.message);
+      // Default to safe values on error
+      return {
+        liquidityUSD: 0,
+        sufficient: false,
+        confidencePenalty: 0.6,
+        threshold: 500000
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 🚀 ENHANCEMENT #7: Micro-Volatility Signal Detection (2025)
+  // Detects sudden volatility spikes in calm markets
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Detect micro-volatility spikes (volatility within volatility)
+   * @param {Array} prices - Price history array
+   * @param {number} window - Window size in minutes (default 15)
+   * @returns {Object} { microVolDetected, strength, shouldTrade }
+   */
+  detectMicroVolatility(prices, window = 15) {
+    try {
+      const ENABLE_MICRO_VOL = process.env.ENABLE_MICRO_VOL === 'true'; // Default: OFF
+
+      if (!ENABLE_MICRO_VOL || prices.length < window * 2) {
+        return { microVolDetected: false, strength: 0, shouldTrade: false };
+      }
+
+      // ✅ STEP 1: Calculate baseline volatility (last 60 min)
+      const baselinePrices = prices.slice(-60);
+      const baselineReturns = [];
+      for (let i = 1; i < baselinePrices.length; i++) {
+        baselineReturns.push((baselinePrices[i] - baselinePrices[i-1]) / baselinePrices[i-1]);
+      }
+      const baselineVol = this.calculateStdDev(baselineReturns);
+
+      // ✅ STEP 2: Calculate micro-window volatility (last 15 min)
+      const microPrices = prices.slice(-window);
+      const microReturns = [];
+      for (let i = 1; i < microPrices.length; i++) {
+        microReturns.push((microPrices[i] - microPrices[i-1]) / microPrices[i-1]);
+      }
+      const microVol = this.calculateStdDev(microReturns);
+
+      // ✅ STEP 3: Detect spike (micro-vol significantly higher than baseline)
+      const volRatio = microVol / (baselineVol || 0.0001);
+      const microVolDetected = volRatio > 2.0 && baselineVol < 0.002; // 2x spike in calm market
+
+      const strength = Math.min(1.0, (volRatio - 2.0) / 3.0); // Normalize to 0-1
+
+      // ✅ STEP 4: Trading decision
+      // Use 10% position size if micro-vol detected in VERY_LOW regime
+      const shouldTrade = microVolDetected && strength > 0.3;
+
+      if (microVolDetected) {
+        logger.info(`📈 [MICRO-VOL] Spike detected! Baseline: ${(baselineVol * 100).toFixed(3)}%, Micro: ${(microVol * 100).toFixed(3)}%, Ratio: ${volRatio.toFixed(2)}x`);
+      }
+
+      return {
+        microVolDetected,
+        strength,
+        shouldTrade,
+        baselineVol,
+        microVol,
+        volRatio
+      };
+
+    } catch (error) {
+      logger.error('❌ Error detecting micro-volatility:', error.message);
+      return { microVolDetected: false, strength: 0, shouldTrade: false };
+    }
+  }
+
+  /**
+   * Helper: Calculate standard deviation of returns
+   * @param {Array} returns - Array of return values
+   * @returns {number} Standard deviation
+   */
+  calculateStdDev(returns) {
+    if (returns.length === 0) return 0;
+
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const squaredDiffs = returns.map(r => Math.pow(r - mean, 2));
+    const variance = squaredDiffs.reduce((a, b) => a + b, 0) / returns.length;
+
+    return Math.sqrt(variance);
   }
 }
 

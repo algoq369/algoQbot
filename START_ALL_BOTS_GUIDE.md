@@ -512,3 +512,5 @@ echo "Bot: $(ps aux | grep AdvancedTradingBot | grep -v grep > /dev/null && echo
 
 
 
+
+

@@ -52,6 +52,7 @@ const logger = require('./logger');
 const WalletManager = require('./walletManager');
 const RateLimiter = require('./security/rateLimiter');
 const PriceHistoryManager = require('./utils/priceHistoryManager');
+const VolatilityTracker = require('./utils/VolatilityTracker');
 const MultiDexManager = require('./dex/multiDexManager');
 const PortfolioManager = require('./managers/PortfolioManager');
 
@@ -76,6 +77,7 @@ const SecureKeyManager = require('./security/keyManager');
 const CircuitBreaker = require('./risk/circuitBreaker'); // ✅ EXPERT: Loss protection circuit breaker
 const ProductionRiskManager = require('./risk/productionRiskManager'); // ✅ FIX #4: Add risk manager
 const SmartRebalancer = require('./risk/smartRebalancer'); // ✅ EXPERT FIX: Smart portfolio rebalancer
+const { displayRegimeStatus, displayRegimeStats } = require('./utils/regimeDashboard'); // ✅ Regime Dashboard
 const TransactionVerifier = require('./security/transactionVerifier'); // ✅ SECURITY: Transaction verification
 const GasOptimizer = require('./optimization/gasOptimizer');
 const MetricsCollector = require('./monitoring/metricsCollector');
@@ -146,6 +148,7 @@ class AdvancedTradingBot {
     this.metricsCollector = new MetricsCollector();
     this.eventManager = new EventManager();
     this.priceHistoryManager = new PriceHistoryManager();
+    this.volatilityTracker = new VolatilityTracker(5); // 5-day lookback for dynamic caps
     this.cacheManager = new CacheManager();
     this.mevProtection = null; // Will be initialized with provider and wallet
     this.contractVerifier = null; // Will be initialized with provider
@@ -197,6 +200,21 @@ class AdvancedTradingBot {
         marketResearch: { executions: 0, success: 0, lastActivity: null },
         tradingStrategy: { executions: 0, success: 0, lastActivity: null }
       }
+    };
+
+    // Hybrid Portfolio Balancing Performance Tracking
+    this.hybridStats = {
+      scaledTrades: {
+        '1.00x': 0,
+        '0.75x': 0,
+        '0.50x': 0,
+        '0.25x': 0,
+        '0.00x': 0
+      },
+      totalOpportunityCost: 0,
+      totalVolumeTraded: 0,
+      totalTradesEvaluated: 0,
+      startTime: Date.now()
     };
   }
 
@@ -297,15 +315,40 @@ class AdvancedTradingBot {
 
       // Initialize database tables
       try {
+        // Try alter mode first (safest - preserves data)
         await sequelize.sync({ force: false, alter: true });
-        logger.info('✅ Database tables initialized');
+        logger.info('✅ Database tables initialized (alter mode)');
 
         // Verify tables exist
         const tables = await sequelize.getQueryInterface().showAllTables();
         logger.info(`📊 Database tables: ${tables.join(', ')}`);
-      } catch (error) {
-        logger.error('❌ Database initialization error:', error.message);
-        throw new Error('Database initialization failed');
+      } catch (alterError) {
+        logger.warn('⚠️ Database alter sync failed:', alterError.message);
+
+        try {
+          // Fallback: Try without alter mode
+          logger.info('🔄 Attempting sync without alter mode...');
+          await sequelize.sync({ force: false, alter: false });
+          logger.info('✅ Database tables initialized (no-alter mode)');
+        } catch (noAlterError) {
+          logger.warn('⚠️ No-alter sync failed:', noAlterError.message);
+
+          try {
+            // Last resort: Force sync (recreates tables)
+            logger.warn('🔄 Attempting force sync (will recreate tables)...');
+            await sequelize.sync({ force: true });
+            logger.info('✅ Database tables initialized (force mode - fresh start)');
+          } catch (forceError) {
+            // If shadow mode, database is optional
+            if (config.shadowMode?.enabled) {
+              logger.warn('⚠️ Database initialization failed, but continuing in SHADOW MODE without persistence');
+              logger.warn('   Trades will be tracked in memory only (not saved to database)');
+            } else {
+              logger.error('❌ All database sync attempts failed:', forceError.message);
+              throw new Error('Database initialization failed - please delete database/trading.db and restart');
+            }
+          }
+        }
       }
 
       // Initialize RAG system (optional)
@@ -554,6 +597,18 @@ class AdvancedTradingBot {
         this.shadowMode.fullReset();
         logger.info('✅ Shadow mode reset completed');
 
+        // ✅ CRITICAL FIX: Reset risk manager peak after shadow mode reset
+        if (this.riskManager) {
+          const virtualBalances = this.shadowMode.getVirtualBalances();
+          const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+          const currentPortfolio = virtualBalances.usdt + (virtualBalances.bnb / currentPrice);
+
+          this.riskManager.state.peakPortfolioValue = currentPortfolio;
+          this.riskManager.emergencyState.isShutdown = false;
+
+          logger.info(`🔄 Risk manager peak reset to: $${currentPortfolio.toFixed(2)}`);
+        }
+
         // Clear activePositions
         if (this.tradingStrategyAgent && this.tradingStrategyAgent.activePositions) {
           this.tradingStrategyAgent.activePositions.clear();
@@ -607,7 +662,7 @@ class AdvancedTradingBot {
     this.setupAPIRoutes();
 
     // Start server
-    const PORT = process.env.API_PORT || 3001;
+    const PORT = process.env.API_PORT || 3002;
     this.server = this.app.listen(PORT, () => {
       logger.info(`🌐 API server running on port ${PORT}`);
     });
@@ -649,7 +704,8 @@ class AdvancedTradingBot {
         const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
         const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
 
-        const totalValue = usdtBalance + (bnbBalance * currentPrice);
+        // ✅ FIX: currentPrice is BNB/USDT, so divide to get USD value
+        const totalValue = usdtBalance + (bnbBalance / currentPrice);
         const profit = totalValue - config.trading.initialBudget;
 
         const status = {
@@ -1058,6 +1114,20 @@ class AdvancedTradingBot {
       });
       logger.info('✅ Smart portfolio rebalancing scheduled (every 6 hours)');
 
+      // ═══════════════════════════════════════════════════════════════
+      // REGIME PERFORMANCE STATISTICS DISPLAY (every hour)
+      // ═══════════════════════════════════════════════════════════════
+      cron.schedule('0 * * * *', async () => {
+        if (this.isRunning && this.tradingStrategyAgent && this.tradingStrategyAgent.regimeStats) {
+          try {
+            displayRegimeStats(this.tradingStrategyAgent.regimeStats);
+          } catch (error) {
+            logger.error('Error displaying regime stats:', error);
+          }
+        }
+      });
+      logger.info('✅ Regime performance stats scheduled (every hour)');
+
       // Initial strategy run
       await this.runAdvancedStrategy();
 
@@ -1317,6 +1387,20 @@ class AdvancedTradingBot {
         researchData: this.latestResearchData
       });
 
+      // ═══════════════════════════════════════════════════════════════
+      // REGIME DASHBOARD DISPLAY
+      // ═══════════════════════════════════════════════════════════════
+      if (tradingDecision && tradingDecision.regime) {
+        displayRegimeStatus(
+          tradingDecision.regime,
+          tradingDecision.regimeConfig?.volatility4h || 0,
+          tradingDecision.regimeConfig?.strategy || 'none',
+          tradingDecision.position_size || 0,
+          tradingDecision.takeProfit || 0,
+          tradingDecision.stopLoss || 0
+        );
+      }
+
       // 🔧 FIX: Smart portfolio-based trade limits (no forced trades, only blocking)
       // Check portfolio allocation and block trades that worsen imbalance
       logger.info('🔍 [PORTFOLIO CHECK] Starting portfolio balance verification...');
@@ -1333,16 +1417,16 @@ class AdvancedTradingBot {
         logger.info(`🔍 [PORTFOLIO CHECK] Fetched fresh price: ${balance.currentPrice}`);
       }
 
-      // 🔧 CRITICAL FIX: currentPrice is "BNB per USDT", so we need to DIVIDE to get USD value
-      // Example: If 1 USDT = 0.0009046 BNB, then 54.8 BNB ÷ 0.0009046 = $60,556
-      const bnbValueInUSD = balance.bnb / balance.currentPrice;  // DIVIDE, not multiply!
+      // ✅ FIX: currentPrice is BNB per USDT (e.g., 0.000929), so we DIVIDE to get USD value
+      // Example: If 1 USDT = 0.000929 BNB, then 22 BNB ÷ 0.000929 = $23,682
+      const bnbValueInUSD = balance.bnb / balance.currentPrice;  // DIVIDE to get USD value
       const totalValueUSD = balance.usdt + bnbValueInUSD;
       const bnbPercent = (bnbValueInUSD / totalValueUSD) * 100;
       const usdtPercent = (balance.usdt / totalValueUSD) * 100;
 
       // 🔧 DEBUG: Log calculation steps
-      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] currentPrice = ${balance.currentPrice} (BNB per USDT)`);
-      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] BNB value: ${balance.bnb} ÷ ${balance.currentPrice.toFixed(6)} = $${bnbValueInUSD.toFixed(2)}`);
+      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] currentPrice = ${balance.currentPrice.toFixed(9)} (BNB per USDT)`);
+      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] BNB value: ${balance.bnb.toFixed(2)} ÷ ${balance.currentPrice.toFixed(9)} = $${bnbValueInUSD.toFixed(2)}`);
       logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Total portfolio: $${balance.usdt.toFixed(2)} + $${bnbValueInUSD.toFixed(2)} = $${totalValueUSD.toFixed(2)}`);
       logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Percentages: USDT ${usdtPercent.toFixed(1)}%, BNB ${bnbPercent.toFixed(1)}%`);
 
@@ -1371,43 +1455,119 @@ class AdvancedTradingBot {
         };
       }
 
+      // ═══════════════════════════════════════════════════════════════
+      // PORTFOLIO BALANCE CHECK (FIXED LOGIC)
+      // ═══════════════════════════════════════════════════════════════
+
       const action = tradingDecision.action;
-      const multiplier = this.calculateDynamicPositionMultiplier(bnbPercent, action);
+      const isBalanced = bnbPercent >= 35 && bnbPercent <= 45;
 
-      // Apply Hybrid Decision Logic
-      if (multiplier === 0) {
-        // HARD BLOCK: Portfolio at extreme imbalance
-        logger.warn(`⛔ [PORTFOLIO BLOCK] ${action.toUpperCase()} blocked due to ${bnbPercent.toFixed(1)}% BNB imbalance.`);
-        logger.warn(`⛔ [PORTFOLIO BLOCK] Original decision: ${action.toUpperCase()} with ${(tradingDecision.confidence * 100).toFixed(0)}% confidence`);
-        logger.warn(`⛔ [PORTFOLIO BLOCK] New decision: HOLD (blocked by hybrid system)`);
-        tradingDecision.action = 'hold';
-        tradingDecision.confidence = 0.5;
-        tradingDecision.reasoning = `🚫 BLOCKED: ${bnbPercent.toFixed(1)}% BNB. ${action.toUpperCase()} exceeds portfolio thresholds (${action === 'buy' ? '≥55%' : '≤35%'}).`;
-      } else if (multiplier < 1.0) {
-        // DYNAMIC SCALING: Reduce position size proportionally
-        const originalSize = tradingDecision.position_size || 0;
+      logger.info(`🔍 [PORTFOLIO] Current: ${bnbPercent.toFixed(1)}% BNB ${isBalanced ? '✅' : '⚠️'}`);
+      logger.info(`🔍 [PORTFOLIO] Target: 35-45% BNB`);
+      logger.info(`🔍 [PORTFOLIO] AI Decision: ${action.toUpperCase()} with ${(tradingDecision.confidence * 100).toFixed(0)}% confidence`);
 
-        // Safety check: Warn if position_size is missing
-        if (!tradingDecision.position_size || tradingDecision.position_size === 0) {
-          logger.warn(`⚠️ [HYBRID WARNING] tradingDecision.position_size is ${tradingDecision.position_size}. Multiplier will have no effect.`);
-        }
+      // Only block trades that would WORSEN the imbalance
+      let isBlocked = false;
 
-        logger.warn(`⚠️ [DYNAMIC SIZING] ${action.toUpperCase()} scaled to ${Math.round(multiplier * 100)}% due to ${bnbPercent.toFixed(1)}% BNB.`);
-        logger.info(`📊 [HYBRID BALANCE] Original position size: ${originalSize.toFixed(2)}, Multiplier: ${multiplier.toFixed(2)}x`);
+      if (action === 'buy' && bnbPercent > 45) {
+        logger.warn(`⛔ [BLOCK] BUY blocked: BNB already high at ${bnbPercent.toFixed(1)}%`);
+        isBlocked = true;
 
-        tradingDecision.positionSizeMultiplier = multiplier;
-        tradingDecision.position_size = originalSize * multiplier; // Apply multiplier to position size
-
-        tradingDecision.reasoning += ` (Dynamically scaled to ${Math.round(multiplier * 100)}% due to BNB portfolio weight: ${bnbPercent.toFixed(1)}%)`;
-        logger.info(`📊 [HYBRID BALANCE] Final position size: ${tradingDecision.position_size.toFixed(2)}`);
-      } else {
-        // NORMAL TRADE: Portfolio within safe range
-        logger.info(`✅ [NORMAL TRADE] ${action.toUpperCase()} allowed at full size (BNB: ${bnbPercent.toFixed(1)}%).`);
-        tradingDecision.positionSizeMultiplier = 1.0;
+        tradingDecision.action = 'HOLD';
+        tradingDecision.reason = 'portfolio_buy_blocked_bnb_too_high';
+        tradingDecision.originalAction = 'buy';
       }
+
+      if (action === 'sell' && bnbPercent < 35) {
+        logger.warn(`⛔ [BLOCK] SELL blocked: BNB already low at ${bnbPercent.toFixed(1)}%`);
+        isBlocked = true;
+
+        tradingDecision.action = 'HOLD';
+        tradingDecision.reason = 'portfolio_sell_blocked_bnb_too_low';
+        tradingDecision.originalAction = 'sell';
+      }
+
+      // HOLD actions are NEVER blocked - they maintain current balance
+      if (action === 'hold') {
+        logger.info(`✅ [PORTFOLIO] HOLD action - maintaining ${bnbPercent.toFixed(1)}% BNB balance`);
+        isBlocked = false;  // Explicitly set to false
+      }
+
+      if (!isBlocked && action !== 'hold') {
+        logger.info(`✅ [PORTFOLIO] ${action.toUpperCase()} action approved`);
+      }
+
+      // Set multiplier for backward compatibility
+      tradingDecision.positionSizeMultiplier = isBlocked ? 0 : 1.0;
 
       // 🔧 DEBUG: Log hybrid decision outcome
       logger.info(`🔍 [HYBRID DEBUG] Final action: ${tradingDecision.action.toUpperCase()}, Multiplier: ${tradingDecision.positionSizeMultiplier || 0}, Position Size: ${tradingDecision.position_size || 0}, BNB%: ${bnbPercent.toFixed(1)}%`);
+
+      // ═══════════════════════════════════════════════════════════════
+      // HYBRID PERFORMANCE TRACKING
+      // Track how effective the hybrid portfolio system is
+      // Only track actual trading decisions (BUY/SELL), not HOLD
+      // ═══════════════════════════════════════════════════════════════
+      if (action === 'buy' || action === 'sell') {
+        // ✅ FIX: Extract multiplier from tradingDecision
+        const multiplier = tradingDecision.positionSizeMultiplier || 1.0;
+        const multiplierLabel = `${multiplier.toFixed(2)}x`;
+        this.hybridStats.totalTradesEvaluated++;
+
+        if (this.hybridStats.scaledTrades[multiplierLabel] !== undefined) {
+          this.hybridStats.scaledTrades[multiplierLabel]++;
+        }
+
+        // Calculate missed volume based on what we would have traded vs what we actually will trade
+        let unscaledSize, actualVolume, missedVolume;
+
+        if (multiplier === 0) {
+          // Blocked: position_size is still original, we trade nothing
+          unscaledSize = tradingDecision.position_size || 0;
+          actualVolume = 0;
+          missedVolume = unscaledSize;
+        } else if (multiplier < 1.0) {
+          // Scaled: position_size has been scaled down, calculate original
+          actualVolume = tradingDecision.position_size || 0;
+          unscaledSize = actualVolume / multiplier;
+          missedVolume = unscaledSize - actualVolume;
+        } else {
+          // Full size: no scaling, trade everything
+          unscaledSize = tradingDecision.position_size || 0;
+          actualVolume = unscaledSize;
+          missedVolume = 0;
+        }
+
+        this.hybridStats.totalOpportunityCost += missedVolume;
+        this.hybridStats.totalVolumeTraded += actualVolume;
+
+        logger.info(`📊 [HYBRID TRACKING] Multiplier: ${multiplierLabel}, Missed: $${missedVolume.toFixed(2)}, Total Missed: $${this.hybridStats.totalOpportunityCost.toFixed(2)}`);
+
+        // Summary every 10 trades
+        if (this.hybridStats.totalTradesEvaluated % 10 === 0) {
+          const runtime = ((Date.now() - this.hybridStats.startTime) / 3600000).toFixed(1);
+          logger.info(`
+═══════════════════════════════════════════════════════════
+📊 HYBRID PERFORMANCE SUMMARY (${this.hybridStats.totalTradesEvaluated} trades)
+═══════════════════════════════════════════════════════════
+Runtime: ${runtime} hours
+
+Multiplier Distribution:
+  Full Size (1.00x): ${this.hybridStats.scaledTrades['1.00x']}
+  75% Size (0.75x):  ${this.hybridStats.scaledTrades['0.75x']}
+  50% Size (0.50x):  ${this.hybridStats.scaledTrades['0.50x']}
+  25% Size (0.25x):  ${this.hybridStats.scaledTrades['0.25x']}
+  Blocked (0.00x):   ${this.hybridStats.scaledTrades['0.00x']}
+
+Volume Analysis:
+  Total Traded:      $${this.hybridStats.totalVolumeTraded.toFixed(2)}
+  Opportunity Cost:  $${this.hybridStats.totalOpportunityCost.toFixed(2)}
+  Cost per Trade:    $${(this.hybridStats.totalOpportunityCost / this.hybridStats.totalTradesEvaluated).toFixed(2)}
+  Risk Reduction:    ${(this.hybridStats.totalOpportunityCost / (this.hybridStats.totalOpportunityCost + this.hybridStats.totalVolumeTraded) * 100).toFixed(1)}%
+═══════════════════════════════════════════════════════════
+`);
+        }
+      }
 
       // Emergency: Force ONE trade per hour only in extreme cases
       // Note: Emergency trades bypass hybrid sizing and execute at full size
@@ -1517,27 +1677,24 @@ class AdvancedTradingBot {
   BNB balance: ${bnbBalance}
 `);
 
-        // 🔧 FIX: Ensure currentPrice is valid and in correct unit (BNB/USD)
+        // ✅ FIXED: Get price in correct format (BNB per USDT) from pancakeSwap
+        // pancakeSwap.getCurrentPrice() now returns ~0.000929 (BNB per USDT)
         let currentPrice = parameters.currentPrice;
 
-        // If currentPrice is invalid, fetch real price
-        if (!currentPrice || currentPrice === 1.0 || currentPrice > 0.01) {
-          logger.warn(`⚠️ Invalid currentPrice: ${currentPrice}, fetching real price`);
-
-          // Get real market price
-          currentPrice = await this.getCurrentPrice();
-
-          logger.info(`✅ Using market price: ${currentPrice}`);
+        // If currentPrice is missing or invalid, fetch real price
+        if (!currentPrice || currentPrice === 0 || currentPrice === 1.0) {
+          // Get real market price from PancakeSwap DEX
+          currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+          logger.debug(`Using market price: ${currentPrice.toFixed(9)} BNB/USDT`);
         }
 
-        // Verify it's in BNB/USD (should be ~0.0007)
-        if (currentPrice > 0.01) {
-          // It's probably USD/BNB, invert it
-          currentPrice = 1 / currentPrice;
-          logger.warn(`⚠️ Price was inverted, corrected to: ${currentPrice}`);
+        // Validate price is in expected range (BNB per USDT should be ~0.0007-0.001)
+        if (currentPrice < 0.0001 || currentPrice > 0.01) {
+          logger.warn(`⚠️ Price outside expected range: ${currentPrice}. Fetching fresh price...`);
+          currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
         }
 
-        logger.info(`📊 Final currentPrice for BNB calc: ${currentPrice}`);
+        logger.debug(`📊 Using price: ${currentPrice.toFixed(9)} BNB/USDT for calculations`);
 
         // Validate balance for sell orders
         // 🔧 FIX: Convert position_size (USD) to BNB for comparison
@@ -1827,7 +1984,8 @@ class AdvancedTradingBot {
       const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
       const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
 
-      const totalValue = usdtBalance + (bnbBalance * currentPrice);
+      // ✅ FIX: currentPrice is BNB/USDT, so divide to get USD value
+      const totalValue = usdtBalance + (bnbBalance / currentPrice);
       const profit = totalValue - config.trading.initialBudget;
 
       this.stats.totalProfit = profit;
@@ -2063,9 +2221,9 @@ class AdvancedTradingBot {
   }
 
   getMarketDiagnostics(currentPrice, priceHistory) {
-    if (priceHistory.length < 50) return { error: 'Insufficient data' };
+    if (priceHistory.length < 100) return { error: 'Insufficient data - need 100+ points for reliable diagnostics' };
 
-    const recentPrices = priceHistory.slice(-20).map(p => p.price);
+    const recentPrices = priceHistory.slice(-288).map(p => p.price);
     const last50 = priceHistory.slice(-50).map(p => p.price);
 
     const priceChange = ((currentPrice - recentPrices[0]) / recentPrices[0]) * 100;
@@ -2144,9 +2302,9 @@ class AdvancedTradingBot {
 
     logger.info(`🔄 Strategy rotation: Hour ${hour} → Using ${selectedStrategy}`);
 
-    const last20 = priceHistory.slice(-20).map(p => p.price);
-    const volatility = this.calculateVolatility(last20);
-    const trend = this.calculateTrend(last20);
+    const last288 = priceHistory.slice(-288).map(p => p.price);
+    const volatility = this.calculateVolatility(last288);
+    const trend = this.calculateTrend(last288);
 
     logger.debug(`Market: vol=${(volatility * 100).toFixed(2)}%, trend=${(trend * 100).toFixed(2)}%`);
 
@@ -2161,10 +2319,53 @@ class AdvancedTradingBot {
   }
 
   // 🚨 CRITICAL FIX: Add calculation methods for strategy selection
+  // Updated to match TradingStrategyAgent.js with 288-period lookback support
   calculateVolatility(prices) {
-    const mean = prices.reduce((a, b) => a + b) / prices.length;
-    const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length;
-    return Math.sqrt(variance) / mean;
+    // Validate input
+    if (!Array.isArray(prices) || prices.length === 0) {
+      logger.warn('⚠️ Invalid prices array for volatility calculation, using default 3.0%');
+      return 0.03; // 3.0% fallback
+    }
+
+    // Need minimum data for reliable calculation
+    if (prices.length < 12) {
+      logger.warn(`⚠️ Insufficient data (${prices.length} points), using default 3.0%`);
+      return 0.03; // 3.0% fallback
+    }
+
+    // Calculate returns (percentage changes)
+    const returns = [];
+    for (let i = 1; i < prices.length; i++) {
+      const ret = (prices[i] - prices[i - 1]) / prices[i - 1];
+      if (!isNaN(ret) && isFinite(ret)) {
+        returns.push(ret);
+      }
+    }
+
+    if (returns.length === 0) {
+      logger.warn('⚠️ No valid returns calculated, using default 3.0%');
+      return 0.03; // 3.0% fallback
+    }
+
+    // Calculate standard deviation of returns
+    const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
+    const volatility = Math.sqrt(variance);
+
+    // Validate result
+    if (isNaN(volatility) || !isFinite(volatility)) {
+      logger.warn('⚠️ Invalid volatility calculation, using default 3.0%');
+      return 0.03; // 3.0% fallback
+    }
+
+    // Track volatility for dynamic cap calculation
+    this.volatilityTracker.addReading(volatility);
+
+    // Use dynamic cap instead of static 5% cap
+    const dynamicCap = this.volatilityTracker.getDynamicCap();
+    const cappedVolatility = Math.min(Math.max(volatility, 0.001), dynamicCap);
+
+    return cappedVolatility;
   }
 
   calculateTrend(prices) {
@@ -2198,7 +2399,8 @@ class AdvancedTradingBot {
         const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
         const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
         const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
-        startBalance = usdtBalance + (bnbBalance * currentPrice);
+        // ✅ FIX: currentPrice is BNB/USDT, so divide to get USD value
+        startBalance = usdtBalance + (bnbBalance / currentPrice);
       } else {
         return 0;
       }
@@ -2207,7 +2409,8 @@ class AdvancedTradingBot {
       const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
       const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
       const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
-      const currentBalance = usdtBalance + (bnbBalance * currentPrice);
+      // ✅ FIX: currentPrice is BNB/USDT, so divide to get USD value
+      const currentBalance = usdtBalance + (bnbBalance / currentPrice);
 
       // Calculate loss percentage
       const loss = (startBalance - currentBalance) / startBalance;

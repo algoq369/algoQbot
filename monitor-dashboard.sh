@@ -3,6 +3,8 @@
 # ════════════════════════════════════════════════════════════════
 # BSC TRADING BOT - LIVE MONITORING DASHBOARD
 # Updates every 30 seconds with color-coded information
+# 4-Strategy System: gridTrading, momentum, mean_reversion, arbitrage
+# 8-Indicator Professional Confidence Scoring
 # ════════════════════════════════════════════════════════════════
 
 # Colors
@@ -710,6 +712,116 @@ show_dashboard() {
     else
         echo -e "  ${YELLOW}No market data available${NC}"
     fi
+
+    # ═══════════════════════════════════════════════════════════════
+    # 14. 8-INDICATOR PROFESSIONAL SCORING SYSTEM
+    # ═══════════════════════════════════════════════════════════════
+    echo -e "${CYAN}${BOLD}[14] 8-INDICATOR SCORING SYSTEM${NC}"
+    echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
+
+    if [ -f "$LOG_FILE" ]; then
+        # Check if 8-indicator system is active
+        INDICATOR_ACTIVE=$(tail -500 "$LOG_FILE" | grep -c "\[1/8\]" 2>/dev/null | tr -d '[:space:]')
+        [ -z "$INDICATOR_ACTIVE" ] && INDICATOR_ACTIVE=0
+
+        if [ "$INDICATOR_ACTIVE" -gt 0 ]; then
+            echo -e "  ${GREEN}✅ 8-Indicator System: ACTIVE${NC}\n"
+
+            # Extract latest 8-indicator scores
+            VWAP_SCORE=$(tail -500 "$LOG_FILE" | grep "\[1/8\] VWAP" | tail -1 | grep -o '[+-][0-9.]*%' | head -1)
+            ATR_SCORE=$(tail -500 "$LOG_FILE" | grep "\[2/8\] ATR" | tail -1 | grep -o '[+-][0-9.]*%' | head -1)
+            MULTITF_SCORE=$(tail -500 "$LOG_FILE" | grep "\[3/8\] Multi-TF" | tail -1 | grep -o '[+-][0-9.]*%' | head -1)
+            VOLUME_SCORE=$(tail -500 "$LOG_FILE" | grep "\[4/8\] Volume" | tail -1 | grep -o '[+-][0-9.]*%' | head -1)
+            RSI_SCORE=$(tail -500 "$LOG_FILE" | grep "\[5/8\] RSI" | tail -1 | grep -o '[+-][0-9.]*%' | head -1)
+            REGIME_SCORE=$(tail -500 "$LOG_FILE" | grep "\[6/8\] Regime" | tail -1 | grep -o '[+-][0-9.]*%' | head -1)
+            EMA_SCORE=$(tail -500 "$LOG_FILE" | grep "\[7/8\] EMA" | tail -1 | grep -o '[+-][0-9.]*%' | head -1)
+            TIME_FACTOR=$(tail -500 "$LOG_FILE" | grep "\[8/8\] Time Factor:" | tail -1 | grep -o '[0-9.]*x')
+            TIME_DESC=$(tail -500 "$LOG_FILE" | grep "\[8/8\] Time Factor:" | tail -1 | sed 's/.*| //')
+
+            FINAL_CONF=$(tail -500 "$LOG_FILE" | grep "FINAL CONFIDENCE:" | tail -1 | grep -o '[0-9.]*%')
+
+            echo -e "  ${CYAN}Indicator Contributions:${NC}"
+            [ -n "$VWAP_SCORE" ] && echo -e "  [1] VWAP (18%):      ${BLUE}$VWAP_SCORE${NC}"
+            [ -n "$ATR_SCORE" ] && echo -e "  [2] ATR (20%):       ${BLUE}$ATR_SCORE${NC}"
+            [ -n "$MULTITF_SCORE" ] && echo -e "  [3] Multi-TF (20%):  ${BLUE}$MULTITF_SCORE${NC}"
+            [ -n "$VOLUME_SCORE" ] && echo -e "  [4] Volume (18%):    ${BLUE}$VOLUME_SCORE${NC}"
+            [ -n "$RSI_SCORE" ] && echo -e "  [5] RSI (12%):       ${BLUE}$RSI_SCORE${NC} ${YELLOW}(reduced from 45%)${NC}"
+            [ -n "$REGIME_SCORE" ] && echo -e "  [6] Regime (12%):    ${BLUE}$REGIME_SCORE${NC}"
+            [ -n "$EMA_SCORE" ] && echo -e "  [7] EMA (10%):       ${BLUE}$EMA_SCORE${NC}"
+            [ -n "$TIME_FACTOR" ] && echo -e "  [8] Time Factor:     ${BLUE}$TIME_FACTOR${NC} ${YELLOW}$TIME_DESC${NC}"
+
+            if [ -n "$FINAL_CONF" ]; then
+                echo -e "\n  ${GREEN}${BOLD}✅ FINAL CONFIDENCE: $FINAL_CONF${NC}"
+
+                # Check for confidence override
+                OVERRIDE=$(tail -500 "$LOG_FILE" | grep "Confidence overridden:" | tail -1)
+                if [ -n "$OVERRIDE" ]; then
+                    ORIG_CONF=$(echo "$OVERRIDE" | grep -o '[0-9.]*%' | head -1)
+                    OVERRIDE_CONF=$(echo "$OVERRIDE" | grep -o '[0-9.]*%' | tail -1)
+                    echo -e "  ${YELLOW}Override: $ORIG_CONF → $OVERRIDE_CONF${NC}"
+                fi
+            fi
+        else
+            echo -e "  ${YELLOW}⏸️  8-Indicator system not active in recent logs${NC}"
+            echo -e "  ${BLUE}System applies professional confidence scoring to all decisions${NC}"
+        fi
+    else
+        echo -e "  ${YELLOW}No log data available${NC}"
+    fi
+    echo ""
+
+    # ═══════════════════════════════════════════════════════════════
+    # 15. 4-STRATEGY PERFORMANCE BREAKDOWN
+    # ═══════════════════════════════════════════════════════════════
+    echo -e "${CYAN}${BOLD}[15] 4-STRATEGY PERFORMANCE${NC}"
+    echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
+
+    if [ -f "$LOG_FILE" ]; then
+        echo -e "  ${CYAN}Active Strategies:${NC}\n"
+
+        # Count decisions per strategy
+        GRID_COUNT=$(tail -2000 "$LOG_FILE" | grep -c "strategy.*gridTrading" 2>/dev/null | tr -d '[:space:]')
+        MOMENTUM_COUNT=$(tail -2000 "$LOG_FILE" | grep -c "strategy.*momentum" 2>/dev/null | tr -d '[:space:]')
+        MEANREV_COUNT=$(tail -2000 "$LOG_FILE" | grep -c "strategy.*mean_reversion" 2>/dev/null | tr -d '[:space:]')
+        ARB_COUNT=$(tail -2000 "$LOG_FILE" | grep -c "strategy.*arbitrage" 2>/dev/null | tr -d '[:space:]')
+
+        [ -z "$GRID_COUNT" ] && GRID_COUNT=0
+        [ -z "$MOMENTUM_COUNT" ] && MOMENTUM_COUNT=0
+        [ -z "$MEANREV_COUNT" ] && MEANREV_COUNT=0
+        [ -z "$ARB_COUNT" ] && ARB_COUNT=0
+
+        TOTAL_DECISIONS=$((GRID_COUNT + MOMENTUM_COUNT + MEANREV_COUNT + ARB_COUNT))
+
+        if [ "$TOTAL_DECISIONS" -gt 0 ]; then
+            GRID_PERCENT=$(echo "scale=1; ($GRID_COUNT * 100) / $TOTAL_DECISIONS" | bc 2>/dev/null || echo "0")
+            MOMENTUM_PERCENT=$(echo "scale=1; ($MOMENTUM_COUNT * 100) / $TOTAL_DECISIONS" | bc 2>/dev/null || echo "0")
+            MEANREV_PERCENT=$(echo "scale=1; ($MEANREV_COUNT * 100) / $TOTAL_DECISIONS" | bc 2>/dev/null || echo "0")
+            ARB_PERCENT=$(echo "scale=1; ($ARB_COUNT * 100) / $TOTAL_DECISIONS" | bc 2>/dev/null || echo "0")
+
+            echo -e "  ${GREEN}[1] gridTrading${NC}        │ \$18,000 │ ${BLUE}$GRID_COUNT decisions${NC} (${BLUE}$GRID_PERCENT%${NC})"
+            echo -e "  ${GREEN}[2] momentum${NC}           │ \$15,000 │ ${BLUE}$MOMENTUM_COUNT decisions${NC} (${BLUE}$MOMENTUM_PERCENT%${NC})"
+            echo -e "  ${GREEN}[3] mean_reversion${NC}     │ \$15,000 │ ${BLUE}$MEANREV_COUNT decisions${NC} (${BLUE}$MEANREV_PERCENT%${NC})"
+            echo -e "  ${GREEN}[4] arbitrage${NC}          │ \$12,000 │ ${BLUE}$ARB_COUNT decisions${NC} (${BLUE}$ARB_PERCENT%${NC})"
+            echo -e "\n  ${CYAN}Total Portfolio: ${GREEN}${BOLD}\$60,000${NC}"
+
+            # Regime-strategy mapping
+            echo -e "\n  ${CYAN}Volatility Regime Mapping:${NC}"
+            echo -e "  ${RED}HIGH${NC}    → momentum, gridTrading"
+            echo -e "  ${YELLOW}MEDIUM${NC}  → mean_reversion, gridTrading"
+            echo -e "  ${BLUE}LOW${NC}     → gridTrading, arbitrage"
+        else
+            echo -e "  ${YELLOW}No strategy decisions in recent logs${NC}\n"
+            echo -e "  ${CYAN}Portfolio Allocation:${NC}"
+            echo -e "  [1] gridTrading:     \$18,000 (30%)"
+            echo -e "  [2] momentum:        \$15,000 (25%)"
+            echo -e "  [3] mean_reversion:  \$15,000 (25%)"
+            echo -e "  [4] arbitrage:       \$12,000 (20%)"
+            echo -e "\n  ${CYAN}Total: ${GREEN}${BOLD}\$60,000${NC}"
+        fi
+    else
+        echo -e "  ${YELLOW}No log data available${NC}"
+    fi
+    echo ""
 
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"

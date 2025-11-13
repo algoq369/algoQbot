@@ -315,3 +315,5 @@ sqlite3 data/trading_bot.db "SELECT COUNT(*), SUM(profit_loss) FROM trades;"
 
 
 
+
+

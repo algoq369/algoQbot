@@ -1,6 +1,14 @@
 const logger = require('../logger');
 const fs = require('fs').promises;
 const path = require('path');
+const { getSharedVirtualBalances, updateSharedVirtualBalances, resetSharedVirtualBalances, executeTrade } = require('../utils/virtualBalanceManager');
+
+// ═══════════════════════════════════════════════════════════════
+// 🚀 ENHANCEMENT #2: Realistic Slippage Simulation (2025)
+// Applies 0.3% slippage to all shadow trades for realistic PnL
+// ═══════════════════════════════════════════════════════════════
+const SLIPPAGE_BUFFER = 0.003; // 0.3% realistic execution cost
+const SIMULATE_SLIPPAGE = process.env.SIMULATE_SLIPPAGE !== 'false'; // Default: enabled
 
 /**
  * Shadow Mode Testing System
@@ -46,23 +54,21 @@ class ShadowMode {
       endTime: null
     };
 
-    // 🔥 FIX #1: Track virtual portfolio to prevent infinite rebalance loop
-    // 60/40 split: 60% USDT ($36K), 40% BNB ($24K)
-    this.virtualPortfolio = {
-      usdt: 36000,  // 60% of $60K
-      bnb: 22.0     // 40% of $60K (~$24K at ~$1,093/BNB)
-    };
+    // 🔥 FIX #1: Use shared virtual balance manager
+    // Prevents state isolation between shadowMode.js and TradingStrategyAgent.js
+    // Balances are now stored in data/virtual_balances.json (single source of truth)
 
     this.liveMetrics = null; // For comparison
 
     // Initialize stats for slippage tracking
+    const initialBalances = getSharedVirtualBalances();
     this.stats = {
       totalTrades: 0,
       totalSlippageCost: 0,
       startTime: Date.now(),
       startBalance: {
-        usdt: this.virtualPortfolio.usdt,
-        bnb: this.virtualPortfolio.bnb
+        usdt: initialBalances.usdt,
+        bnb: initialBalances.bnb
       }
     };
 
@@ -128,19 +134,18 @@ class ShadowMode {
       return null;
     }
 
-    // CRITICAL: Balance validation BEFORE trade
+    // CRITICAL: Balance validation BEFORE trade (using shared manager)
+    const currentBalances = getSharedVirtualBalances();
+
     if (action === 'buy') {
-      if (this.virtualPortfolio.usdt < amount) {
-        logger.warn(`❌ Insufficient USDT: need ${amount}, have ${this.virtualPortfolio.usdt}`);
+      if (currentBalances.usdt < amount) {
+        logger.warn(`❌ Insufficient USDT: need ${amount.toFixed(2)}, have ${currentBalances.usdt.toFixed(2)}`);
         return { success: false, wouldExecute: false, reason: 'insufficient_usdt' };
       }
     } else if (action === 'sell') {
-      // ✅ FIX: Convert USD amount to BNB for validation
-      // targetPrice is in USD/BNB format (e.g., 1067 USD per BNB)
-      // To convert USD to BNB: USD / (USD/BNB) = BNB
-      const bnbNeeded = amount / targetPrice; // USD / (USD/BNB) = BNB
-      if (this.virtualPortfolio.bnb < bnbNeeded) {
-        logger.warn(`❌ Insufficient BNB: need ${bnbNeeded.toFixed(6)}, have ${this.virtualPortfolio.bnb.toFixed(6)}`);
+      // For SELL, amount is in BNB units
+      if (currentBalances.bnb < amount) {
+        logger.warn(`❌ Insufficient BNB: need ${amount.toFixed(6)}, have ${currentBalances.bnb.toFixed(6)}`);
         return { success: false, wouldExecute: false, reason: 'insufficient_bnb' };
       }
     }
@@ -150,26 +155,73 @@ class ShadowMode {
     const slippageCost = amount * slippage;
     const finalAmount = amount - slippageCost;
 
-    // Update balances
+    // 🔥 CRITICAL FIX: targetPrice is ALREADY in BNB/USDT format (~0.000875)
+    // DO NOT invert it! The previous inversion caused 1.46M BNB explosion
+    // Correct format: 0.000875 means 1 USDT = 0.000875 BNB (BNB price ~$1,142)
+    const currentPrice = targetPrice; // Already in BNB per USDT format
+
+    // Update balances using shared manager
     if (action === 'buy') {
-      this.virtualPortfolio.usdt -= amount;
-      // ✅ FIX: targetPrice is USD/BNB, so divide to get BNB received
-      // When buying BNB: USD / (USD/BNB) = BNB
-      this.virtualPortfolio.bnb += amount / targetPrice;
+      // CORRECT: BUY = MULTIPLY by (BNB/USDT) rate
+      let bnbReceived = amount * currentPrice;
+
+      // 🚀 ENHANCEMENT #2: Apply slippage simulation
+      if (SIMULATE_SLIPPAGE) {
+        const slippageLoss = bnbReceived * SLIPPAGE_BUFFER;
+        bnbReceived = bnbReceived * (1 - SLIPPAGE_BUFFER);
+        logger.info(`💸 [SLIPPAGE] BUY: ${slippageLoss.toFixed(6)} BNB lost to slippage (${(SLIPPAGE_BUFFER * 100).toFixed(1)}%)`);
+      }
+
+      // Atomic update using shared manager
+      const success = executeTrade({
+        usdtChange: -amount,
+        bnbChange: bnbReceived
+      });
+
+      if (!success) {
+        logger.error('❌ Failed to update shared balances for BUY trade');
+        return { success: false, wouldExecute: false, reason: 'balance_update_failed' };
+      }
+
+      logger.info(`🔍 [SIMULATE BUY] ${amount.toFixed(2)} USDT × ${currentPrice.toFixed(9)} = ${bnbReceived.toFixed(6)} BNB`);
+      logger.info(`👻 Shadow Trade: ${action} ${amount.toFixed(4)} at ${targetPrice}`);
+
+      const newBalances = getSharedVirtualBalances();
+      logger.info(`👻 New Balances: ${newBalances.usdt.toFixed(2)} USDT, ${newBalances.bnb.toFixed(6)} BNB`);
     } else if (action === 'sell') {
-      // ✅ FIX: amount is in USD, convert to BNB to subtract
-      // targetPrice is USD/BNB, so divide to get BNB to sell
-      const bnbToSell = amount / targetPrice; // USD / (USD/BNB) = BNB
-      this.virtualPortfolio.bnb -= bnbToSell;
-      this.virtualPortfolio.usdt += finalAmount;
+      // CORRECT: SELL = DIVIDE by (BNB/USDT) rate
+      let usdtReceived = amount / currentPrice;
+
+      // 🚀 ENHANCEMENT #2: Apply slippage simulation
+      if (SIMULATE_SLIPPAGE) {
+        const slippageLoss = usdtReceived * SLIPPAGE_BUFFER;
+        usdtReceived = usdtReceived * (1 - SLIPPAGE_BUFFER);
+        logger.info(`💸 [SLIPPAGE] SELL: $${slippageLoss.toFixed(2)} USDT lost to slippage (${(SLIPPAGE_BUFFER * 100).toFixed(1)}%)`);
+      }
+
+      // Atomic update using shared manager
+      const success = executeTrade({
+        usdtChange: usdtReceived,
+        bnbChange: -amount
+      });
+
+      if (!success) {
+        logger.error('❌ Failed to update shared balances for SELL trade');
+        return { success: false, wouldExecute: false, reason: 'balance_update_failed' };
+      }
+
+      logger.info(`🔍 [SIMULATE SELL] ${amount.toFixed(6)} BNB / ${currentPrice.toFixed(9)} = ${usdtReceived.toFixed(2)} USDT`);
+      logger.info(`👻 Shadow Trade: ${action} ${amount.toFixed(4)} at ${targetPrice}`);
+
+      const newBalances = getSharedVirtualBalances();
+      logger.info(`👻 New Balances: ${newBalances.usdt.toFixed(2)} USDT, ${newBalances.bnb.toFixed(6)} BNB`);
     }
 
     // Calculate profit (realistic)
     const estimatedProfit = action === 'buy' ? 0 : Math.max(0, slippageCost * 0.5);
 
-    logger.info(`👻 Shadow Trade: ${action} ${finalAmount.toFixed(4)} at ${targetPrice}`);
-    logger.info(`👻 Estimated Profit: ${estimatedProfit.toFixed(2)} USDT`);
-    logger.info(`👻 New Balances: ${this.virtualPortfolio.usdt.toFixed(2)} USDT, ${this.virtualPortfolio.bnb.toFixed(6)} BNB`);
+    // 🔧 FIX: Get updated balances from shared manager (not this.virtualPortfolio)
+    const finalBalances = getSharedVirtualBalances();
 
     // Save trade
     const trade = {
@@ -181,9 +233,10 @@ class ShadowMode {
       confidence,
       reasoning,
       balances: {
-        usdt: this.virtualPortfolio.usdt,
-        bnb: this.virtualPortfolio.bnb
-      }
+        usdt: finalBalances.usdt,
+        bnb: finalBalances.bnb
+      },
+      shadowMode: true
     };
 
     this.shadowTrades.push(trade);
@@ -195,11 +248,14 @@ class ShadowMode {
     // Record trade to database for analytics
     await this.recordTradeToDatabase(trade);
 
+    // 🔧 FIX: Return shared balances (not this.virtualPortfolio)
     return {
       success: true,
       wouldExecute: true,
       estimatedProfit,
-      balances: this.virtualPortfolio
+      balances: finalBalances,
+      usdt: finalBalances.usdt,
+      bnb: finalBalances.bnb
     };
   }
 
@@ -379,24 +435,46 @@ class ShadowMode {
     const currentPrice = tradeParams.price || tradeParams.parameters?.price || 0.000855;
     const slippageFactor = 1 - simulation.estimatedSlippage;
 
+    // Diagnostic logging for price format verification
+    if (this.tradeCount === 0) {
+      logger.info(`🔬 [PRICE DIAGNOSTIC]`);
+      logger.info(`   Format: ${currentPrice} BNB per USDT`);
+      logger.info(`   Meaning: 1 USDT buys ${currentPrice.toFixed(9)} BNB`);
+      logger.info(`   Inverse: 1 BNB costs ${(1/currentPrice).toFixed(2)} USDT`);
+      logger.info(`   Portfolio check: ${this.virtualPortfolio.bnb} BNB should equal ~$${(this.virtualPortfolio.bnb / currentPrice).toFixed(2)}`);
+    }
+    this.tradeCount = (this.tradeCount || 0) + 1;
+
     if (tradeParams.action === 'buy' || tradeParams.action === 'rebalance') {
-      // Buying BNB with USDT - amount is in USDT
       const usdtSpent = tradeParams.amount;
-      const bnbReceived = (usdtSpent / currentPrice) * slippageFactor;
+      // CORRECT: BUY = MULTIPLY by (BNB/USDT) rate
+      // Dimensional analysis: USDT × (BNB/USDT) = BNB ✅
+      const bnbReceived = (usdtSpent * currentPrice) * slippageFactor;
+
+      logger.info(`🔍 [SHADOW BUY] Spending ${usdtSpent.toFixed(2)} USDT`);
+      logger.info(`   Rate: ${currentPrice.toFixed(9)} BNB per USDT`);
+      logger.info(`   Calculation: ${usdtSpent.toFixed(2)} × ${currentPrice.toFixed(9)} = ${bnbReceived.toFixed(6)} BNB`);
+      logger.info(`   Dimensional check: USDT × (BNB/USDT) = BNB ✅`);
 
       this.virtualPortfolio.usdt -= usdtSpent;
       this.virtualPortfolio.bnb += bnbReceived;
 
-      logger.info(`📊 Virtual portfolio updated: -$${usdtSpent.toFixed(2)} USDT, +${bnbReceived.toFixed(6)} BNB`);
+      logger.info(`   New balances: ${this.virtualPortfolio.usdt.toFixed(2)} USDT, ${this.virtualPortfolio.bnb.toFixed(6)} BNB`);
     } else if (tradeParams.action === 'sell') {
-      // 🔥 FIX #3: For sell, amount is already in BNB (strategy divided by price)
-      const bnbSold = tradeParams.amount; // Don't divide again!
-      const usdtReceived = (bnbSold * currentPrice) * slippageFactor;
+      const bnbSold = tradeParams.amount;
+      // CORRECT: SELL = DIVIDE by (BNB/USDT) rate
+      // Dimensional analysis: BNB / (BNB/USDT) = USDT ✅
+      const usdtReceived = (bnbSold / currentPrice) * slippageFactor;
+
+      logger.info(`🔍 [SHADOW SELL] Selling ${bnbSold.toFixed(6)} BNB`);
+      logger.info(`   Rate: ${currentPrice.toFixed(9)} BNB per USDT`);
+      logger.info(`   Calculation: ${bnbSold.toFixed(6)} / ${currentPrice.toFixed(9)} = ${usdtReceived.toFixed(2)} USDT`);
+      logger.info(`   Dimensional check: BNB / (BNB/USDT) = USDT ✅`);
 
       this.virtualPortfolio.bnb -= bnbSold;
       this.virtualPortfolio.usdt += usdtReceived;
 
-      logger.info(`📊 Virtual portfolio updated: -${bnbSold.toFixed(6)} BNB, +$${usdtReceived.toFixed(2)} USDT`);
+      logger.info(`   New balances: ${this.virtualPortfolio.usdt.toFixed(2)} USDT, ${this.virtualPortfolio.bnb.toFixed(6)} BNB`);
     }
 
     // 🔥 Safety checks for negative balances
@@ -423,34 +501,27 @@ class ShadowMode {
   }
 
   getVirtualBalances() {
-    // Validate balances are reasonable
-    if (this.virtualPortfolio.bnb > 50000) { // More than 50K BNB is unrealistic (allows for 20K starting + trades)
-      logger.warn(`⚠️ Virtual BNB balance suspiciously high: ${this.virtualPortfolio.bnb.toFixed(2)}, resetting to initial`);
-      this.resetBalances();
-    }
-
-    if (this.virtualPortfolio.usdt > 100000) { // More than $100K USDT is unrealistic for testing
-      logger.warn(`⚠️ Virtual USDT balance suspiciously high: ${this.virtualPortfolio.usdt.toFixed(2)}, resetting to initial`);
-      this.resetBalances();
-    }
+    // Use shared virtual balance manager (single source of truth)
+    const balances = getSharedVirtualBalances();
 
     return {
-      usdt: this.virtualPortfolio.usdt,
-      bnb: this.virtualPortfolio.bnb,
-      totalValueUSD: this.virtualPortfolio.usdt + (this.virtualPortfolio.bnb / this.currentPrice) // FIX: DIVIDE by price
+      usdt: balances.usdt,
+      bnb: balances.bnb,
+      totalValueUSD: balances.usdt + (balances.bnb / (this.currentPrice || 0.00088)) // FIX: DIVIDE by price
     };
   }
 
   // Add portfolio value logging method
   async logPortfolioValue() {
     try {
-      const currentPrice = await this.bot.multiDexManager?.dexs?.pancakeSwap?.getCurrentPrice() || 0.00077;
-      const bnbValue = this.virtualPortfolio.bnb / currentPrice; // FIX: DIVIDE by price
-      const totalValue = this.virtualPortfolio.usdt + bnbValue;
+      const balances = getSharedVirtualBalances();
+      const currentPrice = await this.bot.multiDexManager?.dexs?.pancakeSwap?.getCurrentPrice() || 0.00088;
+      const bnbValue = balances.bnb / currentPrice; // FIX: DIVIDE by price
+      const totalValue = balances.usdt + bnbValue;
 
       logger.info(`💰 Portfolio Value: $${totalValue.toFixed(2)}`);
-      logger.info(`   USDT: $${this.virtualPortfolio.usdt.toFixed(2)}`);
-      logger.info(`   BNB: ${this.virtualPortfolio.bnb.toFixed(2)} ($${bnbValue.toFixed(2)} @ $${currentPrice.toFixed(6)})`);
+      logger.info(`   USDT: $${balances.usdt.toFixed(2)}`);
+      logger.info(`   BNB: ${balances.bnb.toFixed(2)} ($${bnbValue.toFixed(2)} @ $${currentPrice.toFixed(6)})`);
 
       return totalValue;
     } catch (error) {
@@ -461,28 +532,22 @@ class ShadowMode {
 
   // Add full reset method for complete cleanup
   fullReset() {
-    // Reset balances to initial state (60/40 split)
-    this.virtualPortfolio = {
-      usdt: 36000,  // 60% of $60K
-      bnb: 22.0     // 40% of $60K (~$24K at ~$1,093/BNB)
-    };
+    // Reset balances to initial state using shared manager
+    resetSharedVirtualBalances();
 
     // Reset other state if needed
     this.tradeHistory = [];
-    this.currentPrice = 0.00077;
+    this.currentPrice = 0.00088;
 
+    const balances = getSharedVirtualBalances();
     logger.info('🔄 Shadow mode FULL RESET complete');
-    logger.info(`💰 USDT: ${this.virtualPortfolio.usdt}, BNB: ${this.virtualPortfolio.bnb}`);
+    logger.info(`💰 USDT: ${balances.usdt}, BNB: ${balances.bnb}`);
   }
 
   // Add reset method
   resetBalances() {
-    logger.warn('🔄 Resetting virtual balances to initial state');
-    this.virtualPortfolio = {
-      usdt: 36000,  // 60% of $60K
-      bnb: 22.0     // 40% of $60K (~$24K at ~$1,093/BNB)
-    };
-    logger.info(`✅ Virtual balances reset: ${this.virtualPortfolio.usdt} USDT, ${this.virtualPortfolio.bnb} BNB`);
+    // Use shared virtual balance manager to reset
+    resetSharedVirtualBalances();
   }
 
   // Record trade to database for analytics

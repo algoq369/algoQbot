@@ -75,3 +75,4 @@ console.log('   3. Check health: bot-health');
 console.log('');
 console.log('🎯 The bot should now start trading normally!');
 
+

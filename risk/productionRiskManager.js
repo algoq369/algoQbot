@@ -21,9 +21,10 @@ class ProductionRiskManager {
       // Portfolio limits
       maxPositionSize: 0.10,      // 10% max per position
 
-      // Loss limits - TIGHTER for testing
-      maxDailyLoss: 1500,         // $1.5K (2.5% of $60K)
-      maxDrawdown: 0.10,          // 10% max drawdown
+      // 🚀 ENHANCEMENT #3: Tighter Risk Limits (2025)
+      // Loss limits - ULTRA-CONSERVATIVE for low-noise trading
+      maxDailyLoss: 600,          // $600 (1% of $60K) - down from $1.5K
+      maxDrawdown: 0.05,          // 5% max drawdown - down from 10%
       maxLeverageExposure: 0,     // No leverage in shadow mode
 
       // Rate limits - HIGHER for testing
@@ -54,9 +55,10 @@ class ProductionRiskManager {
       // Portfolio limits
       maxPositionSize: 0.15,      // 15% max per position
 
-      // Loss limits - STRICT for live
-      maxDailyLoss: 3000,         // $3K (5% of $60K)
-      maxDrawdown: 0.15,          // 15% max drawdown
+      // 🚀 ENHANCEMENT #3: Tighter Risk Limits (2025)
+      // Loss limits - ULTRA-STRICT for low-noise live trading
+      maxDailyLoss: 600,          // $600 (1% of $60K) - down from $3K
+      maxDrawdown: 0.05,          // 5% max drawdown - down from 15%
       maxLeverageExposure: 75000, // $25K × 3x average
 
       // Rate limits - CONSERVATIVE

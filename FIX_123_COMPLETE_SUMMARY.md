@@ -379,3 +379,5 @@ The bot is currently initializing. Last log shows database connected. Need to wa
 
 
 
+
+

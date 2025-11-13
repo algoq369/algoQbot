@@ -1,0 +1,7 @@
+alias bot-start="pm2 start AdvancedTradingBot.js --name bot"
+alias bot-stop="pm2 stop bot"
+alias bot-status="pm2 status bot && curl -s localhost:3000/api/metrics | jq '.'"
+alias bot-quick-status="clear && pm2 status bot && curl -s localhost:3000/api/metrics | jq '.portfolio, .performance'"
+alias portfolio="curl -s localhost:3000/api/metrics | jq .portfolio"
+alias pnl="curl -s localhost:3000/api/metrics | jq .performance"
+echo "🤖 Aliases loaded!"

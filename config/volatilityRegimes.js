@@ -25,8 +25,8 @@ const REGIME_CONFIGS = {
     description: 'High volatility - trending market',
     minVolatility: 2.0,
 
-    // Strategy selection
-    strategies: ['momentum', 'breakout'],
+    // Strategy selection (4-strategy system)
+    strategies: ['momentum', 'gridTrading'],  // Removed: breakout (60-75% correlation with momentum)
     primaryStrategy: 'momentum',
 
     // Position sizing
@@ -51,9 +51,9 @@ const REGIME_CONFIGS = {
     description: 'Medium volatility - range-bound market',
     minVolatility: 0.8,
 
-    // Strategy selection
-    strategies: ['ranging', 'mean_reversion', 'vwap'],
-    primaryStrategy: 'ranging',
+    // Strategy selection (4-strategy system)
+    strategies: ['mean_reversion', 'gridTrading'],  // Removed: ranging (70-85% correlation with mean_reversion), vwap (limited DeFi effectiveness)
+    primaryStrategy: 'mean_reversion',
 
     // Position sizing
     positionSizePercent: 0.06,  // 6% of portfolio
@@ -77,8 +77,8 @@ const REGIME_CONFIGS = {
     description: 'Low volatility - consolidation phase',
     minVolatility: 0.3,
 
-    // Strategy selection
-    strategies: ['gridTrading', 'vwap', 'ichimoku'],
+    // Strategy selection (4-strategy system)
+    strategies: ['gridTrading', 'arbitrage'],  // Removed: vwap (limited DeFi effectiveness), ichimoku (only works in sustained trends)
     primaryStrategy: 'gridTrading',
 
     // Position sizing
@@ -152,6 +152,7 @@ function getRegimeConfig(regime) {
 
 /**
  * Calculate dynamic position size based on regime and confidence
+ * Professional conservative 3/6/9% approach with confidence scaling
  * @param {string} regime - Current regime
  * @param {number} confidence - Trading confidence (0-1)
  * @param {number} portfolioValue - Total portfolio value in USD
@@ -160,18 +161,23 @@ function getRegimeConfig(regime) {
 function calculatePositionSize(regime, confidence, portfolioValue) {
   const config = getRegimeConfig(regime);
 
-  // Base position size from regime
+  // Base position size from regime (3/6/9%)
   let positionPercent = config.positionSizePercent;
 
-  // Adjust based on confidence
-  if (confidence > 0.85) {
-    positionPercent *= 1.2;  // +20% for high confidence
-  } else if (confidence < 0.70) {
-    positionPercent *= 0.8;  // -20% for low confidence
+  // VERY_LOW regime: Skip trading entirely (return 0)
+  if (regime === 'VERY_LOW' || positionPercent === 0) {
+    return 0;
   }
 
-  // Cap at max position size
-  positionPercent = Math.min(positionPercent, config.maxPositionSize);
+  // Apply confidence multiplier (0.7-1.0 range)
+  // Confidence 70% = 0.7x multiplier
+  // Confidence 85% = 0.85x multiplier
+  // Confidence 100% = 1.0x multiplier
+  const confidenceMultiplier = Math.max(0.7, Math.min(confidence, 1.0));
+  positionPercent *= confidenceMultiplier;
+
+  // Professional safety caps: 2-12% absolute limits
+  positionPercent = Math.max(0.02, Math.min(positionPercent, 0.12));
 
   // Calculate USD amount
   const positionSize = portfolioValue * positionPercent;

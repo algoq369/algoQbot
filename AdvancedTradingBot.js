@@ -1,6 +1,32 @@
 // ═══════════════════════════════════════════════════════════════
-// CRITICAL: Prevent EPIPE crashes from broken stdout pipe
+// CRITICAL: Prevent EPIPE crashes from broken stdout/stderr pipe
 // ═══════════════════════════════════════════════════════════════
+
+// ✅ LAYER 1: Prevent EPIPE crashes on stdout/stderr streams
+if (process.stdout) {
+  process.stdout.on('error', (err) => {
+    if (err.code === 'EPIPE' || err.errno === -32) {
+      // Silently ignore EPIPE on stdout - broken pipe is normal
+      // when output is piped to head/tail/grep and they close early
+      return;
+    }
+    // Log other stdout errors (but don't crash)
+    console.error('[STDOUT ERROR]', err.message);
+  });
+}
+
+if (process.stderr) {
+  process.stderr.on('error', (err) => {
+    if (err.code === 'EPIPE' || err.errno === -32) {
+      // Silently ignore EPIPE on stderr - broken pipe is normal
+      return;
+    }
+    // Log other stderr errors (but don't crash)
+    console.error('[STDERR ERROR]', err.message);
+  });
+}
+
+// ✅ LAYER 2: Catch uncaught exceptions with EPIPE handling
 process.on('uncaughtException', (error) => {
   // EPIPE = broken pipe (stdout closed while writing)
   if (error.code === 'EPIPE' || error.errno === -32) {
@@ -49,6 +75,7 @@ try {
 // Import existing modules
 const config = require('./config');
 const logger = require('./logger');
+// const LiveDashboard = require('./src/dashboard/liveDashboard'); // DISABLED - Use external monitoring dashboard
 const WalletManager = require('./walletManager');
 const RateLimiter = require('./security/rateLimiter');
 const PriceHistoryManager = require('./utils/priceHistoryManager');
@@ -202,6 +229,9 @@ class AdvancedTradingBot {
       }
     };
 
+    // Dashboard
+    // this.dashboard = new LiveDashboard(this); // DISABLED - Use external monitoring dashboard
+
     // Hybrid Portfolio Balancing Performance Tracking
     this.hybridStats = {
       scaledTrades: {
@@ -323,7 +353,7 @@ class AdvancedTradingBot {
         const tables = await sequelize.getQueryInterface().showAllTables();
         logger.info(`📊 Database tables: ${tables.join(', ')}`);
       } catch (alterError) {
-        logger.warn('⚠️ Database alter sync failed:', alterError.message);
+        logger.debug('Database alter validation issue, using safe mode');
 
         try {
           // Fallback: Try without alter mode
@@ -661,11 +691,28 @@ class AdvancedTradingBot {
     // API Routes
     this.setupAPIRoutes();
 
-    // Start server
-    const PORT = process.env.API_PORT || 3001;
-    this.server = this.app.listen(PORT, () => {
-      logger.info(`🌐 API server running on port ${PORT}`);
-    });
+    // Start server with automatic port fallback
+    const startServer = (port) => {
+      return new Promise((resolve, reject) => {
+        const server = this.app.listen(port)
+          .on('listening', () => {
+            logger.info(`🌐 API server running on port ${port}`);
+            resolve(server);
+          })
+          .on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+              logger.warn(`⚠️  Port ${port} in use, trying ${port + 1}...`);
+              server.close();
+              resolve(startServer(port + 1));
+            } else {
+              reject(err);
+            }
+          });
+      });
+    };
+
+    const PORT = process.env.API_PORT || 3002;
+    this.server = await startServer(PORT);
   }
 
   setupAPIRoutes() {
@@ -953,8 +1000,8 @@ class AdvancedTradingBot {
       this.isRunning = true;
 
       logger.info('🚀 Starting Advanced BSC Trading Bot...');
-      logger.info(`Trading Pair: ${config.trading.pair}`);
-      logger.info(`Initial Budget: ${config.trading.initialBudget} USDT`);
+      logger.info(`Trading Pair: ${config.trading.pair || 'USDT/BNB'}`);
+      logger.info(`Initial Budget: ${config.trading.initialBudget || this.portfolioManager?.cachedValue?.toFixed(2) || 'N/A'} USDT`);
 
       // Enhanced strategy execution with AI agents
       cron.schedule('*/30 * * * * *', async () => {
@@ -1132,6 +1179,15 @@ class AdvancedTradingBot {
       await this.runAdvancedStrategy();
 
       logger.info('✅ Advanced Trading Bot started successfully!');
+
+      // Start dashboard
+      // DISABLED - Use external monitoring dashboard instead
+      // setTimeout(() => {
+      //   if (this.dashboard) {
+      //     console.log('\n🎯 Starting dashboard...\n');
+      //     this.dashboard.start();
+      //   }
+      // }, 3000);
     } catch (error) {
       logger.error('❌ Error starting bot:', error);
       this.isRunning = false;
@@ -1256,14 +1312,25 @@ class AdvancedTradingBot {
 
         if (usdtDiff > 0) {
           // Need more USDT - sell some BNB
+          // FIXED: SELL calculation - BNB to sell = USDT needed / (BNB/USDT price)
           const bnbToSell = Math.abs(usdtDiff) / balance.currentPrice;
           logger.info(`📉 Rebalancing: Selling ${bnbToSell.toFixed(4)} BNB for USDT`);
 
           if (global.shadowMode && global.shadowMode.virtualPortfolio) {
-            // Update virtual balances directly
-            global.shadowMode.virtualPortfolio.bnb -= bnbToSell;
-            global.shadowMode.virtualPortfolio.usdt += Math.abs(usdtDiff);
-            logger.info(`✅ Virtual portfolio rebalanced: ${global.shadowMode.virtualPortfolio.usdt.toFixed(2)} USDT, ${global.shadowMode.virtualPortfolio.bnb.toFixed(4)} BNB`);
+            // FIXED: Use shared state manager
+            const { getSharedVirtualBalances, updateSharedVirtualBalances } = require('./utils/virtualBalanceManager');
+            const virtualBalances = getSharedVirtualBalances();
+
+            if (virtualBalances.bnb >= bnbToSell) {
+              virtualBalances.bnb -= bnbToSell;
+              virtualBalances.usdt += Math.abs(usdtDiff);
+
+              if (updateSharedVirtualBalances(virtualBalances)) {
+                logger.info(`✅ Virtual portfolio rebalanced: ${virtualBalances.usdt.toFixed(2)} USDT, ${virtualBalances.bnb.toFixed(4)} BNB`);
+              }
+            } else {
+              logger.error(`❌ Insufficient virtual BNB for rebalancing: ${virtualBalances.bnb.toFixed(4)} < ${bnbToSell.toFixed(4)}`);
+            }
           } else {
             await this.multiDexManager.dexs.pancakeSwap.executeTrade('sell', bnbToSell);
           }
@@ -1273,11 +1340,24 @@ class AdvancedTradingBot {
           logger.info(`📈 Rebalancing: Buying BNB with ${usdtToSpend.toFixed(2)} USDT`);
 
           if (global.shadowMode && global.shadowMode.virtualPortfolio) {
-            // Update virtual balances directly
-            const bnbToBuy = usdtToSpend / balance.currentPrice;
-            global.shadowMode.virtualPortfolio.usdt -= usdtToSpend;
-            global.shadowMode.virtualPortfolio.bnb += bnbToBuy;
-            logger.info(`✅ Virtual portfolio rebalanced: ${global.shadowMode.virtualPortfolio.usdt.toFixed(2)} USDT, ${global.shadowMode.virtualPortfolio.bnb.toFixed(4)} BNB`);
+            // FIXED: BUY calculation - BNB received = USDT spent × (BNB/USDT price)
+            // This is the bug that caused 1.5M BNB explosion!
+            const bnbToBuy = usdtToSpend * balance.currentPrice; // CORRECTED: MULTIPLY not divide!
+
+            // FIXED: Use shared state manager
+            const { getSharedVirtualBalances, updateSharedVirtualBalances } = require('./utils/virtualBalanceManager');
+            const virtualBalances = getSharedVirtualBalances();
+
+            if (virtualBalances.usdt >= usdtToSpend) {
+              virtualBalances.usdt -= usdtToSpend;
+              virtualBalances.bnb += bnbToBuy;
+
+              if (updateSharedVirtualBalances(virtualBalances)) {
+                logger.info(`✅ Virtual portfolio rebalanced: ${virtualBalances.usdt.toFixed(2)} USDT, ${virtualBalances.bnb.toFixed(4)} BNB`);
+              }
+            } else {
+              logger.error(`❌ Insufficient virtual USDT for rebalancing: ${virtualBalances.usdt.toFixed(2)} < ${usdtToSpend.toFixed(2)}`);
+            }
           } else {
             await this.multiDexManager.dexs.pancakeSwap.executeTrade('buy', usdtToSpend);
           }
@@ -1306,12 +1386,41 @@ class AdvancedTradingBot {
       // Portfolio balance is now managed by blocking trades that worsen imbalance (see lines 1184-1235)
       // Old approach: await this.rebalancePortfolio() - could force trades at bad prices
 
-      // Get current market data
+      // Get current market data (price only)
       const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
 
-      // Add price to persistent history
-      if (this.priceHistoryManager) {
-        await this.priceHistoryManager.addPrice(currentPrice);
+      // ═══════════════════════════════════════════════════════════════════════════
+      // 📊 PHASE 3: Fetch and store volume data with price
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      // Get volume data (1 hour window for recent trading activity)
+      let volumeData = null;
+      try {
+        volumeData = await this.multiDexManager.dexs.pancakeSwap.getCurrentVolume(1);
+
+        // Add price AND volume to persistent history
+        if (this.priceHistoryManager && volumeData) {
+          await this.priceHistoryManager.addPrice(
+            currentPrice,
+            Date.now(),
+            volumeData.volume || 0
+          );
+
+          logger.debug(
+            `📊 [Volume] Stored - Price: ${currentPrice.toFixed(8)}, ` +
+            `Volume: ${volumeData.volume.toFixed(2)}, Source: ${volumeData.source}`
+          );
+        } else if (this.priceHistoryManager) {
+          // Fallback: store price with zero volume (backward compatible)
+          await this.priceHistoryManager.addPrice(currentPrice, Date.now(), 0);
+          logger.warn('⚠️ [Volume] No volume data available, storing price only');
+        }
+      } catch (volumeError) {
+        logger.error(`❌ [Volume] Error fetching volume: ${volumeError.message}`);
+        // Still store price even if volume fails
+        if (this.priceHistoryManager) {
+          await this.priceHistoryManager.addPrice(currentPrice, Date.now(), 0);
+        }
       }
 
       const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
@@ -1396,8 +1505,8 @@ class AdvancedTradingBot {
           tradingDecision.regimeConfig?.volatility4h || 0,
           tradingDecision.regimeConfig?.strategy || 'none',
           tradingDecision.position_size || 0,
-          tradingDecision.takeProfit || 0,
-          tradingDecision.stopLoss || 0
+          tradingDecision.takeProfitPercent || 0,  // 🔧 FIX: Use percentage, not absolute price
+          tradingDecision.stopLossPercent || 0     // 🔧 FIX: Use percentage, not absolute price
         );
       }
 
@@ -1603,15 +1712,17 @@ Volume Analysis:
       }
 
       // Execute decision based on mode
-      // Shadow mode: Execute all decisions (no risk)
-      // Live mode: Only execute high-confidence decisions (> 70%)
-      // 🔧 FIX: Raised shadow mode threshold from 50% to 70% to prevent weak signal trades
-      const minConfidence = (this.shadowMode && this.shadowMode.isActive) ? 0.7 : 0.7;
+      // 🚀 DYNAMIC THRESHOLD FIX: Use regime-based confidence thresholds
+      // VERY_LOW: 45% | LOW: 55% | MEDIUM: 65% | HIGH: 70%
+      const regime = tradingDecision.regime || this.tradingStrategyAgent.currentRegime || 'MEDIUM';
+      const minConfidence = this.tradingStrategyAgent.getMinConfidenceForRegime(regime);
+
+      logger.debug(`🎯 [DYNAMIC-THRESHOLD] Regime: ${regime}, Min: ${(minConfidence * 100).toFixed(0)}%, Decision: ${(tradingDecision.confidence * 100).toFixed(1)}%`);
 
       if (tradingDecision.confidence >= minConfidence) {
         await this.executeTradingDecision(tradingDecision, selectedStrategy);
       } else {
-        logger.debug(`⏭️ Skipping trade - confidence ${(tradingDecision.confidence * 100).toFixed(0)}% below minimum ${(minConfidence * 100).toFixed(0)}%`);
+        logger.debug(`⏭️ Skipping trade - confidence ${(tradingDecision.confidence * 100).toFixed(0)}% below dynamic threshold ${(minConfidence * 100).toFixed(0)}% (regime: ${regime})`);
       }
 
       // Store trading log in RAG system
@@ -1770,21 +1881,43 @@ Volume Analysis:
         logger.info(`👻 Estimated Profit: ${shadowTrade?.estimatedProfit || 0} USDT`);
         logger.info(`👻 Would Execute: ${shadowTrade?.wouldExecute ? 'YES' : 'NO'}`);
 
-        // 🔥 FIX #4: Create position for monitoring if trade would execute
+        // 🔥 FIX #4: Create virtual position for monitoring if trade would execute
         if (shadowTrade?.wouldExecute && action !== 'hold') {
           const positionId = `pos_${Date.now()}`;
+          const now = Date.now();
+
+          // Calculate take profit target (0.8% default)
+          const takeProfitPercent = 0.008;
+          const takeProfit = action === 'buy'
+            ? parameters.currentPrice * (1 + takeProfitPercent)
+            : parameters.currentPrice * (1 - takeProfitPercent);
+
+          // Calculate stop loss (3% from entry)
+          const stopLoss = action === 'buy'
+            ? parameters.currentPrice * 0.97
+            : parameters.currentPrice * 1.03;
+
+          // Create complete position object matching monitoring requirements
           this.tradingStrategyAgent.activePositions.set(positionId, {
             id: positionId,
-            action,
-            entryPrice: parameters.currentPrice,
-            size: position_size,
-            entryTime: Date.now(),
-            stopLoss: action === 'buy' ? parameters.currentPrice * 0.97 : parameters.currentPrice * 1.03,
-            entryZScore: parameters.zScore || 0,
-            strategy,
-            confidence: decision.confidence
+            side: action,                        // Required: 'buy' or 'sell'
+            entryPrice: parameters.currentPrice, // Required
+            size: position_size,                 // Required
+            timestamp: now,                      // Required: position creation time
+            entryTime: now,                      // Backward compatibility
+            takeProfit: takeProfit,              // Required: TP price level
+            takeProfitPercent: takeProfitPercent, // TP percentage for logging
+            stopLoss: stopLoss,                  // Required: SL price level
+            entryZScore: parameters.zScore || 0, // Strategy specific
+            strategy,                            // Strategy name
+            confidence: decision.confidence,     // Entry confidence
+            pair: 'BNB/USDT',                    // Trading pair
+            isVirtual: true                      // Mark as virtual/shadow position
           });
-          logger.info(`📊 Position ${positionId} created: ${action} $${position_size} @ ${parameters.currentPrice}`);
+          logger.info(`👻 Virtual Position ${positionId} created for monitoring`);
+          logger.info(`   ${action.toUpperCase()} $${position_size} @ ${parameters.currentPrice.toFixed(8)}`);
+          logger.info(`   TP: ${takeProfit.toFixed(8)} (+${(takeProfitPercent * 100).toFixed(1)}%)`);
+          logger.info(`   SL: ${stopLoss.toFixed(8)} (-3%)`);
         }
 
         // Track strategy performance for shadow trades
@@ -1980,8 +2113,16 @@ Volume Analysis:
 
   async logStatus() {
     try {
-      const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
-      const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+      // Use shadow mode balances if active
+      let usdtBalance, bnbBalance;
+      if (this.shadowMode && this.shadowMode.isActive) {
+        const virtualBalances = this.shadowMode.getVirtualBalances();
+        usdtBalance = virtualBalances.usdt;
+        bnbBalance = virtualBalances.bnb;
+      } else {
+        usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
+        bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+      }
       const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
 
       // ✅ FIX: currentPrice is BNB/USDT, so divide to get USD value
@@ -2159,6 +2300,12 @@ Volume Analysis:
 
       // Disconnect wallet
       this.walletManager.disconnect();
+
+      // Stop dashboard
+      // DISABLED - External monitoring dashboard runs separately
+      // if (this.dashboard) {
+      //   this.dashboard.stop();
+      // }
 
       logger.info('✅ Advanced Trading Bot stopped successfully!');
     } catch (error) {
