@@ -15062,5 +15062,103 @@
       "bnb": 53.5985457363489
     },
     "shadowMode": true
+  },
+  {
+    "timestamp": "2025-11-13T10:29:19.439Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 2405,
+    "targetPrice": 0.001034210465465882,
+    "confidence": 0.6575,
+    "reasoning": "Mean reversion strong buy: z-score -5.56, RSI 18.3, reversion strength 70% | 8-IND: 65.8% ✅",
+    "balances": {
+      "usdt": 33595,
+      "bnb": 24.47981434093711
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-11-13T10:29:31.403Z",
+    "action": "buy",
+    "pair": "USDT/BNB",
+    "amount": 2405,
+    "targetPrice": 0.001034163385950281,
+    "confidence": 0.6575,
+    "reasoning": "Mean reversion strong buy: z-score -4.34, RSI 18.2, reversion strength 70% | 8-IND: 65.8% ✅",
+    "balances": {
+      "usdt": 31190,
+      "bnb": 26.959515795317905
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-11-13T10:30:01.467Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 2403,
+    "targetPrice": 0.001035032283545433,
+    "confidence": 0.6575,
+    "reasoning": "Mean reversion strong buy: z-score -3.42, RSI 22.6, reversion strength 67% | 8-IND: 65.8% ✅",
+    "balances": {
+      "usdt": 31190,
+      "bnb": 26.959515795317905
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-11-13T10:30:31.371Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 2403,
+    "targetPrice": 0.001035096978992443,
+    "confidence": 0.6575,
+    "reasoning": "Mean reversion strong buy: z-score -3.01, RSI 23.0, reversion strength 67% | 8-IND: 65.8% ✅",
+    "balances": {
+      "usdt": 31190,
+      "bnb": 26.959515795317905
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-11-13T10:31:32.247Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 2405,
+    "targetPrice": 0.001033529405681077,
+    "confidence": 0.6575,
+    "reasoning": "Mean reversion strong buy: z-score -3.11, RSI 20.8, reversion strength 67% | 8-IND: 65.8% ✅",
+    "balances": {
+      "usdt": 31190,
+      "bnb": 26.959515795317905
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-11-13T10:32:01.757Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 2405,
+    "targetPrice": 0.001033620219100433,
+    "confidence": 0.6575,
+    "reasoning": "Mean reversion strong buy: z-score -2.77, RSI 21.3, reversion strength 66% | 8-IND: 65.8% ✅",
+    "balances": {
+      "usdt": 31190,
+      "bnb": 26.959515795317905
+    },
+    "shadowMode": true
+  },
+  {
+    "timestamp": "2025-11-13T10:32:31.668Z",
+    "action": "HOLD",
+    "pair": "USDT/BNB",
+    "amount": 2405,
+    "targetPrice": 0.001033610488955931,
+    "confidence": 0.6575,
+    "reasoning": "Mean reversion strong buy: z-score -2.53, RSI 21.3, reversion strength 64% | 8-IND: 65.8% ✅",
+    "balances": {
+      "usdt": 31190,
+      "bnb": 26.959515795317905
+    },
+    "shadowMode": true
   }
 ]

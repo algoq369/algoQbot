@@ -3699,18 +3699,22 @@ Return JSON only:
 
       try {
         // Get recent swap events from price history
-        if (this.priceHistoryManager && this.priceHistoryManager.history) {
-          const history = this.priceHistoryManager.history;
+        if (this.priceHistoryManager && this.priceHistoryManager.priceHistory) {
+          const history = this.priceHistoryManager.priceHistory;
           const recentHistory = history.slice(-100); // Last 100 data points
 
           // Convert price history to swap-like format for institutional tools
-          recentSwaps = recentHistory.map((point, i) => ({
-            amount0Out: point.volume > 0 ? String(point.volume / 2) : '0',
-            amount0In: point.volume > 0 ? String(point.volume / 2) : '0',
-            amount1Out: '1.0',
-            amount1In: '1.0',
-            timestamp: point.timestamp || Date.now() - ((100 - i) * 60000)
-          }));
+          // Alternate between buys (amount0Out > 0) and sells (amount0In > 0)
+          recentSwaps = recentHistory.map((point, i) => {
+            const isBuy = i % 2 === 0; // Alternate buy/sell
+            return {
+              amount0Out: isBuy && point.volume > 0 ? String(point.volume) : '0',
+              amount0In: !isBuy && point.volume > 0 ? String(point.volume) : '0',
+              amount1Out: '1.0',
+              amount1In: '1.0',
+              timestamp: point.timestamp || Date.now() - ((100 - i) * 60000)
+            };
+          });
 
           // Historical swaps (last 500 for volume profile)
           const historicalHistory = history.slice(-500);
@@ -3724,7 +3728,7 @@ Return JSON only:
 
           // Enhanced debug logging for institutional tools data pipeline
           logger.info(`🔍 DEBUG: priceHistoryManager exists: ${!!this.priceHistoryManager}`);
-          logger.info(`🔍 DEBUG: priceHistory length: ${this.priceHistoryManager?.history?.length || 0}`);
+          logger.info(`🔍 DEBUG: priceHistory length: ${this.priceHistoryManager?.priceHistory?.length || 0}`);
           logger.info(`🔍 DEBUG: Prepared ${recentSwaps.length} recent swaps`);
           if (recentSwaps.length > 0) {
             logger.info(`🔍 DEBUG: First recent swap: ${JSON.stringify(recentSwaps[0])}`);
@@ -3811,6 +3815,8 @@ Return JSON only:
       // ═══════════════════════════════════════════════════════════════
       try {
         const liquiditySignal = await this.liquidity.getLiquiditySignal(pairContract);
+
+        logger.info(`🔍 DEBUG: Liquidity signal status: ${liquiditySignal.status}, confidence: ${liquiditySignal.confidence}`);
 
         let liquidityScore = 0;
         if (liquiditySignal.status === 'SUCCESS') {
