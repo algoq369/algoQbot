@@ -1,7 +1,7 @@
 {
-  "name": "advanced-bsc-trading-bot",
+  "name": "algoQbot",
   "version": "2.0.0",
-  "description": "Advanced BSC trading bot with AI agents, RAG, and monitoring",
+  "description": "Professional BSC trading bot with AI agents, institutional-grade tools, and real-time monitoring",
   "main": "index.js",
   "scripts": {
     "start": "node AdvancedTradingBot.js",
