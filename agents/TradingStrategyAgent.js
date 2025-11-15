@@ -1276,13 +1276,21 @@ Return JSON only:
 
       // Check if volatility too low for trading
       if (this.currentRegime === 'VERY_LOW') {
-        logger.warn(`⚠️ [REGIME] Volatility too low: ${(volatility4h * 100).toFixed(2)}%`);
-        logger.info(`💤 [REGIME] Minimum required: ${REGIME_THRESHOLDS.LOW}%`);
+        const currentVol = (volatility4h * 100).toFixed(2);
+        const minVol = REGIME_THRESHOLDS.LOW;
+        const gap = (minVol - volatility4h * 100).toFixed(2);
+
+        logger.warn(`⚠️ [REGIME] Volatility too low: ${currentVol}%`);
+        logger.info(`💤 [REGIME] Minimum required: ${minVol}%`);
         logger.info(`💤 [REGIME] Skipping trade - waiting for higher volatility`);
+
+        // Calculate TP/SL percentages for dashboard display
+        const tpslConfig = calculateTPSL(this.currentRegime, volatility4h);
 
         return {
           action: 'HOLD',
           reason: 'volatility_too_low',
+          reasoning: `Volatility too low (${currentVol}% < ${minVol}% minimum) - need ${gap}% more volatility for trading`,  // ✅ FIX: Add reasoning field
           regime: this.currentRegime,
           regimeConfig: {
             name: regimeConfig.name,
@@ -1292,7 +1300,9 @@ Return JSON only:
           confidence: 0.0,  // ✅ FIX: Add confidence for VERY_LOW regime
           position_size: 0,  // ✅ FIX: Use underscore to match normal decisions
           takeProfit: 0,
-          stopLoss: 0
+          stopLoss: 0,
+          takeProfitPercent: tpslConfig.tp,  // ✅ For dashboard consistency
+          stopLossPercent: tpslConfig.sl     // ✅ For dashboard consistency
         };
       }
 
@@ -1420,6 +1430,14 @@ Return JSON only:
       };
 
       // ═══════════════════════════════════════════════════════════════
+      // CALCULATE TP/SL PERCENTAGES FOR DASHBOARD DISPLAY
+      // Calculate early so dashboard can show them even in HOLD mode
+      // ═══════════════════════════════════════════════════════════════
+      const tpslConfigForDisplay = calculateTPSL(this.currentRegime, volatility4h);
+      decision.takeProfitPercent = tpslConfigForDisplay.tp;  // Store for dashboard
+      decision.stopLossPercent = tpslConfigForDisplay.sl;    // Store for dashboard
+
+      // ═══════════════════════════════════════════════════════════════
       // REGIME-BASED POSITION SIZING
       // ═══════════════════════════════════════════════════════════════
 
@@ -1452,6 +1470,21 @@ Return JSON only:
 
       // Override the decision's position size with regime calculation
       decision.position_size = regimePositionSize;
+
+      // ═══════════════════════════════════════════════════════════════
+      // 🔥 CRITICAL FIX: Check confidence threshold BEFORE creating position
+      // This prevents orphan positions that were never executed
+      // ═══════════════════════════════════════════════════════════════
+
+      // Calculate dynamic confidence threshold based on current regime
+      const minConfidence = this.getMinConfidenceForRegime(this.currentRegime);
+
+      if (decision.action !== 'hold' && decision.confidence < minConfidence) {
+        logger.debug(`⏭️ Skipping position creation - confidence ${(decision.confidence * 100).toFixed(0)}% below dynamic threshold ${(minConfidence * 100).toFixed(0)}% (regime: ${this.currentRegime})`);
+        decision.action = 'hold';
+        decision.reasoning += ` (Skipped: confidence ${(decision.confidence * 100).toFixed(0)}% < threshold ${(minConfidence * 100).toFixed(0)}%)`;
+        return decision;
+      }
 
       // 🚨 CRITICAL FIX: Track position when trade is executed
       if (decision.action !== 'hold' && decision.position_size > 0) {
@@ -1500,6 +1533,8 @@ Return JSON only:
         // Update decision with TP/SL values
         decision.takeProfit = takeProfit;
         decision.stopLoss = stopLoss;
+        decision.takeProfitPercent = tpPercent;  // ✅ Add percentage for dashboard display
+        decision.stopLossPercent = slPercent;    // ✅ Add percentage for dashboard display
 
         // 🚨 CRITICAL: Reject trades with poor risk:reward ratio
         // Don't risk 2% to make 0.3% - that's unsustainable

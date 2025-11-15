@@ -7,8 +7,17 @@ const chalk = require('chalk');
 
 /**
  * Display current regime status and trading parameters
+ * @param {string} regime - Current volatility regime
+ * @param {number} volatility4h - 4-hour volatility (decimal, e.g., 0.0025 = 0.25%)
+ * @param {string} strategy - Active trading strategy
+ * @param {number} positionSize - Position size in USD
+ * @param {number} tp - Take profit percentage (decimal, e.g., 0.0299 = 2.99%)
+ * @param {number} sl - Stop loss percentage (decimal, e.g., 0.015 = 1.5%)
+ * @param {number} [minVolatility] - Optional: Minimum volatility required (decimal)
+ * @param {number} [portfolioValue] - Optional: Total portfolio value in USD
+ * @param {number} [bnbPercent] - Optional: BNB percentage of portfolio
  */
-function displayRegimeStatus(regime, volatility4h, strategy, positionSize, tp, sl) {
+function displayRegimeStatus(regime, volatility4h, strategy, positionSize, tp, sl, minVolatility, portfolioValue, bnbPercent) {
   const regimeColors = {
     HIGH: chalk.red.bold,
     MEDIUM: chalk.yellow.bold,
@@ -40,7 +49,23 @@ function displayRegimeStatus(regime, volatility4h, strategy, positionSize, tp, s
     console.log('');
   } else {
     console.log(chalk.cyan('─'.repeat(60)));
-    console.log(chalk.gray.bold('  Waiting for trading conditions...'));
+
+    // ✅ ENHANCEMENT: Show detailed context when waiting
+    if (minVolatility && portfolioValue !== undefined && bnbPercent !== undefined) {
+      const minVolPercent = (minVolatility * 100).toFixed(2);
+      const gap = ((minVolatility - volatility4h) * 100).toFixed(2);
+
+      console.log(chalk.gray.bold('  💤 Waiting for market conditions to improve...'));
+      console.log('');
+      console.log(`  ${chalk.bold('Minimum Required:')} ${chalk.yellow(minVolPercent + '%')} volatility`);
+      console.log(`  ${chalk.bold('Gap:')} ${chalk.red(gap + '%')} more volatility needed`);
+      console.log('');
+      console.log(`  ${chalk.bold('Portfolio:')} ${chalk.cyan('$' + portfolioValue.toFixed(2))} (${chalk.blue(bnbPercent.toFixed(1) + '% BNB')})`);
+      console.log(`  ${chalk.bold('Next Check:')} ${chalk.gray('~30 seconds')}`);
+    } else {
+      console.log(chalk.gray.bold('  Waiting for trading conditions...'));
+    }
+
     console.log(chalk.cyan('─'.repeat(60)));
     console.log('');
   }

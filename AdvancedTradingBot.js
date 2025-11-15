@@ -1497,21 +1497,8 @@ class AdvancedTradingBot {
       });
 
       // ═══════════════════════════════════════════════════════════════
-      // REGIME DASHBOARD DISPLAY
+      // CALCULATE PORTFOLIO DATA FOR DASHBOARD
       // ═══════════════════════════════════════════════════════════════
-      if (tradingDecision && tradingDecision.regime) {
-        displayRegimeStatus(
-          tradingDecision.regime,
-          tradingDecision.regimeConfig?.volatility4h || 0,
-          tradingDecision.regimeConfig?.strategy || 'none',
-          tradingDecision.position_size || 0,
-          tradingDecision.takeProfitPercent || 0,  // 🔧 FIX: Use percentage, not absolute price
-          tradingDecision.stopLossPercent || 0     // 🔧 FIX: Use percentage, not absolute price
-        );
-      }
-
-      // 🔧 FIX: Smart portfolio-based trade limits (no forced trades, only blocking)
-      // Check portfolio allocation and block trades that worsen imbalance
       logger.info('🔍 [PORTFOLIO CHECK] Starting portfolio balance verification...');
 
       const balance = await this.getBalance();
@@ -1542,6 +1529,26 @@ class AdvancedTradingBot {
       logger.info(`🔍 [PORTFOLIO CHECK] Current balances: $${balance.usdt.toFixed(2)} USDT (${usdtPercent.toFixed(1)}%) / ${balance.bnb.toFixed(2)} BNB (${bnbPercent.toFixed(1)}%)`);
       logger.info(`🔍 [PORTFOLIO CHECK] AI Decision: ${tradingDecision.action.toUpperCase()} with ${(tradingDecision.confidence * 100).toFixed(0)}% confidence`);
       logger.info(`🔍 [PORTFOLIO CHECK] Thresholds: Block BUY if BNB > 45%, Block SELL if BNB < 35%`);
+
+      // ═══════════════════════════════════════════════════════════════
+      // REGIME DASHBOARD DISPLAY (with enhanced context)
+      // ═══════════════════════════════════════════════════════════════
+      if (tradingDecision && tradingDecision.regime) {
+        // Minimum volatility required for trading (0.3% = 0.003 decimal)
+        const minVolatility = 0.003;
+
+        displayRegimeStatus(
+          tradingDecision.regime,
+          tradingDecision.regimeConfig?.volatility4h || 0,
+          tradingDecision.regimeConfig?.strategy || 'none',
+          tradingDecision.position_size || 0,
+          tradingDecision.takeProfitPercent || 0,
+          tradingDecision.stopLossPercent || 0,
+          minVolatility,           // ✅ NEW: Minimum volatility threshold
+          totalValueUSD,           // ✅ NEW: Portfolio value
+          bnbPercent               // ✅ NEW: BNB percentage
+        );
+      }
 
       // Track last emergency rebalance time
       if (!this.lastEmergencyRebalance) {
@@ -1714,6 +1721,10 @@ Volume Analysis:
       // Execute decision based on mode
       // 🚀 DYNAMIC THRESHOLD FIX: Use regime-based confidence thresholds
       // VERY_LOW: 45% | LOW: 55% | MEDIUM: 65% | HIGH: 70%
+      //
+      // NOTE: This is now a SAFETY NET check. The primary threshold check happens in
+      // TradingStrategyAgent BEFORE position creation to prevent orphan positions.
+      // If confidence was below threshold, tradingDecision.action will already be 'hold'.
       const regime = tradingDecision.regime || this.tradingStrategyAgent.currentRegime || 'MEDIUM';
       const minConfidence = this.tradingStrategyAgent.getMinConfidenceForRegime(regime);
 
@@ -1722,7 +1733,14 @@ Volume Analysis:
       if (tradingDecision.confidence >= minConfidence) {
         await this.executeTradingDecision(tradingDecision, selectedStrategy);
       } else {
-        logger.debug(`⏭️ Skipping trade - confidence ${(tradingDecision.confidence * 100).toFixed(0)}% below dynamic threshold ${(minConfidence * 100).toFixed(0)}% (regime: ${regime})`);
+        // ✅ FIX: Distinguish between legitimate filtering and safety net catch
+        if (tradingDecision.action.toLowerCase() === 'hold' || tradingDecision.confidence === 0) {
+          // Legitimate early filtering (volatility check, etc.) - no warning needed
+          logger.debug(`✅ [SAFETY NET] HOLD decision confirmed (confidence ${(tradingDecision.confidence * 100).toFixed(1)}% from earlier filtering: ${tradingDecision.reasoning || tradingDecision.reason || 'N/A'})`);
+        } else {
+          // Real safety net catch - something slipped through earlier checks
+          logger.warn(`⚠️ [SAFETY NET] Trade skipped at execution layer - confidence ${(tradingDecision.confidence * 100).toFixed(0)}% below threshold ${(minConfidence * 100).toFixed(0)}% (this should have been caught earlier!)`);
+        }
       }
 
       // Store trading log in RAG system

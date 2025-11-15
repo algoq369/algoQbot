@@ -32,10 +32,10 @@ echo ""
 echo -e "${CYAN}${BOLD}[1] BOT STATUS${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-if ps aux | grep "AdvancedTradingBot" | grep -v grep > /dev/null; then
-    PID=$(ps aux | grep "AdvancedTradingBot" | grep -v grep | awk '{print $2}')
-    CPU=$(ps aux | grep "AdvancedTradingBot" | grep -v grep | awk '{print $3}')
-    MEM=$(ps aux | grep "AdvancedTradingBot" | grep -v grep | awk '{print $4}')
+if ps aux | grep "start-shadow-mode.js" | grep -v grep > /dev/null; then
+    PID=$(ps aux | grep "start-shadow-mode.js" | grep -v grep | awk '{print $2}' | head -1)
+    CPU=$(ps aux | grep "start-shadow-mode.js" | grep -v grep | awk '{print $3}' | head -1)
+    MEM=$(ps aux | grep "start-shadow-mode.js" | grep -v grep | awk '{print $4}' | head -1)
     UPTIME=$(ps -p $PID -o etime= 2>/dev/null | xargs)
     echo -e "  Status:      ${GREEN}●${NC} ${GREEN}Running${NC}"
     echo -e "  PID:         ${BLUE}$PID${NC}"
