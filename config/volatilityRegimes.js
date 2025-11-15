@@ -33,10 +33,11 @@ const REGIME_CONFIGS = {
     positionSizePercent: 0.09,  // 9% of portfolio
     maxPositionSize: 0.12,      // Cap at 12%
 
-    // Take profit / Stop loss
+    // Take profit / Stop loss (PROFESSIONAL BSC STANDARDS)
     tpMultiplier: 1.5,          // TP = volatility × 1.5
     slMultiplier: 0.8,          // SL = volatility × 0.8
-    minTP: 0.018,               // Minimum 1.8% TP
+    minTP: 0.040,               // Minimum 4.0% TP (covers 2.5% BSC costs + 1.5% profit)
+    minSL: 0.020,               // Minimum 2.0% SL (ATR-based protection for high vol)
 
     // Risk management
     maxDailyTrades: 5,
@@ -59,10 +60,11 @@ const REGIME_CONFIGS = {
     positionSizePercent: 0.06,  // 6% of portfolio
     maxPositionSize: 0.09,      // Cap at 9%
 
-    // Take profit / Stop loss
+    // Take profit / Stop loss (PROFESSIONAL BSC STANDARDS)
     tpMultiplier: 2.0,          // TP = volatility × 2.0
     slMultiplier: 1.0,          // SL = volatility × 1.0
-    minTP: 0.012,               // Minimum 1.2% TP
+    minTP: 0.035,               // Minimum 3.5% TP (covers 2.5% BSC costs + 1% profit)
+    minSL: 0.015,               // Minimum 1.5% SL (ATR-based protection)
 
     // Risk management
     maxDailyTrades: 8,
@@ -85,10 +87,11 @@ const REGIME_CONFIGS = {
     positionSizePercent: 0.03,  // 3% of portfolio
     maxPositionSize: 0.06,      // Cap at 6%
 
-    // Take profit / Stop loss
+    // Take profit / Stop loss (PROFESSIONAL BSC STANDARDS)
     tpMultiplier: 2.5,          // TP = volatility × 2.5
     slMultiplier: 1.2,          // SL = volatility × 1.2
-    minTP: 0.008,               // Minimum 0.8% TP
+    minTP: 0.035,               // Minimum 3.5% TP (covers 2.5% BSC costs + 1% profit)
+    minSL: 0.015,               // Minimum 1.5% SL (ATR-based protection)
 
     // Risk management
     maxDailyTrades: 12,
@@ -187,6 +190,10 @@ function calculatePositionSize(regime, confidence, portfolioValue) {
 
 /**
  * Calculate dynamic TP/SL based on regime and volatility
+ * PROFESSIONAL BSC STANDARDS:
+ * - Minimum TP: 3.5% (covers 2.5% BSC round-trip costs + 1% profit)
+ * - Minimum SL: 1.5% (ATR-based risk protection)
+ *
  * @param {string} regime - Current regime
  * @param {number} volatility4h - Current 4h volatility (decimal)
  * @returns {object} - { tp, sl } in decimal format
@@ -196,10 +203,11 @@ function calculateTPSL(regime, volatility4h) {
 
   // Calculate TP
   let tp = volatility4h * config.tpMultiplier;
-  tp = Math.max(tp, config.minTP);  // Ensure minimum TP
+  tp = Math.max(tp, config.minTP || 0.035);  // Ensure minimum TP (default 3.5%)
 
   // Calculate SL
   let sl = volatility4h * config.slMultiplier;
+  sl = Math.max(sl, config.minSL || 0.015);  // Ensure minimum SL (default 1.5%)
 
   return {
     tp: tp,
