@@ -9,21 +9,29 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment variables
+# Environment variables (CRITICAL SECURITY)
 .env
 .env.local
 .env.*.local
 .env.backup
 .env.production
+.env.development
+.env.test
 
 # ✅ SECURITY: Encrypted wallet and shadow trades
 wallet.json
 .shadow-trades.json
 *.key
 *.pem
+credentials.json
 
 # ✅ SECURITY FIX #2: Rate limiter state (persists across restarts)
 ratelimit-state.json
+
+# ✅ SECURITY: Trading data (contains sensitive portfolio info)
+data/virtual_balances.json
+data/shadow_trades.json
+data/*.json
 
 # Database
 *.sql

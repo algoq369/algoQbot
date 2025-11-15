@@ -17,7 +17,18 @@ BOLD='\033[1m'
 
 clear
 
-LOGFILE="logs/combined-$(date +%Y-%m-%d).log"
+# Use the numbered log file (.1 extension) which contains the actual runtime data
+LOGFILE="logs/combined-$(date +%Y-%m-%d).log.1"
+
+# Helper function to parse JSON log messages
+parse_log_json() {
+    local pattern="$1"
+    local json_field="$2"
+
+    if [ -f "$LOGFILE" ]; then
+        grep "$pattern" "$LOGFILE" 2>/dev/null | tail -1 | jq -r ".${json_field}" 2>/dev/null
+    fi
+}
 
 echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${CYAN}${BOLD}           🤖 algoQbot INSTITUTIONAL DASHBOARD${NC}"
@@ -54,14 +65,44 @@ echo ""
 echo -e "${CYAN}${BOLD}[2] PORTFOLIO STATUS${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-PORTFOLIO=$(grep "Portfolio value updated" "$LOGFILE" 2>/dev/null | tail -1 | sed 's/.*updated: //' | sed 's/ .*//')
-DISTRIBUTION=$(tail -200 "$LOGFILE" 2>/dev/null | grep "PORTFOLIO CHECK DEBUG.*Percentages" | tail -1 | sed 's/.*Percentages: //' | sed 's/".*//')
+# Parse portfolio value from JSON logs
+PORTFOLIO_MSG=$(grep "Total portfolio" "$LOGFILE" 2>/dev/null | tail -1 | jq -r '.message' 2>/dev/null)
+BALANCE_MSG=$(grep "Portfolio balanced" "$LOGFILE" 2>/dev/null | tail -1 | jq -r '.message' 2>/dev/null)
 
-if [ ! -z "$PORTFOLIO" ]; then
-    echo -e "  Total Value: ${GREEN}$PORTFOLIO${NC}"
-    [ ! -z "$DISTRIBUTION" ] && echo -e "  Balance:     ${BLUE}$DISTRIBUTION${NC}"
+if [ ! -z "$PORTFOLIO_MSG" ]; then
+    # Extract total value (e.g., "$56657.15" from "Total portfolio: $33620.00 + $23037.15 = $56657.15")
+    TOTAL_VALUE=$(echo "$PORTFOLIO_MSG" | grep -o '= \$[0-9.,]*' | sed 's/= //')
+    if [ -z "$TOTAL_VALUE" ]; then
+        # Try alternative format: "Total portfolio value: $56,698.08"
+        TOTAL_VALUE=$(echo "$PORTFOLIO_MSG" | sed 's/.*value: //' | sed 's/ .*//')
+    fi
+
+    if [ ! -z "$TOTAL_VALUE" ]; then
+        echo -e "  Total Value: ${GREEN}$TOTAL_VALUE${NC}"
+
+        # Extract BNB info if available
+        BNB_INFO=$(echo "$PORTFOLIO_MSG" | grep -o '([^)]* BNB @ [^)]*)')
+        [ ! -z "$BNB_INFO" ] && echo -e "  Holdings:    ${BLUE}$BNB_INFO${NC}"
+    else
+        echo -e "  ${YELLOW}No portfolio total available${NC}"
+    fi
 else
     echo -e "  ${YELLOW}No portfolio data available${NC}"
+fi
+
+# Show balance status
+if [ ! -z "$BALANCE_MSG" ]; then
+    # Extract BNB percentage (e.g., "40.7% BNB (target 35-45%)")
+    BNB_PERCENT=$(echo "$BALANCE_MSG" | grep -o '[0-9.]*% BNB' | sed 's/ BNB//')
+    TARGET=$(echo "$BALANCE_MSG" | grep -o 'target [0-9-]*%' | sed 's/target //')
+
+    if echo "$BALANCE_MSG" | grep -q "✅"; then
+        echo -e "  BNB %:       ${GREEN}$BNB_PERCENT (target $TARGET) ✅${NC}"
+    elif echo "$BALANCE_MSG" | grep -q "⚠️"; then
+        echo -e "  BNB %:       ${YELLOW}$BNB_PERCENT (target $TARGET) ⚠️${NC}"
+    else
+        echo -e "  BNB %:       ${BLUE}$BNB_PERCENT (target $TARGET)${NC}"
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -111,11 +152,12 @@ echo -e "${CYAN}  📊 INSTITUTIONAL TOOLS (56% total weight):${NC}"
 echo -e "${CYAN}  ────────────────────────────────────────────────────────────${NC}"
 
 # Order Flow (20%)
-ORDER_FLOW=$(grep "Order Flow" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$ORDER_FLOW" ]; then
-    SCORE=$(echo "$ORDER_FLOW" | sed 's/.*Order Flow (20%): //' | sed 's/ |.*//')
-    DELTA=$(echo "$ORDER_FLOW" | sed 's/.*Delta: //' | sed 's/".*//')
-    TIMESTAMP=$(echo "$ORDER_FLOW" | grep -o '"timestamp":"[^"]*"' | cut -d'"' -f4)
+ORDER_FLOW_LINE=$(grep "\[1/6\] Order Flow" "$LOGFILE" 2>/dev/null | tail -1)
+if [ ! -z "$ORDER_FLOW_LINE" ]; then
+    ORDER_FLOW_MSG=$(echo "$ORDER_FLOW_LINE" | jq -r '.message' 2>/dev/null)
+    TIMESTAMP=$(echo "$ORDER_FLOW_LINE" | jq -r '.timestamp' 2>/dev/null)
+    SCORE=$(echo "$ORDER_FLOW_MSG" | sed 's/.*Order Flow (20%): //' | sed 's/ |.*//')
+    DELTA=$(echo "$ORDER_FLOW_MSG" | sed 's/.*Delta: //')
     echo -e "  ${BLUE}[1/6] Order Flow (20%):${NC}    $SCORE | Delta: $DELTA"
     echo -e "       ${BLUE}Last updated: $TIMESTAMP${NC}"
 else
@@ -123,11 +165,12 @@ else
 fi
 
 # Volume Profile (18%)
-VOL_PROF=$(grep "Volume Profile" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$VOL_PROF" ]; then
-    SCORE=$(echo "$VOL_PROF" | sed 's/.*Volume Profile (18%): //' | sed 's/ |.*//')
-    POC=$(echo "$VOL_PROF" | sed 's/.*POC: //' | sed 's/".*//')
-    TIMESTAMP=$(echo "$VOL_PROF" | grep -o '"timestamp":"[^"]*"' | cut -d'"' -f4)
+VOL_PROF_LINE=$(grep "\[2/6\] Volume Profile" "$LOGFILE" 2>/dev/null | tail -1)
+if [ ! -z "$VOL_PROF_LINE" ]; then
+    VOL_PROF_MSG=$(echo "$VOL_PROF_LINE" | jq -r '.message' 2>/dev/null)
+    TIMESTAMP=$(echo "$VOL_PROF_LINE" | jq -r '.timestamp' 2>/dev/null)
+    SCORE=$(echo "$VOL_PROF_MSG" | sed 's/.*Volume Profile (18%): //' | sed 's/ |.*//')
+    POC=$(echo "$VOL_PROF_MSG" | sed 's/.*POC: //')
     echo -e "  ${BLUE}[2/6] Volume Profile (18%):${NC} $SCORE | POC: $POC"
     echo -e "       ${BLUE}Last updated: $TIMESTAMP${NC}"
 else
@@ -135,11 +178,12 @@ else
 fi
 
 # Liquidity (18%)
-LIQUIDITY=$(grep "Liquidity (18%)" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$LIQUIDITY" ]; then
-    SCORE=$(echo "$LIQUIDITY" | sed 's/.*Liquidity (18%): //' | sed 's/ |.*//')
-    RATIO=$(echo "$LIQUIDITY" | sed 's/.*Ratio: //' | sed 's/".*//')
-    TIMESTAMP=$(echo "$LIQUIDITY" | grep -o '"timestamp":"[^"]*"' | cut -d'"' -f4)
+LIQUIDITY_LINE=$(grep "\[3/6\] Liquidity" "$LOGFILE" 2>/dev/null | tail -1)
+if [ ! -z "$LIQUIDITY_LINE" ]; then
+    LIQUIDITY_MSG=$(echo "$LIQUIDITY_LINE" | jq -r '.message' 2>/dev/null)
+    TIMESTAMP=$(echo "$LIQUIDITY_LINE" | jq -r '.timestamp' 2>/dev/null)
+    SCORE=$(echo "$LIQUIDITY_MSG" | sed 's/.*Liquidity (18%): //' | sed 's/ |.*//')
+    RATIO=$(echo "$LIQUIDITY_MSG" | sed 's/.*Ratio: //')
     echo -e "  ${BLUE}[3/6] Liquidity (18%):${NC}      $SCORE | Ratio: $RATIO"
     echo -e "       ${BLUE}Last updated: $TIMESTAMP${NC}"
 else
@@ -151,27 +195,30 @@ echo -e "${CYAN}  📊 TECHNICAL TOOLS (44% total weight):${NC}"
 echo -e "${CYAN}  ────────────────────────────────────────────────────────────${NC}"
 
 # VWAP (15%)
-VWAP=$(grep "VWAP (15%)" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$VWAP" ]; then
-    SCORE=$(echo "$VWAP" | sed 's/.*VWAP (15%): //' | sed 's/".*//')
+VWAP_LINE=$(grep "\[4/6\] VWAP" "$LOGFILE" 2>/dev/null | tail -1)
+if [ ! -z "$VWAP_LINE" ]; then
+    VWAP_MSG=$(echo "$VWAP_LINE" | jq -r '.message' 2>/dev/null)
+    SCORE=$(echo "$VWAP_MSG" | sed 's/.*VWAP (15%): //')
     echo -e "  ${BLUE}[4/6] VWAP (15%):${NC}           $SCORE"
 else
     echo -e "  ${YELLOW}[4/6] VWAP:${NC}                 Waiting for data..."
 fi
 
 # ATR (12%)
-ATR=$(grep "ATR (12%)" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$ATR" ]; then
-    SCORE=$(echo "$ATR" | sed 's/.*ATR (12%): //' | sed 's/".*//')
+ATR_LINE=$(grep "\[5/6\] ATR" "$LOGFILE" 2>/dev/null | tail -1)
+if [ ! -z "$ATR_LINE" ]; then
+    ATR_MSG=$(echo "$ATR_LINE" | jq -r '.message' 2>/dev/null)
+    SCORE=$(echo "$ATR_MSG" | sed 's/.*ATR (12%): //')
     echo -e "  ${BLUE}[5/6] ATR (12%):${NC}            $SCORE"
 else
     echo -e "  ${YELLOW}[5/6] ATR:${NC}                  Waiting for data..."
 fi
 
 # Regime (9%)
-REGIME_IND=$(grep "Regime (9%)" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$REGIME_IND" ]; then
-    SCORE=$(echo "$REGIME_IND" | sed 's/.*Regime (9%): //' | sed 's/".*//')
+REGIME_IND_LINE=$(grep "\[6/6\] Regime" "$LOGFILE" 2>/dev/null | tail -1)
+if [ ! -z "$REGIME_IND_LINE" ]; then
+    REGIME_IND_MSG=$(echo "$REGIME_IND_LINE" | jq -r '.message' 2>/dev/null)
+    SCORE=$(echo "$REGIME_IND_MSG" | sed 's/.*Regime (9%): //')
     echo -e "  ${BLUE}[6/6] Regime (9%):${NC}          $SCORE"
 else
     echo -e "  ${YELLOW}[6/6] Regime:${NC}               Waiting for data..."
@@ -182,8 +229,9 @@ echo ""
 echo -e "${CYAN}  ────────────────────────────────────────────────────────────${NC}"
 FINAL_CONF_LINE=$(grep "FINAL.*INSTITUTIONAL.*CONFIDENCE" "$LOGFILE" 2>/dev/null | tail -1)
 if [ ! -z "$FINAL_CONF_LINE" ]; then
-    FINAL_CONF=$(echo "$FINAL_CONF_LINE" | sed 's/.*CONFIDENCE: //' | sed 's/".*//')
-    TIMESTAMP=$(echo "$FINAL_CONF_LINE" | grep -o '"timestamp":"[^"]*"' | cut -d'"' -f4)
+    FINAL_CONF_MSG=$(echo "$FINAL_CONF_LINE" | jq -r '.message' 2>/dev/null)
+    TIMESTAMP=$(echo "$FINAL_CONF_LINE" | jq -r '.timestamp' 2>/dev/null)
+    FINAL_CONF=$(echo "$FINAL_CONF_MSG" | sed 's/.*CONFIDENCE: //')
 
     # Parse confidence value
     CONF_VAL=$(echo "$FINAL_CONF" | tr -d '"%' | tr -d ',' | tr -d '"')
@@ -200,8 +248,10 @@ if [ ! -z "$FINAL_CONF_LINE" ]; then
     echo -e "       ${BLUE}Last calculated: $TIMESTAMP${NC}"
 
     # Show breakdown if available
-    INST_CONTRIB=$(tail -500 "$LOGFILE" 2>/dev/null | grep "Institutional tools:" | tail -1 | sed 's/.*Institutional tools: //' | sed 's/ .*//')
-    if [ ! -z "$INST_CONTRIB" ]; then
+    INST_CONTRIB_LINE=$(grep "Institutional tools:" "$LOGFILE" 2>/dev/null | tail -1)
+    if [ ! -z "$INST_CONTRIB_LINE" ]; then
+        INST_CONTRIB_MSG=$(echo "$INST_CONTRIB_LINE" | jq -r '.message' 2>/dev/null)
+        INST_CONTRIB=$(echo "$INST_CONTRIB_MSG" | sed 's/.*Institutional tools: //' | sed 's/ .*//')
         echo -e "  ${CYAN}📊 Institutional contribution: $INST_CONTRIB${NC}"
     fi
 else
@@ -281,12 +331,22 @@ echo ""
 echo -e "${CYAN}${BOLD}[7] ACTIVE POSITIONS${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-ACTIVE_POS=$(tail -200 "$LOGFILE" 2>/dev/null | grep "activePositions size:" | tail -1 | sed 's/.*size: //' | sed 's/".*//')
-if [ ! -z "$ACTIVE_POS" ]; then
-    if [ "$ACTIVE_POS" = "0" ]; then
-        echo -e "  Active: ${YELLOW}0${NC} (No open positions)"
+# Parse position monitoring data from JSON logs
+POS_LINE=$(grep "Monitoring.*active position" "$LOGFILE" 2>/dev/null | tail -1)
+if [ ! -z "$POS_LINE" ]; then
+    POS_MSG=$(echo "$POS_LINE" | jq -r '.message' 2>/dev/null)
+
+    # Extract total, virtual, and live counts (e.g., "📊 Monitoring 6 active position(s): 2 virtual, 4 live")
+    TOTAL=$(echo "$POS_MSG" | grep -o '[0-9]* active position' | grep -o '[0-9]*')
+    VIRTUAL=$(echo "$POS_MSG" | grep -o '[0-9]* virtual' | grep -o '[0-9]*')
+    LIVE=$(echo "$POS_MSG" | grep -o '[0-9]* live' | grep -o '[0-9]*')
+
+    if [ "$TOTAL" = "0" ] || [ -z "$TOTAL" ]; then
+        echo -e "  Total Active: ${YELLOW}0${NC} (No open positions)"
     else
-        echo -e "  Active: ${GREEN}$ACTIVE_POS${NC}"
+        echo -e "  Total Active: ${GREEN}$TOTAL${NC}"
+        [ ! -z "$VIRTUAL" ] && echo -e "  Virtual:      ${BLUE}$VIRTUAL${NC}"
+        [ ! -z "$LIVE" ] && echo -e "  Live:         ${BLUE}$LIVE${NC}"
     fi
 else
     echo -e "  ${YELLOW}No position data${NC}"

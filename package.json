@@ -10,6 +10,7 @@
     "start-original": "node index.js",
     "dev": "nodemon AdvancedTradingBot.js",
     "monitor": "streamlit run monitoring/app.py",
+    "dashboard": "./monitor-dashboard-institutional.sh",
     "setup-db": "node scripts/setup-database.js",
     "quick-start": "node quick-start.js",
     "setup": "./setup.sh",
@@ -56,15 +57,31 @@
     "nodemon": "^3.0.2"
   },
   "keywords": [
-    "defi",
     "trading",
     "bot",
     "bsc",
+    "binance-smart-chain",
+    "defi",
     "pancakeswap",
+    "algorithmic-trading",
     "ai",
-    "rag",
-    "agents"
+    "claude",
+    "crypto",
+    "automated-trading",
+    "trading-strategies"
   ],
-  "author": "Your Name",
-  "license": "MIT"
+  "author": "algoq369",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/algoq369/algoQbot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/algoq369/algoQbot/issues"
+  },
+  "homepage": "https://github.com/algoq369/algoQbot#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  }
 }

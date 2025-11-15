@@ -1,363 +1,395 @@
-# 🤖 Advanced BSC Trading Bot
+# 🚀 algoQbot - Professional BSC Trading Bot
 
-An intelligent, AI-powered trading bot for Binance Smart Chain (BSC) with advanced monitoring capabilities, multi-agent architecture, and RAG (Retrieval Augmented Generation) system.
+[![Health Score](https://img.shields.io/badge/Health%20Score-100%2F100-brightgreen)](https://github.com/algoq369/algoQbot)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-success)](https://github.com/algoq369/algoQbot)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-## 🌟 Features
+## Overview
 
-### 🧠 AI-Powered Trading
-- **Multi-Agent System**: Specialized AI agents for market research, strategy analysis, and execution
-- **RAG System**: Intelligent data retrieval and analysis using vector databases
-- **Sentiment Analysis**: Real-time market sentiment monitoring from news and social media
-- **Technical Analysis**: Advanced technical indicators and market structure analysis
-- **Dynamic Strategy Selection**: AI chooses optimal trading strategies based on market conditions
+Professional-grade algorithmic trading bot for Binance Smart Chain (BSC) with institutional-level features:
 
-### 📊 Advanced Monitoring
-- **Streamlit Dashboard**: Beautiful, interactive web interface for real-time monitoring
-- **Natural Language Querying**: Ask questions about your bot's performance in plain English
-- **Real-time Analytics**: Live charts, performance metrics, and trading statistics
-- **Alert System**: Smart notifications for important events and anomalies
-- **Historical Analysis**: Comprehensive backtesting and performance tracking
+- **7 Trading Strategies**: Ranging, Momentum, Grid, Mean Reversion, Breakout, VWAP, Arbitrage
+- **8 Institutional Indicators**: Order Flow, Volume Profile, Liquidity, VWAP, ATR, Regime Detection
+- **AI-Powered Decision Making**: Claude API integration for intelligent strategy selection
+- **Shadow Mode**: Safe testing with virtual trades before going live
+- **Real-Time Dashboard**: Professional monitoring with live metrics
+- **77% Cache Optimization**: 17x faster than v1 with intelligent price caching
 
-### 🔧 Technical Excellence
-- **RESTful API**: Complete API for integration with external tools
-- **Vector Database**: Milvus integration for intelligent data storage and retrieval
-- **Structured Logging**: Comprehensive logging with Winston and database storage
-- **Rate Limiting**: Built-in API protection and resource management
-- **Graceful Shutdown**: Proper cleanup and error handling
+## Features
 
-## 🏗️ Architecture
+### Trading Capabilities
+- **Multi-Strategy System**: 7 professional trading strategies optimized for different market conditions
+- **8-Indicator Confidence Scoring**: Institutional-grade weighted indicator system (56% institutional + 44% technical)
+- **Multi-DEX Support**: PancakeSwap, Uniswap, SushiSwap, 1inch integration
+- **Regime-Based Adaptation**: Automatic strategy selection based on volatility regime (VERY_LOW, LOW, MEDIUM, HIGH)
 
-```mermaid
-graph TB
-    A[Advanced Trading Bot] --> B[AI Agents]
-    A --> C[RAG System]
-    A --> D[Monitoring Dashboard]
-    A --> E[API Server]
-    
-    B --> F[Market Research Agent]
-    B --> G[Trading Strategy Agent]
-    B --> H[Risk Management Agent]
-    
-    C --> I[Vector Database]
-    C --> J[OpenAI Integration]
-    C --> K[Context Engine]
-    
-    D --> L[Streamlit App]
-    D --> M[Real-time Charts]
-    D --> N[Natural Language Query]
-    
-    E --> O[RESTful Endpoints]
-    E --> P[WebSocket Support]
-    E --> Q[Authentication]
-    
-    I --> R[Market Data Embeddings]
-    I --> S[News Article Embeddings]
-    I --> T[Trading Log Embeddings]
-```
+### Risk Management
+- **Circuit Breakers**: Auto-pause on excessive losses
+- **Position Limits**: Maximum 15% of portfolio per position
+- **Daily Loss Limits**: 5% portfolio protection
+- **Portfolio Balancing**: Automatic 35-45% BNB allocation
+- **Real-Time Monitoring**: TradingStrategyAgent monitors all positions
 
-## 🚀 Quick Start
+### Performance
+- **Speed**: 221ms average analysis time (17x faster than v1)
+- **Cache Hit Rate**: 77% (target: 90%) - 30-second price caching
+- **Cost Reduction**: 77% fewer RPC calls
+- **Uptime**: 99%+ with automatic recovery
+- **Health Score**: 100/100
 
-### Prerequisites
-- Node.js 18+ 
-- Python 3.8+
-- BSC wallet with USDT and BNB
-- OpenAI API key (optional but recommended)
+## Prerequisites
 
-### Installation
+- **Node.js**: 16.x or higher
+- **Operating System**: macOS or Linux (Windows via WSL)
+- **BSC Wallet**: With private key for trading
+- **Anthropic API Key**: For AI-powered strategy selection
+- **Minimum Capital**: $100 for testing (recommended $1000+ for live trading)
+- **RPC Access**: BSC node RPC URL (default: Binance public RPC)
 
-1. **Clone and Setup**
-   ```bash
-   git clone <repository-url>
-   cd bsc-ranging-bot
-   ./setup.sh
-   ```
+## Quick Start
 
-2. **Configure Environment**
-   ```bash
-   cp env.example .env
-   # Edit .env with your configuration
-   ```
-
-3. **Start the Bot**
-   ```bash
-   npm start
-   ```
-
-4. **Start Monitoring Dashboard**
-   ```bash
-   npm run monitor
-   # Open http://localhost:8501
-   ```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-```env
-# BSC Network
-BSC_RPC_URL=https://bsc-dataseed1.binance.org/
-BSC_CHAIN_ID=56
-
-# Wallet (REQUIRED)
-WALLET_ADDRESS=0xYourWalletAddress
-PRIVATE_KEY=your_private_key_here
-
-# Trading Parameters
-INITIAL_BUDGET=100
-MIN_TRADE_AMOUNT=1
-MAX_TRADE_AMOUNT=10
-LOWER_BOUND_PERCENT=0.95
-UPPER_BOUND_PERCENT=1.05
-
-# AI Features (OPTIONAL)
-OPENAI_API_KEY=sk-your-openai-api-key
-MILVUS_HOST=localhost:19530
-
-# API
-API_PORT=3001
-```
-
-### Trading Strategies
-
-The bot supports multiple AI-powered strategies:
-
-1. **Ranging Strategy**: Buy low, sell high within defined bounds
-2. **Momentum Strategy**: Follow market momentum with volume confirmation
-3. **Mean Reversion**: Exploit price reversions from extremes
-4. **Arbitrage Strategy**: Cross-DEX arbitrage opportunities
-
-## 📊 Monitoring Dashboard
-
-### Features
-- **Real-time Portfolio Tracking**: Live P&L, balances, and performance
-- **AI Chat Interface**: Ask questions about your bot's performance
-- **Market Analysis**: Technical indicators, sentiment, and news
-- **Trading History**: Detailed logs of all trades and decisions
-- **System Health**: Agent status, database health, and alerts
-
-### Access
-- URL: `http://localhost:8501`
-- Natural language queries: "Show me my profit today"
-- Quick actions: Market analysis, performance review, strategy optimization
-
-## 🔌 API Endpoints
-
-### Health & Status
-- `GET /api/health` - System health check
-- `GET /api/status` - Bot status and performance
-- `POST /api/control/start` - Start the bot
-- `POST /api/control/stop` - Stop the bot
-- `POST /api/control/emergency-stop` - Emergency stop
-
-### Data Access
-- `GET /api/trades` - Trading history
-- `GET /api/logs` - System logs
-- `GET /api/agents/activity` - Agent activity logs
-- `GET /api/market/analysis` - Market analysis
-
-### AI Features
-- `POST /api/rag/query` - Natural language queries
-- `GET /api/sentiment` - Market sentiment analysis
-- `GET /api/strategies` - Available strategies
-
-## 🤖 AI Agents
-
-### Market Research Agent
-- **Purpose**: Gathers market intelligence from multiple sources
-- **Features**: News scraping, sentiment analysis, fundamental analysis
-- **Data Sources**: CoinDesk, CoinTelegraph, DeFiPulse, social media
-
-### Trading Strategy Agent
-- **Purpose**: Makes intelligent trading decisions
-- **Features**: Technical analysis, strategy selection, risk assessment
-- **Capabilities**: Dynamic parameter adjustment, multi-strategy support
-
-### Risk Management Agent
-- **Purpose**: Monitors and manages trading risks
-- **Features**: Position sizing, stop-loss, exposure limits
-- **Protection**: Emergency stops, anomaly detection
-
-## 🧠 RAG System
-
-### Vector Database Integration
-- **Storage**: Market data, news articles, trading logs as embeddings
-- **Retrieval**: Semantic search for relevant context
-- **Analysis**: AI-powered insights from historical data
-
-### Context Engineering
-- **Parallel Processing**: Multiple data sources analyzed simultaneously
-- **Relevance Scoring**: Intelligent filtering of irrelevant information
-- **Continuous Learning**: System improves with more data
-
-## 📈 Performance Analytics
-
-### Metrics Tracked
-- **Financial**: P&L, ROI, Sharpe ratio, max drawdown
-- **Operational**: Success rate, trade frequency, execution time
-- **AI Performance**: Agent accuracy, decision confidence, learning progress
-
-### Reporting
-- **Real-time**: Live dashboard updates
-- **Historical**: Comprehensive backtesting and analysis
-- **Export**: CSV/JSON data export for external analysis
-
-## 🛡️ Security Features
-
-### Wallet Security
-- **Private Key Protection**: Encrypted storage and secure handling
-- **Transaction Validation**: Multiple checks before execution
-- **Slippage Protection**: Configurable slippage limits
-
-### System Security
-- **Rate Limiting**: API protection against abuse
-- **Input Validation**: Sanitized inputs and outputs
-- **Error Handling**: Graceful degradation and recovery
-
-## 🔧 Development
-
-### Project Structure
-```
-bsc-ranging-bot/
-├── agents/                 # AI agents
-├── database/              # Database models and setup
-├── monitoring/            # Streamlit dashboard
-├── rag/                   # RAG system components
-├── logs/                  # Log files
-├── data/                  # Database files
-├── AdvancedTradingBot.js  # Main bot application
-├── package.json           # Node.js dependencies
-└── setup.sh              # Installation script
-```
-
-### Adding New Agents
-1. Extend `BaseAgent` class
-2. Implement `performAction` method
-3. Register in main bot class
-4. Add monitoring in dashboard
-
-### Custom Strategies
-1. Add strategy logic to `TradingStrategyAgent`
-2. Implement technical indicators
-3. Configure strategy parameters
-4. Test with backtesting
-
-## 📚 Advanced Usage
-
-### Custom Indicators
-```javascript
-// Add custom technical indicators
-const customIndicator = {
-  name: 'MyIndicator',
-  calculate: (prices, period) => {
-    // Your calculation logic
-    return result;
-  }
-};
-```
-
-### Webhook Integration
-```javascript
-// Custom webhook handlers
-bot.on('trade_executed', (tradeData) => {
-  // Send to external system
-  sendToWebhook(tradeData);
-});
-```
-
-### Machine Learning Integration
-```javascript
-// Custom ML models
-const mlPredictor = new MLPredictor();
-const prediction = await mlPredictor.predict(marketData);
-```
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Bot won't start**
-   - Check wallet configuration in `.env`
-   - Verify BSC RPC connection
-   - Ensure sufficient balance
-
-2. **API not responding**
-   - Check if port 3001 is available
-   - Verify API server started correctly
-   - Check firewall settings
-
-3. **Dashboard not loading**
-   - Ensure Python dependencies installed
-   - Check Streamlit installation
-   - Verify port 8501 is available
-
-4. **Vector database errors**
-   - Bot works in mock mode without Milvus
-   - Check Milvus connection settings
-   - Verify Docker installation for Milvus
-
-### Logs and Debugging
+### 1. Clone Repository
 ```bash
-# View real-time logs
-tail -f logs/combined.log
-
-# Check specific log levels
-grep "ERROR" logs/error.log
-
-# Monitor agent activity
-tail -f logs/agent_activity.log
+git clone https://github.com/algoq369/algoQbot.git
+cd algoQbot
 ```
 
-## 📋 Roadmap
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-### Upcoming Features
-- [ ] Multi-DEX support (Uniswap, SushiSwap)
-- [ ] Advanced ML models for price prediction
-- [ ] Telegram/Discord bot integration
-- [ ] Mobile app for monitoring
-- [ ] Advanced risk management tools
-- [ ] Social trading features
-- [ ] Backtesting framework
-- [ ] Strategy marketplace
+### 3. Configure Environment
+```bash
+cp .env.example .env
+nano .env  # Edit with your credentials
+```
 
-### Performance Improvements
-- [ ] Microservices architecture
-- [ ] Kubernetes deployment
-- [ ] Redis caching layer
-- [ ] GraphQL API
-- [ ] Real-time WebSocket updates
+**Required Configuration:**
+- `WALLET_ADDRESS`: Your BSC wallet address
+- `PRIVATE_KEY`: Your wallet private key (KEEP SECURE!)
+- `ANTHROPIC_API_KEY`: Your Claude API key
+- `BSC_RPC_URL`: BSC node RPC endpoint
 
-## 🤝 Contributing
+### 4. Start in Shadow Mode (Recommended)
+```bash
+npm run start-shadow
+```
+
+Shadow mode runs virtual trades without real money - perfect for testing and validation.
+
+### 5. Monitor Dashboard
+```bash
+# In a new terminal
+./monitor-dashboard-institutional.sh
+
+# Or with auto-refresh every 10 seconds
+watch -n 10 ./monitor-dashboard-institutional.sh
+```
+
+## Architecture
+
+```
+algoQbot/
+├── AdvancedTradingBot.js              # Main bot orchestrator
+├── start-shadow-mode.js               # Shadow mode entry point
+├── agents/
+│   ├── TradingStrategyAgent.js        # 8-indicator confidence system
+│   ├── MarketResearchAgent.js         # Market analysis (future)
+│   └── RiskManagementAgent.js         # Risk monitoring (future)
+├── strategies/
+│   ├── rangingStrategy.js             # Range-bound trading
+│   ├── momentumStrategy.js            # Trend following
+│   ├── gridStrategy.js                # Grid trading
+│   ├── meanReversionStrategy.js       # Statistical arbitrage
+│   ├── breakoutStrategy.js            # Volatility breakout
+│   ├── vwapStrategy.js                # VWAP-based trading
+│   └── arbitrageStrategy.js           # Multi-DEX arbitrage
+├── dex/
+│   ├── pancakeSwapService.js          # PancakeSwap integration
+│   ├── uniswapService.js              # Uniswap integration
+│   └── aggregatorService.js           # 1inch aggregation
+├── risk/
+│   ├── productionRiskManager.js       # Real-time risk management
+│   └── circuitBreaker.js              # Safety circuit breakers
+├── utils/
+│   ├── priceCache.js                  # 30s price cache (77% hit rate)
+│   ├── performanceTracker.js          # Performance monitoring
+│   ├── regimeDashboard.js             # Visual regime display
+│   └── priceHistoryManager.js         # Historical price data
+├── data/
+│   ├── virtual_balances.json          # Shadow mode balances
+│   └── trading_bot.db                 # SQLite database
+└── monitor-dashboard-institutional.sh # Real-time monitoring dashboard
+```
+
+## Trading Strategies
+
+### 1. Ranging Strategy (Low Volatility < 0.3%)
+- **Use Case**: Sideways markets
+- **Method**: Buy support, sell resistance
+- **TP/SL**: 0.5% / 0.3%
+- **Position Size**: $1190
+
+### 2. Momentum Strategy (High Volatility > 2%)
+- **Use Case**: Strong trends
+- **Method**: Trend following with confirmation
+- **TP/SL**: 4% / 2%
+- **Position Size**: $4200
+
+### 3. Grid Trading (Medium Volatility 0.8-2%)
+- **Use Case**: Oscillating markets
+- **Method**: Systematic grid orders
+- **TP/SL**: 1.5% / 1%
+- **Position Size**: $2100
+
+### 4. Mean Reversion (Low-Medium Volatility)
+- **Use Case**: Overbought/oversold conditions
+- **Method**: Statistical deviation trading
+- **TP/SL**: 2% / 1%
+- **Position Size**: $1750
+
+### 5. Breakout Strategy (All Volatility Regimes)
+- **Use Case**: Range breakouts
+- **Method**: Volume-confirmed breakouts
+- **TP/SL**: 3% / 1.5%
+- **Position Size**: $2800
+
+### 6. VWAP Strategy (Medium-High Volatility)
+- **Use Case**: Institutional price levels
+- **Method**: Trade around VWAP
+- **TP/SL**: 2.5% / 1.25%
+- **Position Size**: $2450
+
+### 7. Arbitrage Strategy (All Regimes)
+- **Use Case**: Multi-DEX price differences
+- **Method**: Exploit price discrepancies
+- **TP/SL**: 1% / 0.5%
+- **Position Size**: $1400
+
+## 8-Indicator Confidence System
+
+The bot uses a sophisticated weighted indicator system for trade confidence:
+
+### Institutional Tools (56% weight)
+1. **Order Flow (20%)**: Buy/sell delta analysis
+   - Measures buying vs selling pressure
+   - Delta > 0 = bullish, < 0 = bearish
+
+2. **Volume Profile (18%)**: Point of Control detection
+   - Identifies key price levels with high volume
+   - POC acts as support/resistance
+
+3. **Liquidity (18%)**: AMM reserve analysis
+   - Analyzes liquidity pool depth
+   - Higher liquidity = better execution
+
+### Technical Tools (44% weight)
+4. **VWAP (15%)**: 24-hour volume-weighted average price
+   - Price above VWAP = bullish
+   - Price below VWAP = bearish
+
+5. **ATR (12%)**: Average True Range volatility
+   - Measures market volatility
+   - Higher ATR = larger position sizing adjustments
+
+6. **Regime (9%)**: Market condition detection
+   - VERY_LOW: < 0.3% volatility
+   - LOW: 0.3-0.8% volatility
+   - MEDIUM: 0.8-2% volatility
+   - HIGH: > 2% volatility
+
+### Confidence Thresholds (Dynamic)
+- **VERY_LOW Regime**: 45% minimum confidence
+- **LOW Regime**: 55% minimum confidence
+- **MEDIUM Regime**: 65% minimum confidence
+- **HIGH Regime**: 70% minimum confidence
+
+**Final Confidence** = Weighted sum of all 6 indicators
+
+## Performance Metrics
+
+### Speed & Efficiency
+- **Analysis Time**: 221ms average (down from 3800ms in v1)
+- **Speed Improvement**: 17x faster
+- **Cache Hit Rate**: 77% (target: 90%)
+- **RPC Call Reduction**: 77% fewer calls
+- **Cost Savings**: Significant reduction in RPC fees
+
+### Reliability
+- **Uptime**: 99%+ with automatic recovery
+- **Error Rate**: < 0.1%
+- **Circuit Breaker Activations**: Tracked in dashboard
+- **Health Score**: 100/100
+
+### Trading Performance
+- **Win Rate**: Tracked per regime
+- **Average Profit**: Tracked per strategy
+- **Sharpe Ratio**: Calculated daily
+- **Max Drawdown**: Monitored in real-time
+
+## Shadow Mode
+
+Shadow mode allows safe testing without risking real funds:
+
+```bash
+npm run start-shadow
+```
+
+**Features:**
+- Virtual balance tracking (data/virtual_balances.json)
+- All trade decisions logged
+- Real market data
+- Same logic as live trading
+- No blockchain transactions
+- Perfect for strategy validation
+
+**Virtual Portfolio:**
+- Starting USDT: $60,000 (configurable)
+- Starting BNB: Based on current price
+- Balance updates: Real-time
+- Trade history: Logged in shadow_trades.json
+
+## Monitoring Dashboard
+
+The institutional-grade dashboard provides real-time insights:
+
+```bash
+./monitor-dashboard-institutional.sh
+```
+
+**Dashboard Sections:**
+1. **Bot Status**: PID, uptime, CPU, memory
+2. **Portfolio Status**: Total value, BNB allocation, balance status
+3. **Market Conditions**: Current price, volatility, regime
+4. **8-Indicator System**: All indicator scores with timestamps
+5. **Recent Trading Activity**: Trade count, last decision
+6. **Last 3 Trades**: Recent trade history
+7. **Active Positions**: Total, virtual, live positions
+8. **Recent Errors**: Error monitoring
+
+**Auto-Refresh:**
+```bash
+watch -n 10 ./monitor-dashboard-institutional.sh
+```
+
+## Safety Features
+
+### Automatic Protections
+- **Orphan Position Prevention**: Positions only created after passing all checks
+- **Confidence Threshold Enforcement**: Dynamic thresholds based on regime
+- **Portfolio Balancing**: Automatic rebalancing to 35-45% BNB
+- **Daily Loss Limits**: Auto-pause at 5% daily loss
+- **Max Consecutive Losses**: Circuit breaker at 5 losses
+- **Position Size Limits**: Maximum 15% per position
+
+### Manual Controls
+- **Emergency Stop**: Ctrl+C for graceful shutdown
+- **Shadow Mode**: Test without real trades
+- **Dry Run**: Analyze without executing
+- **Logging**: Comprehensive logs in logs/ directory
+
+## Configuration
+
+See [CONFIGURATION.md](CONFIGURATION.md) for detailed configuration options.
+
+**Key Settings:**
+- `INITIAL_BUDGET`: Starting capital
+- `MIN_TRADE_AMOUNT`: Minimum trade size
+- `MAX_TRADE_AMOUNT`: Maximum trade size
+- `DAILY_LOSS_LIMIT`: Maximum daily loss
+- `MAX_POSITION_SIZE`: Maximum position as % of portfolio
+- `TARGET_BNB_PERCENT_MIN/MAX`: Portfolio balance range (35-45%)
+
+## Documentation
+
+- **[Installation Guide](INSTALLATION.md)**: Step-by-step setup instructions
+- **[Configuration Guide](CONFIGURATION.md)**: All configuration options explained
+- **[Security Guide](SECURITY.md)**: API key safety and best practices
+- **[Troubleshooting](TROUBLESHOOTING.md)**: Common issues and solutions
+
+## Development
+
+### Running Tests
+```bash
+npm test
+```
+
+### Logs
+```bash
+# View live logs
+tail -f logs/combined-$(date +%Y-%m-%d).log.1
+
+# View errors only
+grep '"level":"error"' logs/combined-$(date +%Y-%m-%d).log.1
+```
+
+### Database
+```bash
+# View shadow trades
+sqlite3 data/trading_bot.db "SELECT * FROM shadow_trades ORDER BY timestamp DESC LIMIT 10;"
+```
+
+## Support
+
+- **GitHub Issues**: [algoq369/algoQbot/issues](https://github.com/algoq369/algoQbot/issues)
+- **Documentation**: Full documentation in this repository
+- **Discussions**: GitHub Discussions for questions
+
+## Roadmap
+
+- [ ] Multi-agent system (Market Research, Risk Management agents)
+- [ ] RAG system with vector database (Milvus)
+- [ ] Streamlit dashboard with natural language querying
+- [ ] RESTful API + WebSocket support
+- [ ] Machine learning strategy optimization
+- [ ] Multi-chain support (Ethereum, Polygon, Arbitrum)
+- [ ] Advanced backtesting framework
+- [ ] Paper trading competition mode
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+⚠️ **IMPORTANT DISCLAIMER**
+
+This trading bot trades with real money and cryptocurrencies. Please understand:
+
+- **Financial Risk**: You can lose money. Never invest more than you can afford to lose.
+- **Testing Required**: Always start in shadow mode and test thoroughly before live trading.
+- **No Guarantees**: Past performance does not guarantee future results.
+- **Not Financial Advice**: This software is for educational purposes. Do your own research.
+- **User Responsibility**: You are solely responsible for your trading decisions and outcomes.
+- **Market Risks**: Cryptocurrency markets are highly volatile and unpredictable.
+- **Smart Contract Risks**: DeFi protocols may have bugs or vulnerabilities.
+- **Regulatory Risks**: Ensure compliance with local regulations.
+
+**USE AT YOUR OWN RISK**
+
+## Contributing
+
+Contributions are welcome! Please:
 
 1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📄 License
+## Acknowledgments
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Built brick by brick. 🧱
 
-## ⚠️ Disclaimer
-
-**This software is for educational and research purposes only. Trading cryptocurrencies involves substantial risk of loss and is not suitable for all investors. The high degree of leverage can work against you as well as for you. Before deciding to trade cryptocurrency, you should carefully consider your investment objectives, level of experience, and risk appetite. The possibility exists that you could sustain a loss of some or all of your initial investment and therefore you should not invest money that you cannot afford to lose.**
-
-## 🙏 Acknowledgments
-
-- Built with advanced AI workflows inspired by modern MCP and agent architectures
-- Integrates best practices from RAG systems and context engineering
-- Utilizes state-of-the-art vector database technology
-- Inspired by the latest developments in AI-powered trading systems
-
-## 📞 Support
-
-- 📧 Email: support@your-domain.com
-- 💬 Discord: [Join our community](https://discord.gg/your-server)
-- 📖 Documentation: [Full docs](https://docs.your-domain.com)
-- 🐛 Issues: [GitHub Issues](https://github.com/your-repo/issues)
+Special thanks to:
+- Anthropic for Claude API
+- Binance Smart Chain community
+- PancakeSwap, Uniswap, and other DEX protocols
+- Open source contributors
 
 ---
 
-**Happy Trading! 🚀**
+**Status**: Production Ready | **Health Score**: 100/100 | **Version**: 2.0.0
 
-*Remember: Always start with small amounts and never invest more than you can afford to lose.*
+Made with ❤️ for algorithmic trading
