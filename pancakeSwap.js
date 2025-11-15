@@ -1,6 +1,8 @@
 const { ethers } = require('ethers');
 const config = require('./config');
 const logger = require('./logger');
+const PriceCache = require('./utils/priceCache'); // ⚡ Price caching
+const perf = require('./utils/performanceTracker'); // ⚡ Performance tracking
 
 class PancakeSwap {
   constructor(provider, wallet, txVerifier = null) {
@@ -18,6 +20,18 @@ class PancakeSwap {
       ],
       wallet
     );
+
+    // ⚡ OPTIMIZATION: Initialize 30-second price cache
+    this.priceCache = new PriceCache(30000); // 30 second TTL
+    logger.info('⚡ Price cache initialized (30s TTL)');
+
+    // Setup periodic cache cleanup (every 5 minutes)
+    this.cacheCleanupInterval = setInterval(() => {
+      const cleaned = this.priceCache.cleanup();
+      if (cleaned > 0) {
+        logger.debug(`🧹 Cleaned ${cleaned} expired cache entries`);
+      }
+    }, 300000);
   }
 
   async getPrice(tokenIn, tokenOut, amountIn) {
@@ -32,6 +46,18 @@ class PancakeSwap {
   }
 
   async getCurrentPrice(retries = 3) {
+    const cacheKey = 'BNB/USDT';
+
+    // ⚡ OPTIMIZATION: Check cache first
+    const cached = this.priceCache.get(cacheKey);
+    if (cached !== null) {
+      logger.debug(`💨 Price cache HIT: ${cached.toFixed(8)} (saved RPC call)`);
+      return cached;
+    }
+
+    // Cache miss - fetch from blockchain with retry logic
+    logger.debug(`🔍 Price cache MISS: Fetching from RPC...`);
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         // ✅ FIX: Return price in BNB per USDT format for consistent calculations
@@ -39,6 +65,9 @@ class PancakeSwap {
         const amountIn = ethers.parseUnits('1', 18); // 1 USDT
         const price = await this.getPrice(config.tokens.USDT, config.tokens.WBNB, amountIn);
         const bnbPerUsdt = parseFloat(ethers.formatUnits(price, 18));
+
+        // ⚡ OPTIMIZATION: Store in cache for 30 seconds
+        this.priceCache.set(cacheKey, bnbPerUsdt);
 
         // Result: ~0.000929 (BNB per USDT) instead of ~1076 (USDT per BNB)
         // This format works directly for calculations: usdAmount × bnbPerUsdt = bnbAmount
@@ -196,6 +225,17 @@ class PancakeSwap {
   async getBNBBalance() {
     const balance = await this.provider.getBalance(this.wallet.address);
     return parseFloat(ethers.formatEther(balance));
+  }
+
+  // ⚡ OPTIMIZATION: Get both balances in parallel (2x faster)
+  async getBalances() {
+    return await perf.measure('Balance Fetch (Parallel)', async () => {
+      const [usdtBalance, bnbBalance] = await Promise.all([
+        this.getUSDTBalance(),
+        this.getBNBBalance()
+      ]);
+      return { usdtBalance, bnbBalance };
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -467,6 +507,18 @@ class PancakeSwap {
         error: error.message
       };
     }
+  }
+  // ⚡ OPTIMIZATION: Cache management methods
+  getCacheStats() {
+    return this.priceCache.getStats();
+  }
+
+  cleanup() {
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+    }
+    this.priceCache.clear();
+    logger.info('⚡ Price cache cleaned up');
   }
 }
 

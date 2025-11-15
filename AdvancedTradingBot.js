@@ -1112,6 +1112,29 @@ class AdvancedTradingBot {
         }
       });
 
+      // ⚡ OPTIMIZATION: Log price cache & performance stats every 10 minutes
+      cron.schedule('*/10 * * * *', async () => {
+        try {
+          // Cache statistics
+          if (this.multiDexManager?.dexs?.pancakeSwap?.getCacheStats) {
+            const stats = this.multiDexManager.dexs.pancakeSwap.getCacheStats();
+            logger.info(`📊 [CACHE] Price Cache: ${stats.hitRate} hit rate, ${stats.hits} hits, ${stats.misses} misses`);
+          }
+
+          // Performance statistics
+          const perf = require('./utils/performanceTracker');
+          const perfStats = perf.getAllStats();
+          if (perfStats.length > 0) {
+            logger.info('📊 [PERF] Top 3 slowest operations:');
+            perfStats.slice(0, 3).forEach(stat => {
+              logger.info(`  - ${stat.operation}: ${stat.average}ms avg (${stat.count} calls)`);
+            });
+          }
+        } catch (error) {
+          logger.debug('Error logging performance stats:', error.message);
+        }
+      });
+
       // Schedule every 5 minutes: BugBot metrics monitoring
       cron.schedule('*/5 * * * *', async () => {
         if (this.isRunning) {
