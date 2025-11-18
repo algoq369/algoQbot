@@ -830,10 +830,42 @@ class ShadowMode {
         trades = [];
       }
 
-      // Add new trade with timestamp
+      // 🔥 ENHANCED: Extract strategy from reasoning field
+      let strategy = 'unknown';
+      if (trade.reasoning) {
+        // Parse strategy from reasoning: "Exit downward_breakout: ranging" -> "ranging"
+        const strategyMatch = trade.reasoning.match(/:\s*(\w+)/);
+        if (strategyMatch) {
+          strategy = strategyMatch[1];
+        }
+        // Also check for common strategy names directly in reasoning
+        const strategyKeywords = ['ranging', 'momentum', 'mean_reversion', 'grid', 'breakout'];
+        for (const keyword of strategyKeywords) {
+          if (trade.reasoning.toLowerCase().includes(keyword)) {
+            strategy = keyword;
+            break;
+          }
+        }
+      }
+
+      // 🔥 ENHANCED: Calculate position size in USD
+      const sizeUSD = trade.amount || 0;
+      const currentPrice = trade.targetPrice || 0.00088;
+      const sizeToken = trade.action === 'buy' ? (sizeUSD * currentPrice) : sizeUSD;
+
+      // 🔥 ENHANCED: Filter out HOLD actions
+      if (trade.action === 'HOLD') {
+        logger.debug(`📝 Skipping HOLD action from shadow trades file`);
+        return; // Don't save HOLD actions
+      }
+
+      // Add new trade with enhanced data
       const tradeRecord = {
         ...trade,
         timestamp: new Date().toISOString(),
+        strategy: strategy,  // 🔥 NEW: Extracted strategy
+        size: sizeToken,     // 🔥 NEW: Token size
+        sizeUSD: sizeUSD,    // 🔥 NEW: USD size
         shadowMode: true
       };
 
@@ -847,7 +879,7 @@ class ShadowMode {
       // Write to file
       await fs.writeFile(tradesFile, JSON.stringify(trades, null, 2));
 
-      logger.info(`💾 Shadow trade saved to file: ${trade.action} ${trade.amount} ${trade.pair || 'BNB/USDT'}`);
+      logger.info(`💾 Shadow trade saved: ${trade.action} ${strategy} $${sizeUSD.toFixed(2)}`);
 
     } catch (error) {
       logger.error(`❌ Failed to save shadow trade to file: ${error.message}`);

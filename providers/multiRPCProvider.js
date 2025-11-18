@@ -25,15 +25,22 @@ class MultiRPCProvider {
       },
       {
         name: 'Binance Backup 1',
-        url: 'https://bsc-dataseed2.binance.org',
+        url: process.env.BSC_RPC_URL_2 || 'https://bsc-dataseed2.binance.org',
         priority: 3,
         maxRetries: 2,
         timeout: 30000
       },
       {
         name: 'Binance Backup 2',
-        url: 'https://bsc-dataseed3.binance.org',
+        url: process.env.BSC_RPC_URL_3 || 'https://bsc-dataseed3.binance.org',
         priority: 4,
+        maxRetries: 1,
+        timeout: 30000
+      },
+      {
+        name: 'Ankr Public',
+        url: process.env.ANKR_RPC_URL || 'https://rpc.ankr.com/bsc',
+        priority: 5,
         maxRetries: 1,
         timeout: 30000
       }

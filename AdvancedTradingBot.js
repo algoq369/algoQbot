@@ -99,6 +99,12 @@ const TradingStrategyAgent = require('./agents/TradingStrategyAgent');
 const RAGSystem = require('./rag/RAGSystem');
 const { sequelize, Trade, MarketData, BotLog, Alert, AgentActivity, StrategyPerformance } = require('./database/models');
 
+// ✅ FIX: Import volatility regime detection for proper TP/SL calculation
+const {
+  detectVolatilityRegime,
+  calculateTPSL
+} = require('./config/volatilityRegimes');
+
 // Import critical security and optimization modules
 const SecureKeyManager = require('./security/keyManager');
 const CircuitBreaker = require('./risk/circuitBreaker'); // ✅ EXPERT: Loss protection circuit breaker
@@ -208,6 +214,14 @@ class AdvancedTradingBot {
     this.telegram = getTelegramAlerts();
     this.discord = getDiscordAlerts();
     logger.info('✅ Notification systems initialized (Telegram & Discord)');
+
+    // 🤖 AI Chat Interface
+    this.chat = null; // Will initialize after bot starts
+    logger.info('🤖 AI Chat interface will be initialized after startup');
+
+    // 🤖 AlgoQBot #1 - Autonomous Agent
+    this.algoqbotAgent = null; // Will initialize after bot starts
+    logger.info('🤖 AlgoQBot #1 agent will be initialized...');
 
     // API Server
     this.app = null;
@@ -659,6 +673,30 @@ class AdvancedTradingBot {
         logger.info('✅ Risk manager monitoring started');
       }
 
+      // Initialize AI Chat (after all systems ready)
+      try {
+        const AlgoQBotChat = require('./chat/AlgoQBotChat');
+        this.chat = new AlgoQBotChat(this);
+        await this.chat.initialize();
+        logger.info('✅ AI Chat interface ready - Start chatting: node scripts/chat-cli.js');
+      } catch (error) {
+        logger.warn('⚠️  AI Chat initialization skipped:', error.message);
+      }
+
+      // Initialize AlgoQBot #1 - The First Autonomous Agent
+      try {
+        const AlgoQBotAgent = require('./agent/AlgoQBotAgent');
+        this.algoqbotAgent = new AlgoQBotAgent(this);
+        await this.algoqbotAgent.initialize();
+
+        // Register globally for chat access
+        global.algoqbot = this.algoqbotAgent;
+
+        logger.info('✅ AlgoQBot #1 agent ready - Chat: node scripts/chat-with-algoqbot.js');
+      } catch (error) {
+        logger.warn('⚠️  AlgoQBot agent initialization skipped:', error.message);
+      }
+
       logger.info('✅ Advanced Trading Bot initialized successfully!');
       return true;
     } catch (error) {
@@ -692,18 +730,36 @@ class AdvancedTradingBot {
     this.setupAPIRoutes();
 
     // Start server with automatic port fallback
-    const startServer = (port) => {
+    const startServer = (port, retries = 0) => {
       return new Promise((resolve, reject) => {
-        const server = this.app.listen(port)
+        // ✅ FIX: Ensure port is numeric and valid
+        const numericPort = parseInt(port);
+
+        // Validate port range (1024-65535, avoid privileged ports)
+        if (numericPort < 1024 || numericPort > 65535) {
+          logger.error(`❌ Invalid port ${numericPort} (must be 1024-65535)`);
+          return reject(new Error(`Invalid port: ${numericPort}`));
+        }
+
+        // Limit retry attempts (max 5 tries)
+        if (retries >= 5) {
+          logger.error(`❌ Could not find available port after ${retries} attempts`);
+          logger.warn(`💡 Disabling API server - bot will continue without API`);
+          return resolve(null);
+        }
+
+        const server = this.app.listen(numericPort)
           .on('listening', () => {
-            logger.info(`🌐 API server running on port ${port}`);
+            logger.info(`🌐 API server running on port ${numericPort}`);
             resolve(server);
           })
           .on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
-              logger.warn(`⚠️  Port ${port} in use, trying ${port + 1}...`);
+              // ✅ FIX: Use larger increment (1000) to avoid nearby conflicts
+              const nextPort = numericPort + 1000;
+              logger.warn(`⚠️  Port ${numericPort} in use, trying ${nextPort}...`);
               server.close();
-              resolve(startServer(port + 1));
+              resolve(startServer(nextPort, retries + 1));
             } else {
               reject(err);
             }
@@ -711,7 +767,9 @@ class AdvancedTradingBot {
       });
     };
 
-    const PORT = process.env.API_PORT || 3002;
+    // ✅ FIX: Parse PORT as integer to ensure numeric operations
+    const PORT = parseInt(process.env.API_PORT || process.env.PORT || 3002);
+    logger.info(`🔌 Starting API server on port ${PORT}...`);
     this.server = await startServer(PORT);
   }
 
@@ -987,6 +1045,36 @@ class AdvancedTradingBot {
         res.status(500).json({ error: error.message });
       }
     });
+
+    // AI Chat endpoints
+    this.app.post('/api/chat', async (req, res) => {
+      try {
+        const { message } = req.body;
+        if (!this.chat) {
+          return res.status(503).json({ error: 'Chat not initialized' });
+        }
+        const response = await this.chat.chat(message);
+        res.json(response);
+      } catch (error) {
+        logger.error('API chat error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/chat/history', (req, res) => {
+      try {
+        if (!this.chat || !this.chat.memory) {
+          return res.status(503).json({ error: 'Chat not initialized' });
+        }
+        res.json({
+          conversations: this.chat.memory.getRecentConversations(20),
+          userProfile: this.chat.memory.userProfile
+        });
+      } catch (error) {
+        logger.error('API chat history error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
   }
 
   async start() {
@@ -1197,6 +1285,40 @@ class AdvancedTradingBot {
         }
       });
       logger.info('✅ Regime performance stats scheduled (every hour)');
+
+      // ═══════════════════════════════════════════════════════════════
+      // RPC HEALTH MONITORING (every hour)
+      // ═══════════════════════════════════════════════════════════════
+      cron.schedule('0 * * * *', async () => {
+        if (this.isRunning && this.walletManager?.provider?.getHealthReport) {
+          try {
+            const healthReport = this.walletManager.provider.getHealthReport();
+            const status = this.walletManager.provider.getStatus();
+
+            logger.info('═══════════════════════════════════════════════════════════════');
+            logger.info('📡 RPC HEALTH REPORT (Hourly)');
+            logger.info('═══════════════════════════════════════════════════════════════');
+            logger.info(`🟢 Current Provider: ${healthReport.current}`);
+            logger.info(`✅ Healthy Endpoints: ${healthReport.healthy.join(', ') || 'None'}`);
+            logger.info(`❌ Unhealthy Endpoints: ${healthReport.unhealthy.join(', ') || 'None'}`);
+            logger.info(`🔄 Last Failover: ${status.lastFailover}`);
+            logger.info(`📊 Failure Count: ${status.failureCount}`);
+            logger.info('');
+            logger.info('📈 Endpoint Statistics:');
+
+            Object.entries(healthReport.stats).forEach(([name, stats]) => {
+              const successRate = (stats.successRate * 100).toFixed(1);
+              const healthIcon = stats.isHealthy ? '🟢' : '🔴';
+              logger.info(`   ${healthIcon} ${name}: ${successRate}% success | ${stats.totalCalls} calls | ${stats.avgLatency}ms avg`);
+            });
+
+            logger.info('═══════════════════════════════════════════════════════════════');
+          } catch (error) {
+            logger.error('Error getting RPC health report:', error);
+          }
+        }
+      });
+      logger.info('✅ RPC health monitoring scheduled (every hour)');
 
       // Initial strategy run
       await this.runAdvancedStrategy();
@@ -1781,6 +1903,9 @@ Volume Analysis:
 
       logger.info(`🧠 AI Strategy executed - Action: ${tradingDecision.action}, Confidence: ${(tradingDecision.confidence * 100).toFixed(1)}%, Reasoning: ${tradingDecision.reasoning}`);
 
+      // Publish state for chat interface
+      await this.publishState();
+
     } catch (error) {
       logger.error('❌ Error running advanced strategy:', error);
       this.stats.failedTrades++;
@@ -1927,16 +2052,28 @@ Volume Analysis:
           const positionId = `pos_${Date.now()}`;
           const now = Date.now();
 
-          // Calculate take profit target (0.8% default)
-          const takeProfitPercent = 0.008;
+          // ✅ FIX: Calculate TP/SL using professional BSC standards (3.5%/1.5% minimum)
+          // Get current 4h volatility from tradingStrategyAgent
+          const volatility4h = this.tradingStrategyAgent?.currentVolatility4h || 0.001; // Default 0.1% if unavailable
+
+          // Detect current market regime
+          const currentRegime = detectVolatilityRegime(volatility4h);
+
+          // Calculate professional TP/SL percentages (minimum 3.5% TP, 1.5% SL)
+          const tpslConfig = calculateTPSL(currentRegime, volatility4h);
+          const takeProfitPercent = tpslConfig.tp;  // Will be ≥3.5% (0.035)
+          const stopLossPercent = tpslConfig.sl;     // Will be ≥1.5% (0.015)
+
+          // Calculate TP and SL price levels
           const takeProfit = action === 'buy'
             ? parameters.currentPrice * (1 + takeProfitPercent)
             : parameters.currentPrice * (1 - takeProfitPercent);
 
-          // Calculate stop loss (3% from entry)
           const stopLoss = action === 'buy'
-            ? parameters.currentPrice * 0.97
-            : parameters.currentPrice * 1.03;
+            ? parameters.currentPrice * (1 - stopLossPercent)
+            : parameters.currentPrice * (1 + stopLossPercent);
+
+          logger.info(`✅ [VIRTUAL POSITION TP/SL] Regime: ${currentRegime}, Vol: ${(volatility4h * 100).toFixed(2)}%, TP: ${(takeProfitPercent * 100).toFixed(2)}%, SL: ${(stopLossPercent * 100).toFixed(2)}%`);
 
           // Create complete position object matching monitoring requirements
           this.tradingStrategyAgent.activePositions.set(positionId, {
@@ -1957,8 +2094,8 @@ Volume Analysis:
           });
           logger.info(`👻 Virtual Position ${positionId} created for monitoring`);
           logger.info(`   ${action.toUpperCase()} $${position_size} @ ${parameters.currentPrice.toFixed(8)}`);
-          logger.info(`   TP: ${takeProfit.toFixed(8)} (+${(takeProfitPercent * 100).toFixed(1)}%)`);
-          logger.info(`   SL: ${stopLoss.toFixed(8)} (-3%)`);
+          logger.info(`   TP: ${takeProfit.toFixed(8)} (+${(takeProfitPercent * 100).toFixed(2)}%)`);
+          logger.info(`   SL: ${stopLoss.toFixed(8)} (-${(stopLossPercent * 100).toFixed(2)}%)`);
         }
 
         // Track strategy performance for shadow trades
@@ -2244,6 +2381,33 @@ Volume Analysis:
 
     } catch (error) {
       logger.error('❌ Error during data cleanup:', error);
+    }
+  }
+
+  // Publish bot state for chat interface
+  async publishState() {
+    try {
+      const currentPrice = await this.multiDexManager?.dexs?.pancakeSwap?.getCurrentPrice();
+
+      const state = {
+        portfolioValue: this.portfolioManager?.cachedValue || 0,
+        currentPrice: currentPrice || 0,
+        volatility: (this.tradingStrategyAgent?.currentVolatility4h || 0) * 100,
+        regime: this.tradingStrategyAgent?.currentRegime || 'UNKNOWN',
+        activePositions: this.tradingStrategyAgent?.activePositions?.size || 0,
+        timestamp: new Date().toISOString()
+      };
+
+      const fs = require('fs').promises;
+      const path = require('path');
+
+      await fs.writeFile(
+        path.join(__dirname, 'data/bot-state.json'),
+        JSON.stringify(state, null, 2)
+      );
+    } catch (error) {
+      // Silent fail - not critical
+      logger.debug('State publish skipped:', error.message);
     }
   }
 

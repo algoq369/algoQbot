@@ -33,6 +33,16 @@ data/virtual_balances.json
 data/shadow_trades.json
 data/*.json
 
+# ✅ Data subdirectories (keep structure, exclude files)
+data/price-history/*.json
+data/price-history/*.tmp
+data/trades/*.json
+data/trades/*.csv
+data/backups/*
+!data/backups/.gitkeep
+!data/price-history/.gitkeep
+!data/trades/.gitkeep
+
 # Database
 *.sql
 *.dump

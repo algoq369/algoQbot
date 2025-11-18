@@ -1,0 +1,179 @@
+{
+  "analysis_date": "2025-11-18T09:08:48.450Z",
+  "trades_analyzed": 49,
+  "strategies": {
+    "grid": {
+      "usage_percent": "59.2",
+      "exit_reasons": {
+        "stop_loss": 21,
+        "take_profit": 0,
+        "max_hold_time_exceeded": 8,
+        "emergency_time": 0,
+        "breakout": 0,
+        "downward_breakout": 0,
+        "upward_breakout": 0,
+        "reversion_complete": 0
+      },
+      "avg_size": 1176.5172413793102,
+      "avg_confidence": 95
+    },
+    "ranging": {
+      "usage_percent": "26.5",
+      "exit_reasons": {
+        "stop_loss": 0,
+        "take_profit": 0,
+        "max_hold_time_exceeded": 0,
+        "emergency_time": 0,
+        "breakout": 0,
+        "downward_breakout": 8,
+        "upward_breakout": 5,
+        "reversion_complete": 0
+      },
+      "avg_size": 1178.6153846153845,
+      "avg_confidence": 95
+    },
+    "momentum": {
+      "usage_percent": "14.3",
+      "exit_reasons": {
+        "stop_loss": 0,
+        "take_profit": 0,
+        "max_hold_time_exceeded": 7,
+        "emergency_time": 0,
+        "breakout": 0,
+        "downward_breakout": 0,
+        "upward_breakout": 0,
+        "reversion_complete": 0
+      },
+      "avg_size": 1177.5714285714287,
+      "avg_confidence": 95
+    }
+  },
+  "problems": [
+    {
+      "strategy": "grid",
+      "severity": "HIGH",
+      "issue": "72.4% of exits are stop losses",
+      "cause": "Stop loss too tight OR poor entry timing",
+      "impact": "Cutting positions short, not letting strategy work",
+      "recommendation": "Widen grid stop loss by 50% (current likely 1.5%, try 2.25%)"
+    },
+    {
+      "strategy": "grid",
+      "severity": "MEDIUM",
+      "issue": "Only 0.0% of exits are take profits",
+      "cause": "Take profit target unrealistic for current volatility",
+      "impact": "Never capturing planned profits",
+      "recommendation": "Lower grid take profit target or disable in low volatility"
+    },
+    {
+      "strategy": "grid",
+      "severity": "CRITICAL",
+      "issue": "59.2% of trades using underperforming strategy",
+      "cause": "Strategy selection algorithm favoring wrong strategy",
+      "impact": "Majority of trades failing",
+      "recommendation": "Reduce grid confidence threshold or improve entry conditions"
+    },
+    {
+      "strategy": "ranging",
+      "severity": "MEDIUM",
+      "issue": "Only 0.0% of exits are take profits",
+      "cause": "Take profit target unrealistic for current volatility",
+      "impact": "Never capturing planned profits",
+      "recommendation": "Lower ranging take profit target or disable in low volatility"
+    },
+    {
+      "strategy": "ranging",
+      "severity": "INFO",
+      "issue": "100.0% exits on breakouts",
+      "cause": "Strategy designed to exit on range breaks",
+      "impact": "Expected behavior for ranging strategy",
+      "recommendation": "Monitor if breakouts are profitable or loss-making"
+    },
+    {
+      "strategy": "momentum",
+      "severity": "HIGH",
+      "issue": "100.0% of exits hit max hold time",
+      "cause": "Take profit too far OR not enough volatility",
+      "impact": "Tying up capital in dead positions",
+      "recommendation": "Reduce momentum take profit by 30% (if current is 3.5%, try 2.5%)"
+    },
+    {
+      "strategy": "momentum",
+      "severity": "MEDIUM",
+      "issue": "Only 0.0% of exits are take profits",
+      "cause": "Take profit target unrealistic for current volatility",
+      "impact": "Never capturing planned profits",
+      "recommendation": "Lower momentum take profit target or disable in low volatility"
+    }
+  ],
+  "recommendations": [
+    {
+      "section": "Grid Trading Strategy",
+      "current": "Stop Loss: ~1.5% (estimated)",
+      "recommended": "Stop Loss: 2.25-2.5%",
+      "reason": "72.4% stop loss rate indicates stops are too tight",
+      "configPath": "config.trading.gridTrading.stopLoss",
+      "value": 0.025
+    },
+    {
+      "section": "Grid Trading Strategy",
+      "current": "Grid Levels: 10 (estimated)",
+      "recommended": "Grid Levels: 7-8",
+      "reason": "Fewer, wider grid levels reduce stop-out frequency",
+      "configPath": "config.trading.gridTrading.levels",
+      "value": 8
+    },
+    {
+      "section": "Grid Trading Strategy",
+      "current": "Max Hold Time: 24 hours",
+      "recommended": "Max Hold Time: 18 hours",
+      "reason": "27.6% hitting max hold - positions not resolving",
+      "configPath": "config.trading.gridTrading.maxHoldTime",
+      "value": 64800000
+    },
+    {
+      "section": "Momentum Strategy",
+      "current": "Take Profit: 3.5%",
+      "recommended": "Take Profit: 2.5%",
+      "reason": "100.0% hit max hold time - not capturing profits",
+      "configPath": "config.trading.momentum.takeProfit",
+      "value": 0.025
+    },
+    {
+      "section": "Momentum Strategy",
+      "current": "Max Hold Time: 24 hours",
+      "recommended": "Max Hold Time: 12 hours",
+      "reason": "Faster exit of non-performing positions",
+      "configPath": "config.trading.momentum.maxHoldTime",
+      "value": 43200000
+    },
+    {
+      "section": "Ranging Strategy",
+      "current": "Breakout Detection: Standard",
+      "recommended": "Breakout Detection: More Conservative",
+      "reason": "100.0% exits on breakouts - may be too sensitive",
+      "configPath": "config.trading.ranging.breakoutThreshold",
+      "value": 1.5
+    }
+  ],
+  "action_plan": [
+    {
+      "priority": 1,
+      "action": "Fix Grid Strategy Stop Loss",
+      "details": "Widen from 1.5% to 2.25% to reduce 72.4% stop-out rate",
+      "impact": "HIGH - Grid is 59.2% of trades"
+    },
+    {
+      "priority": 2,
+      "action": "Reduce Momentum Take Profit",
+      "details": "Lower from 3.5% to 2.5% to capture profits before max hold time",
+      "impact": "MEDIUM - Momentum is 14.3% of trades"
+    },
+    {
+      "priority": 3,
+      "action": "Implement Full P&L Tracking",
+      "details": "Add entry logging to calculate actual profitability",
+      "impact": "HIGH - Enables win rate measurement"
+    }
+  ]
+}

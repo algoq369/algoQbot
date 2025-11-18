@@ -1,0 +1,39 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║            AlgoQBot Performance Report                        ║
+║            Generated: Mon Nov 17 15:55:07 CET 2025                       ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+YESTERDAY (2025-11-16)
+────────────────────────────────────────────────────────────────
+Database Trades: 0
+P&L: $0
+
+TODAY (2025-11-17)
+────────────────────────────────────────────────────────────────
+Database Trades: 0
+P&L: $0
+AI Decisions: 741
+Positions Exited: 0
+0
+Latest Volatility: 0.50%
+Errors: 0
+0
+
+REGIME DISTRIBUTION (Today)
+────────────────────────────────────────────────────────────────
+VERY_LOW: 2
+LOW: 180
+MEDIUM: 10
+HIGH: 0
+VERY_HIGH: 0
+
+INSIGHTS
+────────────────────────────────────────────────────────────────
+• No database trades (expected for shadow mode)
+
+RECOMMENDATIONS
+────────────────────────────────────────────────────────────────
+• Continue monitoring for volatility increase
+• System correctly protecting capital
