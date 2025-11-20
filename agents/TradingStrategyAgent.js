@@ -909,6 +909,19 @@ Return JSON only:
           confidence: 0.95,
           reasoning: `Exit ${reason}: ${position.strategy}`
         });
+
+        // 🔥 NEW: Record detailed exit information for P&L tracking
+        await global.shadowMode.recordPositionExit({
+          positionId: position.id,
+          side: position.side,
+          entryPrice: position.entryPrice,
+          entryTime: position.timestamp,
+          exitPrice: currentPrice,
+          exitTime: Date.now(),
+          reason: reason,
+          size: position.size,
+          strategy: position.strategy || 'unknown'
+        });
       } else {
         // Live trade execution
         await this.executeTradingDecision({

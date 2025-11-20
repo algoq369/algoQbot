@@ -259,6 +259,83 @@ class ShadowMode {
     };
   }
 
+  // Record position exit for P&L tracking
+  async recordPositionExit(exitData) {
+    const {
+      positionId,
+      side,           // 'buy' or 'sell'
+      entryPrice,
+      entryTime,
+      exitPrice,
+      exitTime,
+      reason,         // 'take_profit', 'stop_loss', 'max_hold_time_exceeded', etc.
+      size,           // Position size in USD
+      strategy        // 'ranging', 'momentum', etc.
+    } = exitData;
+
+    if (!this.isActive) {
+      logger.warn('Shadow mode not active, skipping exit logging');
+      return;
+    }
+
+    // Calculate profit/loss
+    const profit = side === 'buy'
+      ? (exitPrice - entryPrice) / entryPrice
+      : (entryPrice - exitPrice) / entryPrice;
+
+    const profitUSD = profit * size;
+    const duration = exitTime - entryTime;
+    const durationMinutes = Math.floor(duration / 60000);
+
+    // Create exit record
+    const exitRecord = {
+      type: 'EXIT',
+      positionId,
+      side,
+      entryPrice,
+      entryTime: new Date(entryTime).toISOString(),
+      exitPrice,
+      exitTime: new Date(exitTime).toISOString(),
+      reason,
+      size,
+      profit: profitUSD,
+      profitPercent: profit * 100,
+      duration,
+      durationMinutes,
+      strategy,
+      shadowMode: true,
+      timestamp: new Date(exitTime).toISOString()
+    };
+
+    // Add to shadow trades array
+    this.shadowTrades.push(exitRecord);
+
+    // Save to file immediately
+    if (this.options.recordToFile) {
+      await this.saveTradesToFile(exitRecord);
+    }
+
+    // Log summary
+    const profitSign = profitUSD >= 0 ? '✅' : '❌';
+    logger.info(`${profitSign} [SHADOW EXIT] ${reason.toUpperCase()}: ${side.toUpperCase()} | Profit: $${profitUSD.toFixed(2)} (${(profit * 100).toFixed(2)}%) | Duration: ${durationMinutes}m`);
+
+    // Update metrics
+    this.shadowMetrics.totalTrades++;
+    if (profitUSD > 0) {
+      this.shadowMetrics.successfulTrades++;
+      this.shadowMetrics.totalProfit += profitUSD;
+    } else {
+      this.shadowMetrics.failedTrades++;
+      this.shadowMetrics.totalLoss += Math.abs(profitUSD);
+    }
+    this.shadowMetrics.netProfit = this.shadowMetrics.totalProfit - this.shadowMetrics.totalLoss;
+    this.shadowMetrics.winRate = this.shadowMetrics.totalTrades > 0
+      ? (this.shadowMetrics.successfulTrades / this.shadowMetrics.totalTrades) * 100
+      : 0;
+
+    return exitRecord;
+  }
+
   _calculateSlippage(orderSizeUSD) {
     // Realistic slippage model for BSC/PancakeSwap based on order size
     // These are conservative estimates based on typical low-cap pair liquidity
