@@ -113,6 +113,8 @@ const SmartRebalancer = require('./risk/smartRebalancer'); // ✅ EXPERT FIX: Sm
 const { displayRegimeStatus, displayRegimeStats } = require('./utils/regimeDashboard'); // ✅ Regime Dashboard
 const TransactionVerifier = require('./security/transactionVerifier'); // ✅ SECURITY: Transaction verification
 const GasOptimizer = require('./optimization/gasOptimizer');
+const GasSurgeDetector = require('./optimization/gasSurgeDetector');
+const BatchPriceFetcher = require('./optimization/batchPriceFetcher');
 const MetricsCollector = require('./monitoring/metricsCollector');
 const EventManager = require('./events/eventManager');
 const CacheManager = require('./optimization/cacheManager');
@@ -178,6 +180,8 @@ class AdvancedTradingBot {
       maxTradesPerDay: parseInt(process.env.RATE_LIMIT_DAILY) || 100     // Higher for shadow mode
     });
     this.gasOptimizer = null; // Will be initialized with provider
+    this.gasSurgeDetector = null; // Will be initialized with provider
+    this.batchPriceFetcher = null; // Will be initialized with provider
     this.metricsCollector = new MetricsCollector();
     this.eventManager = new EventManager();
     this.priceHistoryManager = new PriceHistoryManager();
@@ -451,10 +455,22 @@ class AdvancedTradingBot {
         logger.info('👻 Shadow mode - initializing mock security components');
         // Mock providers for shadow mode
         this.gasOptimizer = { estimateGas: () => Promise.resolve({ gasPrice: '5000000000' }) };
+        this.gasSurgeDetector = { isTradingAllowed: () => true, start: () => {}, stop: () => {} };
+        this.batchPriceFetcher = { getPrice: () => Promise.resolve({ amountOut: '0' }) };
         this.mevProtection = { checkMEV: () => Promise.resolve({ safe: true }) };
         this.contractVerifier = { verifyContract: () => Promise.resolve({ verified: true }) };
       } else {
         this.gasOptimizer = new GasOptimizer(this.walletManager.getProvider());
+        this.gasSurgeDetector = new GasSurgeDetector(this.walletManager.getProvider(), {
+          surgeThreshold: 2.0,
+          checkInterval: 5000,
+          pauseDuration: 60000
+        });
+        this.batchPriceFetcher = new BatchPriceFetcher(this.walletManager.getProvider(), {
+          batchSize: 10,
+          batchDelay: 50,
+          timeout: 5000
+        });
         this.mevProtection = new MEVProtection(this.walletManager.getProvider(), this.walletManager.getWallet());
         this.contractVerifier = new SmartContractVerifier(this.walletManager.getProvider());
       }
@@ -468,7 +484,8 @@ class AdvancedTradingBot {
         this.multiDexManager = new MultiDexManager(
           this.walletManager.getProvider(),
           this.walletManager.getWallet(), // Use wallet for contract calls
-          this.txVerifier
+          this.txVerifier,
+          this.batchPriceFetcher // 🚀 Phase 1: Pass batch price fetcher for RPC optimization
         );
 
         // Override trading functions to be mock while keeping price data real
@@ -493,7 +510,8 @@ class AdvancedTradingBot {
         this.multiDexManager = new MultiDexManager(
           this.walletManager.getProvider(),
           this.walletManager.getWallet(),
-          this.txVerifier  // Pass transaction verifier for pre-send validation
+          this.txVerifier,  // Pass transaction verifier for pre-send validation
+          this.batchPriceFetcher // 🚀 Phase 1: Pass batch price fetcher for RPC optimization
         );
       }
 
@@ -1091,6 +1109,36 @@ class AdvancedTradingBot {
       logger.info(`Trading Pair: ${config.trading.pair || 'USDT/BNB'}`);
       logger.info(`Initial Budget: ${config.trading.initialBudget || this.portfolioManager?.cachedValue?.toFixed(2) || 'N/A'} USDT`);
 
+      // 🚀 Phase 1 Efficiency Enhancements
+      // Start gas surge detector for cost optimization
+      if (this.gasSurgeDetector && typeof this.gasSurgeDetector.start === 'function') {
+        this.gasSurgeDetector.start();
+        logger.info('⛽ Gas surge detector started - Will pause trading during network congestion');
+        
+        // Set up event handlers for gas surge events
+        this.gasSurgeDetector.onGasSurge = (event) => {
+          logger.warn(`🚨 Gas surge detected: ${event.data.surgeRatio}x threshold - Trading paused`);
+          this.eventManager.emit('gas_surge', event);
+        };
+        
+        this.gasSurgeDetector.onGasNormalized = (event) => {
+          logger.info(`✅ Gas prices normalized - Trading resumed`);
+          this.eventManager.emit('gas_normalized', event);
+        };
+      }
+
+      // Initialize batch price fetcher for RPC optimization
+      if (this.batchPriceFetcher && typeof this.batchPriceFetcher.flushQueue === 'function') {
+        logger.info('📦 Batch price fetcher initialized - Reducing RPC calls by up to 80%');
+        
+        // Periodically flush any pending batches
+        setInterval(() => {
+          if (this.batchPriceFetcher.getStatistics().queueSize > 0) {
+            this.batchPriceFetcher.flushQueue();
+          }
+        }, 10000); // Every 10 seconds
+      }
+
       // Enhanced strategy execution with AI agents
       cron.schedule('*/30 * * * * *', async () => {
         if (this.isRunning) {
@@ -1524,6 +1572,13 @@ class AdvancedTradingBot {
       // 🚨 EXPERT: Check circuit breaker first
       if (!this.circuitBreaker.canTrade()) {
         logger.warn('⏸️  Trading paused by circuit breaker');
+        return;
+      }
+
+      // 🚀 Phase 1: Check gas surge detector before trading
+      if (this.gasSurgeDetector && !this.gasSurgeDetector.isTradingAllowed()) {
+        const gasStatus = this.gasSurgeDetector.getStatistics();
+        logger.warn(`⛽ Trading paused due to gas surge: ${gasStatus.currentGasPrice} gwei (${gasStatus.surgeRatio}x threshold)`);
         return;
       }
 
