@@ -56,6 +56,11 @@ class AlgoQBotAgent {
       profitability_change: 0
     };
 
+    // Task tracking
+    this.activeTasks = [];
+    this.lastActiveTask = null;
+    this.taskHistory = [];
+
     // Data persistence
     this.dataPath = path.join(__dirname, '../data/algoqbot-agent');
   }
@@ -427,6 +432,109 @@ Remember: You exist to make trading more profitable through intelligent partners
     await this.saveMemory();
   }
 
+  startTask(taskName, taskType = 'general', metadata = {}) {
+    const task = {
+      id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: taskName,
+      type: taskType,
+      status: 'running',
+      startTime: new Date().toISOString(),
+      endTime: null,
+      duration: null,
+      metadata: metadata,
+      result: null
+    };
+
+    this.activeTasks.push(task);
+    this.lastActiveTask = task;
+
+    logger.info(`⚙️ Task started: ${taskName} [${task.id}]`);
+
+    return task.id;
+  }
+
+  endTask(taskId, result = null, metadata = {}) {
+    const task = this.activeTasks.find(t => t.id === taskId);
+
+    if (!task) {
+      logger.warn(`Task not found: ${taskId}`);
+      return null;
+    }
+
+    const endTime = new Date().toISOString();
+    const startTimeMs = new Date(task.startTime).getTime();
+    const endTimeMs = new Date(endTime).getTime();
+
+    task.status = 'completed';
+    task.endTime = endTime;
+    task.duration = endTimeMs - startTimeMs; // in milliseconds
+    task.result = result;
+    task.metadata = { ...task.metadata, ...metadata };
+
+    this.lastActiveTask = task;
+    this.taskHistory.push(task);
+
+    // Keep task history manageable (last 100 tasks)
+    if (this.taskHistory.length > 100) {
+      this.taskHistory = this.taskHistory.slice(-100);
+    }
+
+    // Remove from active tasks
+    this.activeTasks = this.activeTasks.filter(t => t.id !== taskId);
+
+    logger.info(`✅ Task completed: ${task.name} [${taskId}] - Duration: ${task.duration}ms`);
+
+    return task;
+  }
+
+  failTask(taskId, error, metadata = {}) {
+    const task = this.activeTasks.find(t => t.id === taskId);
+
+    if (!task) {
+      logger.warn(`Task not found: ${taskId}`);
+      return null;
+    }
+
+    const endTime = new Date().toISOString();
+    const startTimeMs = new Date(task.startTime).getTime();
+    const endTimeMs = new Date(endTime).getTime();
+
+    task.status = 'failed';
+    task.endTime = endTime;
+    task.duration = endTimeMs - startTimeMs;
+    task.result = { error: error.message || String(error) };
+    task.metadata = { ...task.metadata, ...metadata };
+
+    this.lastActiveTask = task;
+    this.taskHistory.push(task);
+
+    if (this.taskHistory.length > 100) {
+      this.taskHistory = this.taskHistory.slice(-100);
+    }
+
+    this.activeTasks = this.activeTasks.filter(t => t.id !== taskId);
+
+    logger.error(`❌ Task failed: ${task.name} [${taskId}] - Error: ${error.message || String(error)}`);
+
+    return task;
+  }
+
+  getLastActiveTask() {
+    return this.lastActiveTask;
+  }
+
+  getActiveTasksCount() {
+    return this.activeTasks.length;
+  }
+
+  getAllActiveTasks() {
+    return this.activeTasks;
+  }
+
+  getTaskHistory(limit = 20) {
+    return this.taskHistory.slice(-limit).reverse();
+  }
+
   async saveMemory() {
     try {
       const data = {
@@ -435,6 +543,8 @@ Remember: You exist to make trading more profitable through intelligent partners
         trading_memory: this.tradingMemory,
         improvement_areas: this.improvementAreas,
         performance_metrics: this.performanceMetrics,
+        task_history: this.taskHistory,
+        last_active_task: this.lastActiveTask,
         last_updated: new Date().toISOString()
       };
 
@@ -467,6 +577,8 @@ Remember: You exist to make trading more profitable through intelligent partners
         improvements_implemented: 0,
         profitability_change: 0
       };
+      this.taskHistory = data.task_history || [];
+      this.lastActiveTask = data.last_active_task || null;
 
       logger.info('📚 Agent memory restored from previous session');
 
@@ -487,6 +599,11 @@ Remember: You exist to make trading more profitable through intelligent partners
       trading: {
         decisions_made: this.tradingMemory.decisions_made.length,
         last_decision: this.getLastDecision()
+      },
+      tasks: {
+        active_count: this.getActiveTasksCount(),
+        last_active_task: this.getLastActiveTask(),
+        recent_tasks: this.getTaskHistory(5)
       }
     };
   }

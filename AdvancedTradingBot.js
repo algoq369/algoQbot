@@ -1075,6 +1075,78 @@ class AdvancedTradingBot {
         res.status(500).json({ error: error.message });
       }
     });
+
+    // AlgoQBot task endpoints
+    this.app.get('/api/algoqbot/last-active-task', (req, res) => {
+      try {
+        if (!this.algoqbot) {
+          return res.status(503).json({ error: 'AlgoQBot not initialized' });
+        }
+        const lastTask = this.algoqbot.getLastActiveTask();
+        res.json({
+          success: true,
+          lastActiveTask: lastTask,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error('API last active task error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/algoqbot/active-tasks', (req, res) => {
+      try {
+        if (!this.algoqbot) {
+          return res.status(503).json({ error: 'AlgoQBot not initialized' });
+        }
+        const activeTasks = this.algoqbot.getAllActiveTasks();
+        res.json({
+          success: true,
+          activeCount: this.algoqbot.getActiveTasksCount(),
+          activeTasks: activeTasks,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error('API active tasks error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/algoqbot/task-history', (req, res) => {
+      try {
+        if (!this.algoqbot) {
+          return res.status(503).json({ error: 'AlgoQBot not initialized' });
+        }
+        const limit = req.query.limit ? parseInt(req.query.limit) : 20;
+        const taskHistory = this.algoqbot.getTaskHistory(limit);
+        res.json({
+          success: true,
+          historyCount: taskHistory.length,
+          taskHistory: taskHistory,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error('API task history error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/algoqbot/status', (req, res) => {
+      try {
+        if (!this.algoqbot) {
+          return res.status(503).json({ error: 'AlgoQBot not initialized' });
+        }
+        const status = this.algoqbot.getStatus();
+        res.json({
+          success: true,
+          algoqbotStatus: status,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error('API algoqbot status error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
   }
 
   async start() {
