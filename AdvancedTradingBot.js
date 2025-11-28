@@ -1079,10 +1079,10 @@ class AdvancedTradingBot {
     // AlgoQBot task endpoints
     this.app.get('/api/algoqbot/last-active-task', (req, res) => {
       try {
-        if (!this.algoqbot) {
+        if (!this.algoqbotAgent) {
           return res.status(503).json({ error: 'AlgoQBot not initialized' });
         }
-        const lastTask = this.algoqbot.getLastActiveTask();
+        const lastTask = this.algoqbotAgent.getLastActiveTask();
         res.json({
           success: true,
           lastActiveTask: lastTask,
@@ -1096,13 +1096,13 @@ class AdvancedTradingBot {
 
     this.app.get('/api/algoqbot/active-tasks', (req, res) => {
       try {
-        if (!this.algoqbot) {
+        if (!this.algoqbotAgent) {
           return res.status(503).json({ error: 'AlgoQBot not initialized' });
         }
-        const activeTasks = this.algoqbot.getAllActiveTasks();
+        const activeTasks = this.algoqbotAgent.getAllActiveTasks();
         res.json({
           success: true,
-          activeCount: this.algoqbot.getActiveTasksCount(),
+          activeCount: this.algoqbotAgent.getActiveTasksCount(),
           activeTasks: activeTasks,
           timestamp: new Date().toISOString()
         });
@@ -1114,11 +1114,11 @@ class AdvancedTradingBot {
 
     this.app.get('/api/algoqbot/task-history', (req, res) => {
       try {
-        if (!this.algoqbot) {
+        if (!this.algoqbotAgent) {
           return res.status(503).json({ error: 'AlgoQBot not initialized' });
         }
         const limit = req.query.limit ? parseInt(req.query.limit) : 20;
-        const taskHistory = this.algoqbot.getTaskHistory(limit);
+        const taskHistory = this.algoqbotAgent.getTaskHistory(limit);
         res.json({
           success: true,
           historyCount: taskHistory.length,
@@ -1133,10 +1133,10 @@ class AdvancedTradingBot {
 
     this.app.get('/api/algoqbot/status', (req, res) => {
       try {
-        if (!this.algoqbot) {
+        if (!this.algoqbotAgent) {
           return res.status(503).json({ error: 'AlgoQBot not initialized' });
         }
-        const status = this.algoqbot.getStatus();
+        const status = this.algoqbotAgent.getStatus();
         res.json({
           success: true,
           algoqbotStatus: status,
