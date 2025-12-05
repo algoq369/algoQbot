@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-12-05T14:46:43.692Z",
+  "original": {
+    "total": 95,
+    "entries": 69,
+    "exits": 69,
+    "holds": 26
+  },
+  "cleaned": {
+    "total": 69,
+    "exitReasonsFixed": 69,
+    "strategiesFixed": 20,
+    "holdsRemoved": 26
+  },
+  "analysis": {
+    "orphanedExits": 69,
+    "exitReasons": {
+      "breakout": 17,
+      "stop_loss": 21,
+      "max_hold_time_exceeded": 31
+    },
+    "strategies": {
+      "ranging": 13,
+      "grid": 29,
+      "momentum": 7,
+      "unknown": 46
+    }
+  },
+  "pnl": {
+    "totalExits": 69,
+    "winners": 0,
+    "losers": 0,
+    "winRate": 0,
+    "totalPnL": 0
+  }
+}

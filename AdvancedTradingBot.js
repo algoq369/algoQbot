@@ -2785,7 +2785,7 @@ Volume Analysis:
 
     // Fallback: calculate manually with strategy rotation
     if (priceHistory.length < 50) {
-      console.log('Insufficient data, using ranging strategy');
+      logger.debug('Insufficient data, using ranging strategy');
       return 'ranging';
     }
 

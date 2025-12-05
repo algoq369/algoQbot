@@ -127,7 +127,29 @@ class ShadowMode {
 
   // Execute trade in shadow mode
   async executeShadowTrade(params) {
-    const { action, pair, amount, targetPrice, confidence, reasoning } = params;
+    // 🔥 FIX: Extract ALL fields including exit-specific data
+    const {
+      action,
+      pair,
+      amount,
+      targetPrice,
+      confidence,
+      reasoning,
+      // ✅ P&L TRACKING: Extract exit-specific fields
+      type,           // 'EXIT' or 'ENTRY'
+      positionId,     // Position ID for matching
+      entryPrice,     // Entry price for P&L calculation
+      entryTime,      // Entry timestamp
+      exitPrice,      // Exit price
+      exitTime,       // Exit timestamp
+      exitReason,     // 'take_profit', 'stop_loss', 'max_hold_time_exceeded', etc.
+      holdTime,       // Hold duration in milliseconds
+      holdTimeMinutes,// Hold duration in minutes
+      plPercent,      // P&L percentage
+      plUSD,          // P&L in USD
+      profit,         // Alias for plUSD
+      strategy        // Trading strategy used
+    } = params;
 
     if (!this.isActive) {
       logger.warn('Shadow mode not active, skipping trade simulation');
@@ -223,9 +245,9 @@ class ShadowMode {
     // 🔧 FIX: Get updated balances from shared manager (not this.virtualPortfolio)
     const finalBalances = getSharedVirtualBalances();
 
-    // Save trade
+    // Save trade with complete exit data
     const trade = {
-      timestamp: Date.now(),
+      timestamp: exitTime || Date.now(),
       action,
       pair,
       amount,
@@ -236,7 +258,23 @@ class ShadowMode {
         usdt: finalBalances.usdt,
         bnb: finalBalances.bnb
       },
-      shadowMode: true
+      shadowMode: true,
+      // ✅ P&L TRACKING: Include all exit-specific data
+      type: type || (action === 'sell' ? 'EXIT' : 'ENTRY'),
+      positionId: positionId || null,
+      entryPrice: entryPrice || null,
+      entryTime: entryTime || null,
+      exitPrice: exitPrice || targetPrice,
+      exitTime: exitTime || Date.now(),
+      exitReason: exitReason || null,
+      holdTime: holdTime || null,
+      holdTimeMinutes: holdTimeMinutes || (holdTime ? Math.floor(holdTime / 60000) : null),
+      plPercent: plPercent || null,
+      plUSD: plUSD || profit || null,
+      profit: profit || plUSD || null,
+      strategy: strategy || 'unknown',
+      size: amount,
+      sizeUSD: amount
     };
 
     this.shadowTrades.push(trade);
@@ -907,42 +945,55 @@ class ShadowMode {
         trades = [];
       }
 
-      // 🔥 ENHANCED: Extract strategy from reasoning field
-      let strategy = 'unknown';
-      if (trade.reasoning) {
-        // Parse strategy from reasoning: "Exit downward_breakout: ranging" -> "ranging"
-        const strategyMatch = trade.reasoning.match(/:\s*(\w+)/);
-        if (strategyMatch) {
-          strategy = strategyMatch[1];
-        }
-        // Also check for common strategy names directly in reasoning
-        const strategyKeywords = ['ranging', 'momentum', 'mean_reversion', 'grid', 'breakout'];
-        for (const keyword of strategyKeywords) {
-          if (trade.reasoning.toLowerCase().includes(keyword)) {
-            strategy = keyword;
-            break;
-          }
-        }
-      }
-
-      // 🔥 ENHANCED: Calculate position size in USD
-      const sizeUSD = trade.amount || 0;
-      const currentPrice = trade.targetPrice || 0.00088;
-      const sizeToken = trade.action === 'buy' ? (sizeUSD * currentPrice) : sizeUSD;
-
       // 🔥 ENHANCED: Filter out HOLD actions
       if (trade.action === 'HOLD') {
         logger.debug(`📝 Skipping HOLD action from shadow trades file`);
         return; // Don't save HOLD actions
       }
 
-      // Add new trade with enhanced data
+      // 🔥 FIX: Use provided strategy, fallback to extraction from reasoning
+      let strategy = trade.strategy || 'unknown';
+      if (strategy === 'unknown' && trade.reasoning) {
+        // Parse strategy from reasoning: "Exit downward_breakout: ranging" -> "ranging"
+        const strategyMatch = trade.reasoning.match(/:\s*(\w+)/);
+        if (strategyMatch) {
+          strategy = strategyMatch[1];
+        }
+        // Also check for common strategy names directly in reasoning
+        const strategyKeywords = ['ranging', 'momentum', 'mean_reversion', 'grid', 'breakout', 'gridTrading'];
+        for (const keyword of strategyKeywords) {
+          if (trade.reasoning.toLowerCase().includes(keyword.toLowerCase())) {
+            strategy = keyword === 'gridTrading' ? 'grid' : keyword;
+            break;
+          }
+        }
+      }
+
+      // 🔥 ENHANCED: Calculate position size in USD
+      const sizeUSD = trade.sizeUSD || trade.amount || 0;
+      const currentPrice = trade.targetPrice || 0.00088;
+      const sizeToken = trade.size || (trade.action === 'buy' ? (sizeUSD * currentPrice) : sizeUSD);
+
+      // Add new trade with enhanced data - preserve all exit fields
       const tradeRecord = {
         ...trade,
-        timestamp: new Date().toISOString(),
-        strategy: strategy,  // 🔥 NEW: Extracted strategy
-        size: sizeToken,     // 🔥 NEW: Token size
-        sizeUSD: sizeUSD,    // 🔥 NEW: USD size
+        timestamp: trade.timestamp ? new Date(trade.timestamp).toISOString() : new Date().toISOString(),
+        strategy: strategy,
+        size: sizeToken,
+        sizeUSD: sizeUSD,
+        // ✅ P&L TRACKING: Ensure exit data is preserved
+        type: trade.type || null,
+        positionId: trade.positionId || null,
+        entryPrice: trade.entryPrice || null,
+        entryTime: trade.entryTime ? new Date(trade.entryTime).toISOString() : null,
+        exitPrice: trade.exitPrice || trade.targetPrice || null,
+        exitTime: trade.exitTime ? new Date(trade.exitTime).toISOString() : null,
+        exitReason: trade.exitReason || null,
+        holdTime: trade.holdTime || null,
+        holdTimeMinutes: trade.holdTimeMinutes || null,
+        plPercent: trade.plPercent || null,
+        plUSD: trade.plUSD || trade.profit || null,
+        profit: trade.profit || trade.plUSD || null,
         shadowMode: true
       };
 

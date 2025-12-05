@@ -14,7 +14,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.283926006689505,
-    "sizeUSD": 1179
+    "sizeUSD": 1179,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T02:55:30.719Z",
@@ -31,7 +33,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.2982366379665344,
-    "sizeUSD": 1182
+    "sizeUSD": 1182,
+    "exitReason": "upward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T02:55:30.727Z",
@@ -48,7 +52,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.2982366379665344,
-    "sizeUSD": 1182
+    "sizeUSD": 1182,
+    "exitReason": "upward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T02:59:00.213Z",
@@ -65,7 +71,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.2985294723861132,
-    "sizeUSD": 1178
+    "sizeUSD": 1178,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T02:59:30.404Z",
@@ -82,7 +90,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.298528857730729,
-    "sizeUSD": 1178
+    "sizeUSD": 1178,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T02:59:30.406Z",
@@ -99,7 +109,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.302938123801122,
-    "sizeUSD": 1182
+    "sizeUSD": 1182,
+    "exitReason": "upward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T02:59:30.499Z",
@@ -116,7 +128,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.2919149586251395,
-    "sizeUSD": 1172
+    "sizeUSD": 1172,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T02:59:30.621Z",
@@ -133,7 +147,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.2974265412131307,
-    "sizeUSD": 1177
+    "sizeUSD": 1177,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:02:30.530Z",
@@ -150,7 +166,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3153792003001092,
-    "sizeUSD": 1179
+    "sizeUSD": 1179,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:03:00.522Z",
@@ -167,7 +185,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3215111865303741,
-    "sizeUSD": 1181
+    "sizeUSD": 1181,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:03:00.870Z",
@@ -184,7 +204,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3226301629795956,
-    "sizeUSD": 1182
+    "sizeUSD": 1182,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:03:30.491Z",
@@ -201,7 +223,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3226301629795956,
-    "sizeUSD": 1182
+    "sizeUSD": 1182,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:16:00.146Z",
@@ -218,7 +242,9 @@
     "shadowMode": true,
     "strategy": "momentum",
     "size": 1.3122003110099694,
-    "sizeUSD": 1181
+    "sizeUSD": 1181,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:16:00.829Z",
@@ -235,7 +261,9 @@
     "shadowMode": true,
     "strategy": "momentum",
     "size": 1.3121763416031311,
-    "sizeUSD": 1181
+    "sizeUSD": 1181,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:16:00.867Z",
@@ -252,7 +280,9 @@
     "shadowMode": true,
     "strategy": "momentum",
     "size": 1.3121763416031311,
-    "sizeUSD": 1181
+    "sizeUSD": 1181,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:30:30.444Z",
@@ -269,7 +299,9 @@
     "shadowMode": true,
     "strategy": "momentum",
     "size": 1.3170320157852489,
-    "sizeUSD": 1181
+    "sizeUSD": 1181,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:31:00.490Z",
@@ -286,7 +318,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.3027587427962515,
-    "sizeUSD": 1167
+    "sizeUSD": 1167,
+    "exitReason": "upward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:00.612Z",
@@ -303,7 +337,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.323801658748001,
-    "sizeUSD": 1180
+    "sizeUSD": 1180,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:00.855Z",
@@ -320,7 +356,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.323801658748001,
-    "sizeUSD": 1180
+    "sizeUSD": 1180,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:00.858Z",
@@ -337,7 +375,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.323801658748001,
-    "sizeUSD": 1180
+    "sizeUSD": 1180,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:00.862Z",
@@ -354,7 +394,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.317070463873011,
-    "sizeUSD": 1174
+    "sizeUSD": 1174,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:00.998Z",
@@ -371,7 +413,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3279355207504049,
-    "sizeUSD": 1180
+    "sizeUSD": 1180,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:01.001Z",
@@ -388,7 +432,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3279355207504049,
-    "sizeUSD": 1180
+    "sizeUSD": 1180,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:01.004Z",
@@ -405,7 +451,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.320057937152733,
-    "sizeUSD": 1173
+    "sizeUSD": 1173,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:01.010Z",
@@ -422,7 +470,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.320057937152733,
-    "sizeUSD": 1173
+    "sizeUSD": 1173,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:30.644Z",
@@ -439,7 +489,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3268101516650233,
-    "sizeUSD": 1179
+    "sizeUSD": 1179,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:30.650Z",
@@ -456,7 +508,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3245594134942598,
-    "sizeUSD": 1177
+    "sizeUSD": 1177,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:30.675Z",
@@ -473,7 +527,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3245594134942598,
-    "sizeUSD": 1177
+    "sizeUSD": 1177,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:30.680Z",
@@ -490,7 +546,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3211833062381146,
-    "sizeUSD": 1174
+    "sizeUSD": 1174,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T03:35:30.896Z",
@@ -507,7 +565,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3268072962067614,
-    "sizeUSD": 1179
+    "sizeUSD": 1179,
+    "exitReason": "stop_loss",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T04:38:30.600Z",
@@ -524,7 +584,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.3055038527483018,
-    "sizeUSD": 1177
+    "sizeUSD": 1177,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T04:41:00.974Z",
@@ -541,7 +603,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.3008187190331642,
-    "sizeUSD": 1171
+    "sizeUSD": 1171,
+    "exitReason": "upward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T04:58:00.593Z",
@@ -558,7 +622,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.2998120879773383,
-    "sizeUSD": 1176
+    "sizeUSD": 1176,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T04:58:00.596Z",
@@ -575,7 +641,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.300917370365074,
-    "sizeUSD": 1177
+    "sizeUSD": 1177,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T04:58:00.662Z",
@@ -592,7 +660,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.300917370365074,
-    "sizeUSD": 1177
+    "sizeUSD": 1177,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T05:16:30.915Z",
@@ -609,7 +679,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.2895643579454796,
-    "sizeUSD": 1172
+    "sizeUSD": 1172,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T05:16:30.931Z",
@@ -626,7 +698,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.2906646688310988,
-    "sizeUSD": 1173
+    "sizeUSD": 1173,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T05:16:31.044Z",
@@ -643,7 +717,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.2917649797167177,
-    "sizeUSD": 1174
+    "sizeUSD": 1174,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T05:30:01.230Z",
@@ -660,7 +736,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.289935003270233,
-    "sizeUSD": 1178
+    "sizeUSD": 1178,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T05:30:01.234Z",
@@ -677,7 +755,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.288839982045046,
-    "sizeUSD": 1177
+    "sizeUSD": 1177,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T05:47:01.085Z",
@@ -694,7 +774,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.275443548440755,
-    "sizeUSD": 1162
+    "sizeUSD": 1162,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T06:03:30.512Z",
@@ -711,7 +793,9 @@
     "shadowMode": true,
     "strategy": "momentum",
     "size": 1.2868337115711934,
-    "sizeUSD": 1173
+    "sizeUSD": 1173,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T06:20:30.942Z",
@@ -728,7 +812,9 @@
     "shadowMode": true,
     "strategy": "grid",
     "size": 1.2836751248585194,
-    "sizeUSD": 1170
+    "sizeUSD": 1170,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T07:14:09.006Z",
@@ -745,7 +831,9 @@
     "shadowMode": true,
     "strategy": "momentum",
     "size": 1.2939303528272468,
-    "sizeUSD": 1173
+    "sizeUSD": 1173,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T07:14:09.073Z",
@@ -762,7 +850,9 @@
     "shadowMode": true,
     "strategy": "momentum",
     "size": 1.2939303528272468,
-    "sizeUSD": 1173
+    "sizeUSD": 1173,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T08:04:30.197Z",
@@ -779,7 +869,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.2937355757210653,
-    "sizeUSD": 1183
+    "sizeUSD": 1183,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T08:09:30.382Z",
@@ -796,7 +888,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.2934334385800395,
-    "sizeUSD": 1183
+    "sizeUSD": 1183,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T08:09:30.393Z",
@@ -813,7 +907,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.2934334385800395,
-    "sizeUSD": 1183
+    "sizeUSD": 1183,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T08:11:00.223Z",
@@ -830,7 +926,9 @@
     "shadowMode": true,
     "strategy": "ranging",
     "size": 1.291186839021791,
-    "sizeUSD": 1181
+    "sizeUSD": 1181,
+    "exitReason": "downward_breakout",
+    "type": "EXIT"
   },
   {
     "timestamp": "2025-11-18T09:11:30.617Z",
@@ -844,7 +942,10 @@
       "usdt": 11295,
       "bnb": 49.25874542389141
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "upward_breakout",
+    "type": "EXIT",
+    "strategy": "ranging"
   },
   {
     "timestamp": "2025-11-18T09:50:01.021Z",
@@ -858,7 +959,10 @@
       "usdt": 10114,
       "bnb": 50.53404073668784
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "momentum"
   },
   {
     "timestamp": "2025-11-18T09:56:00.373Z",
@@ -872,7 +976,10 @@
       "usdt": 8933,
       "bnb": 51.80810947913798
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T11:55:00.190Z",
@@ -886,7 +993,10 @@
       "usdt": 6615,
       "bnb": 54.37643939692989
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T11:55:00.536Z",
@@ -900,7 +1010,10 @@
       "usdt": 7740,
       "bnb": 53.10183955344609
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T11:55:00.939Z",
@@ -914,7 +1027,10 @@
       "usdt": 10100,
       "bnb": 50.59498124841535
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T12:03:30.641Z",
@@ -928,7 +1044,10 @@
       "usdt": 5423,
       "bnb": 55.66995054641039
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T12:04:01.159Z",
@@ -942,7 +1061,10 @@
       "usdt": 6549,
       "bnb": 54.39548912104644
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T12:04:30.448Z",
@@ -956,175 +1078,10 @@
       "usdt": 8908,
       "bnb": 51.88986504616876
     },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:39:31.420Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1185,
-    "targetPrice": 0.00109057496735669,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 8/10: 0.001091 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 6549,
-      "bnb": 54.39548912104644
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:39:31.502Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1177,
-    "targetPrice": 0.001090578115913661,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 8/10: 0.001091 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 780,
-      "bnb": 60.30105615164693
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:39:31.639Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1185,
-    "targetPrice": 0.001090502421983381,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 8/10: 0.001091 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 5423,
-      "bnb": 55.66995054641039
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:39:32.187Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1186,
-    "targetPrice": 0.001090202385020416,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 8/10: 0.001091 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 8908,
-      "bnb": 51.88986504616876
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:42:31.049Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1187,
-    "targetPrice": 0.001087514085649615,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 6/10: 0.001088 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 6549,
-      "bnb": 54.39548912104644
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:42:31.696Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1180,
-    "targetPrice": 0.001087673411590207,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 6/10: 0.001088 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 780,
-      "bnb": 60.30105615164693
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:42:32.193Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1189,
-    "targetPrice": 0.001087673411590207,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 6/10: 0.001088 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 8908,
-      "bnb": 51.88986504616876
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:42:32.335Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1188,
-    "targetPrice": 0.001087514085649615,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 6/10: 0.001088 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 5423,
-      "bnb": 55.66995054641039
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:47:32.372Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1182,
-    "targetPrice": 0.001086279109290696,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 5/10: 0.001086 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 780,
-      "bnb": 60.30105615164693
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:47:32.397Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1189,
-    "targetPrice": 0.001086279109290696,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 5/10: 0.001086 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 6549,
-      "bnb": 54.39548912104644
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:48:01.617Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1190,
-    "targetPrice": 0.001086278801337606,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 5/10: 0.001086 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 5423,
-      "bnb": 55.66995054641039
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T12:48:01.619Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1190,
-    "targetPrice": 0.001086278801337606,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 5/10: 0.001086 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 8908,
-      "bnb": 51.88986504616876
-    },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T13:15:00.469Z",
@@ -1138,7 +1095,10 @@
       "usdt": 7722,
       "bnb": 53.1764663093805
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "upward_breakout",
+    "type": "EXIT",
+    "strategy": "ranging"
   },
   {
     "timestamp": "2025-11-18T13:15:00.480Z",
@@ -1152,7 +1112,10 @@
       "usdt": 6533,
       "bnb": 54.46632204459025
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "upward_breakout",
+    "type": "EXIT",
+    "strategy": "ranging"
   },
   {
     "timestamp": "2025-11-18T14:25:30.886Z",
@@ -1166,21 +1129,10 @@
       "usdt": 5365,
       "bnb": 55.68076838215061
     },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T14:26:33.431Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1190,
-    "targetPrice": 0.001086180326217111,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 5/10: 0.001086 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 5423,
-      "bnb": 55.66995054641039
-    },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T14:46:00.984Z",
@@ -1194,7 +1146,10 @@
       "usdt": 4238,
       "bnb": 56.95060288468415
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "mean_reversion"
   },
   {
     "timestamp": "2025-11-18T14:46:00.992Z",
@@ -1208,7 +1163,10 @@
       "usdt": 3050,
       "bnb": 58.234497380776325
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "mean_reversion"
   },
   {
     "timestamp": "2025-11-18T14:46:00.999Z",
@@ -1222,7 +1180,10 @@
       "usdt": 1860,
       "bnb": 59.52055331541411
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "downward_breakout",
+    "type": "EXIT",
+    "strategy": "ranging"
   },
   {
     "timestamp": "2025-11-18T14:46:01.015Z",
@@ -1236,7 +1197,10 @@
       "usdt": 2997,
       "bnb": 58.23991162015252
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "mean_reversion"
   },
   {
     "timestamp": "2025-11-18T14:46:01.020Z",
@@ -1250,7 +1214,10 @@
       "usdt": 1810,
       "bnb": 59.522725396971886
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "mean_reversion"
   },
   {
     "timestamp": "2025-11-18T15:04:00.941Z",
@@ -1264,7 +1231,10 @@
       "usdt": 621,
       "bnb": 60.814541301847804
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "mean_reversion"
   },
   {
     "timestamp": "2025-11-18T15:04:00.952Z",
@@ -1278,7 +1248,10 @@
       "usdt": 4155,
       "bnb": 57.049953854342085
     },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "grid"
   },
   {
     "timestamp": "2025-11-18T15:04:00.954Z",
@@ -1292,188 +1265,9 @@
       "usdt": 670,
       "bnb": 60.81345569287613
     },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T15:38:31.373Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1187,
-    "targetPrice": 0.001081646808263502,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001082 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 780,
-      "bnb": 60.30105615164693
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T15:38:31.429Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1194,
-    "targetPrice": 0.001081646808263502,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001082 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 670,
-      "bnb": 60.81345569287613
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T15:38:31.766Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1193,
-    "targetPrice": 0.001081646808263502,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001082 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 621,
-      "bnb": 60.814541301847804
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T15:39:32.554Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1197,
-    "targetPrice": 0.001078074713041218,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 1/10: 0.001079 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 621,
-      "bnb": 60.814541301847804
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:08:32.401Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1194,
-    "targetPrice": 0.001074895442993943,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001075 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 780,
-      "bnb": 60.30105615164693
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:09:01.327Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1201,
-    "targetPrice": 0.00107496143690308,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001075 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 621,
-      "bnb": 60.814541301847804
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:09:01.349Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1201,
-    "targetPrice": 0.00107496143690308,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001075 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 4155,
-      "bnb": 57.049953854342085
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:09:01.576Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1202,
-    "targetPrice": 0.00107496143690308,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001075 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 670,
-      "bnb": 60.81345569287613
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:10:31.460Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1207,
-    "targetPrice": 0.00106983705718868,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001070 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 4155,
-      "bnb": 57.049953854342085
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:19:01.319Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1206,
-    "targetPrice": 0.001069889195825191,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001070 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 621,
-      "bnb": 60.814541301847804
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:19:31.481Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1208,
-    "targetPrice": 0.001069888187628119,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001070 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 4155,
-      "bnb": 57.049953854342085
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:19:32.177Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1209,
-    "targetPrice": 0.001070027756586025,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001070 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 670,
-      "bnb": 60.81345569287613
-    },
-    "shadowMode": true
-  },
-  {
-    "timestamp": "2025-11-18T16:19:32.258Z",
-    "action": "HOLD",
-    "pair": "USDT/BNB",
-    "amount": 1201,
-    "targetPrice": 0.001070027756586025,
-    "confidence": 0.644,
-    "reasoning": "Grid buy at level 2/10: 0.001070 | 8-IND: 64.4% ⚠️",
-    "balances": {
-      "usdt": 780,
-      "bnb": 60.30105615164693
-    },
-    "shadowMode": true
+    "shadowMode": true,
+    "exitReason": "max_hold_time_exceeded",
+    "type": "EXIT",
+    "strategy": "mean_reversion"
   }
 ]

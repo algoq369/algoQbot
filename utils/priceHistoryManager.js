@@ -144,70 +144,74 @@ class PriceHistoryManager {
     const maxRetries = 3;
     let lastError = null;
 
+    // ✅ FIX: Resolve file path ONCE at the start
+    const resolvedPath = path.isAbsolute(this.filePath)
+      ? this.filePath
+      : path.resolve(process.cwd(), this.filePath);
+    const dataDir = path.dirname(resolvedPath);
+    const tempPath = resolvedPath + '.tmp';
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // ✅ FIX: Resolve file path to absolute path to avoid directory issues
-        const resolvedPath = path.isAbsolute(this.filePath) 
-          ? this.filePath 
-          : path.resolve(process.cwd(), this.filePath);
-        
-        // ✅ FIX: Ensure directory exists with proper error handling
-        const dataDir = path.dirname(resolvedPath);
+        // ✅ FIX: Ensure directory exists BEFORE any file operations
+        await fs.mkdir(dataDir, { recursive: true });
+
+        // ✅ FIX: Verify directory exists (sync check for race condition)
         try {
-          await fs.mkdir(dataDir, { recursive: true, mode: 0o755 });
-          logger.debug(`📁 Directory ensured: ${dataDir}`);
-        } catch (mkdirError) {
-          // If directory creation fails, log but continue (might already exist)
-          if (mkdirError.code !== 'EEXIST') {
-            logger.warn(`⚠️ Directory creation warning: ${mkdirError.message}`);
-          }
+          await fs.access(dataDir);
+        } catch (accessError) {
+          logger.warn(`⚠️ Directory access failed, retrying mkdir: ${accessError.message}`);
+          await fs.mkdir(dataDir, { recursive: true });
+          // Small delay to ensure filesystem sync
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
 
-        // ✅ FIX: Atomic write with retry logic
-        const tempPath = resolvedPath + '.tmp';
-        
-        // ✅ CRITICAL FIX: Ensure directory exists RIGHT BEFORE rename (race condition fix)
-        // Double-check directory exists even if mkdir was called earlier
-        // Use mkdir with recursive: true - it won't error if directory already exists
-        try {
-          await fs.mkdir(dataDir, { recursive: true, mode: 0o755 });
-        } catch (mkdirError) {
-          // If mkdir fails (e.g., permission issue), log but continue
-          if (mkdirError.code !== 'EEXIST') {
-            logger.warn(`⚠️ Directory check warning: ${mkdirError.message}`);
-          }
-        }
-        
         // Write to temp file first
-        await fs.writeFile(tempPath, JSON.stringify(this.priceHistory, null, 2), { encoding: 'utf8' });
-        
-        // Atomic rename - now safe because directory is guaranteed to exist
+        const jsonData = JSON.stringify(this.priceHistory, null, 2);
+        await fs.writeFile(tempPath, jsonData, { encoding: 'utf8' });
+
+        // ✅ FIX: Verify temp file was written before rename
+        try {
+          await fs.access(tempPath);
+        } catch (tempAccessError) {
+          logger.warn(`⚠️ Temp file access failed: ${tempAccessError.message}`);
+          // Fallback: write directly to target file
+          await fs.writeFile(resolvedPath, jsonData, { encoding: 'utf8' });
+          logger.debug(`✅ Price history saved directly (fallback) on attempt ${attempt}`);
+          return;
+        }
+
+        // Atomic rename
         await fs.rename(tempPath, resolvedPath);
-        
+
         logger.debug(`✅ Price history saved successfully (attempt ${attempt}/${maxRetries})`);
         return; // Success - exit retry loop
 
       } catch (error) {
         lastError = error;
         logger.warn(`⚠️ Error saving price history (attempt ${attempt}/${maxRetries}): ${error.message}`);
-        
-        // If it's a directory issue, try to create it again
-        if (error.code === 'ENOENT' && attempt < maxRetries) {
-          const resolvedPath = path.isAbsolute(this.filePath) 
-            ? this.filePath 
-            : path.resolve(process.cwd(), this.filePath);
-          const dataDir = path.dirname(resolvedPath);
+
+        // ✅ FIX: On ENOENT, try direct write as fallback
+        if (error.code === 'ENOENT') {
           try {
-            await fs.mkdir(dataDir, { recursive: true, mode: 0o755 });
-            logger.debug(`📁 Retry: Directory created: ${dataDir}`);
-            // Wait a bit before retrying
-            await new Promise(resolve => setTimeout(resolve, 100 * attempt));
-            continue;
-          } catch (retryError) {
-            logger.error(`❌ Retry directory creation failed: ${retryError.message}`);
+            // Ensure directory exists one more time
+            await fs.mkdir(dataDir, { recursive: true });
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Direct write (non-atomic but works)
+            const jsonData = JSON.stringify(this.priceHistory, null, 2);
+            await fs.writeFile(resolvedPath, jsonData, { encoding: 'utf8' });
+            logger.info(`✅ Price history saved via direct write fallback`);
+
+            // Clean up temp file if it exists
+            try { await fs.unlink(tempPath); } catch (e) { /* ignore */ }
+
+            return; // Success via fallback
+          } catch (fallbackError) {
+            logger.error(`❌ Fallback write also failed: ${fallbackError.message}`);
           }
         }
-        
+
         // Wait before retrying (exponential backoff)
         if (attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 200 * attempt));
@@ -215,10 +219,11 @@ class PriceHistoryManager {
       }
     }
 
-    // All retries failed
+    // All retries failed - clean up temp file
+    try { await fs.unlink(tempPath); } catch (e) { /* ignore */ }
+
     logger.error('❌ Error saving price history after all retries:', lastError);
     // Don't throw - allow bot to continue even if history save fails
-    // throw lastError;
   }
 
   getHistory() {

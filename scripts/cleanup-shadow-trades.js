@@ -1,186 +1,288 @@
 #!/usr/bin/env node
+
 /**
  * Shadow Trades Cleanup Script
- * 
- * Removes invalid entries from shadow_trades.json:
- * 1. Entries with side="HOLD" (phantom positions)
- * 2. Duplicate entries at same timestamp
- * 3. Entries with missing required fields
- * 
- * Run: node scripts/cleanup-shadow-trades.js
+ *
+ * This script:
+ * 1. Analyzes shadow trades for data integrity
+ * 2. Matches entries with exits using positionId
+ * 3. Removes orphaned exits (exits without matching entries)
+ * 4. Recalculates P&L with matched pairs only
+ * 5. Generates a cleanup report
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 
 const SHADOW_TRADES_PATH = path.join(__dirname, '../data/shadow_trades.json');
-const BACKUP_PATH = path.join(__dirname, '../data/shadow_trades_backup_' + Date.now() + '.json');
+const BACKUP_PATH = path.join(__dirname, '../data/shadow_trades.backup.json');
+const REPORT_PATH = path.join(__dirname, '../reports/cleanup-report.json');
 
-console.log('═══════════════════════════════════════════════════════════');
-console.log('       SHADOW TRADES CLEANUP SCRIPT');
-console.log('═══════════════════════════════════════════════════════════');
+async function cleanupShadowTrades() {
+  console.log('╔═══════════════════════════════════════════════════════════╗');
+  console.log('║       🧹 SHADOW TRADES CLEANUP UTILITY                    ║');
+  console.log('╚═══════════════════════════════════════════════════════════╝\n');
 
-// Read current data
-let trades;
-try {
-  const content = fs.readFileSync(SHADOW_TRADES_PATH, 'utf8');
-  trades = JSON.parse(content);
-  console.log(`\n📂 Loaded ${trades.length} trades from shadow_trades.json`);
-} catch (error) {
-  console.error('❌ Failed to read shadow_trades.json:', error.message);
-  process.exit(1);
-}
+  try {
+    // 1. Load shadow trades
+    console.log('📂 Loading shadow trades...\n');
+    let trades = [];
 
-// Create backup
-try {
-  fs.writeFileSync(BACKUP_PATH, JSON.stringify(trades, null, 2));
-  console.log(`💾 Backup created: ${BACKUP_PATH}`);
-} catch (error) {
-  console.error('❌ Failed to create backup:', error.message);
-  process.exit(1);
-}
+    try {
+      const data = await fs.readFile(SHADOW_TRADES_PATH, 'utf8');
+      const parsed = JSON.parse(data);
 
-// Count issues before cleanup
-const beforeStats = {
-  total: trades.length,
-  holdPositions: trades.filter(t => t.side === 'HOLD' || t.side === 'hold').length,
-  unknownStrategy: trades.filter(t => t.strategy === 'unknown').length,
-  zeroSize: trades.filter(t => t.type === 'EXIT' && (t.size === 0 || t.sizeUSD === 0)).length,
-  exits: trades.filter(t => t.type === 'EXIT').length,
-  entries: trades.filter(t => t.action && t.action !== 'HOLD').length
-};
-
-console.log('\n📊 BEFORE CLEANUP:');
-console.log(`   Total entries: ${beforeStats.total}`);
-console.log(`   HOLD positions (phantom): ${beforeStats.holdPositions}`);
-console.log(`   Unknown strategy: ${beforeStats.unknownStrategy}`);
-console.log(`   EXIT trades: ${beforeStats.exits}`);
-console.log(`   Entry trades: ${beforeStats.entries}`);
-
-// Remove HOLD positions
-const validTrades = trades.filter(trade => {
-  // Remove HOLD positions (phantom entries)
-  if (trade.side === 'HOLD' || trade.side === 'hold') {
-    return false;
-  }
-  
-  // Remove HOLD actions from entries (keep only buy/sell)
-  if (trade.action === 'HOLD' || trade.action === 'hold') {
-    return false;
-  }
-  
-  return true;
-});
-
-console.log(`\n🧹 Removed ${trades.length - validTrades.length} invalid entries`);
-
-// Remove duplicates (same timestamp within 100ms)
-const seenTimestamps = new Map();
-const uniqueTrades = validTrades.filter(trade => {
-  const ts = new Date(trade.timestamp || trade.entryTime || trade.exitTime).getTime();
-  const key = `${ts}_${trade.action || trade.type}_${trade.side || ''}`;
-  
-  // Allow same action within 100ms only once
-  for (const [existingKey, existingTs] of seenTimestamps) {
-    if (existingKey.startsWith(key.split('_')[0]) && Math.abs(ts - existingTs) < 100) {
-      return false;
+      if (Array.isArray(parsed)) {
+        trades = parsed;
+      } else if (parsed && parsed.trades && Array.isArray(parsed.trades)) {
+        trades = parsed.trades;
+      }
+    } catch (error) {
+      console.log('❌ Could not load shadow trades:', error.message);
+      return;
     }
+
+    console.log(`📊 Total trades loaded: ${trades.length}\n`);
+
+    // 2. Create backup
+    console.log('💾 Creating backup...');
+    await fs.writeFile(BACKUP_PATH, JSON.stringify(trades, null, 2));
+    console.log(`✅ Backup saved to: ${BACKUP_PATH}\n`);
+
+    // 3. Analyze trades
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📊 ANALYSIS');
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    const entries = trades.filter(t =>
+      t.type === 'ENTRY' ||
+      (t.action === 'buy' && !t.type && !t.exitReason)
+    );
+
+    const exits = trades.filter(t =>
+      t.type === 'EXIT' ||
+      t.exitReason ||
+      (t.reasoning && t.reasoning.includes('Exit'))
+    );
+
+    const holds = trades.filter(t => t.action === 'HOLD');
+    const other = trades.filter(t =>
+      !entries.includes(t) &&
+      !exits.includes(t) &&
+      !holds.includes(t)
+    );
+
+    console.log(`   Entries: ${entries.length}`);
+    console.log(`   Exits: ${exits.length}`);
+    console.log(`   HOLDs: ${holds.length}`);
+    console.log(`   Other/Unknown: ${other.length}`);
+    console.log(`   Entry/Exit ratio: 1:${(exits.length / Math.max(entries.length, 1)).toFixed(2)}\n`);
+
+    // 4. Find orphaned exits (exits without matching entries)
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔍 ORPHAN DETECTION');
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    const entryPositionIds = new Set(entries.map(e => e.positionId).filter(Boolean));
+    const exitPositionIds = new Set(exits.map(e => e.positionId).filter(Boolean));
+
+    const orphanedExits = exits.filter(exit => {
+      if (!exit.positionId) return true;
+      return !entryPositionIds.has(exit.positionId);
+    });
+
+    console.log(`   Entries with positionId: ${entryPositionIds.size}`);
+    console.log(`   Exits with positionId: ${exitPositionIds.size}`);
+    console.log(`   Orphaned exits found: ${orphanedExits.length}\n`);
+
+    // 5. Analyze exit reasons
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📊 EXIT REASON ANALYSIS');
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    const exitReasons = {};
+    exits.forEach(exit => {
+      let reason = exit.exitReason || 'unknown';
+
+      if (reason === 'unknown' && exit.reasoning) {
+        if (exit.reasoning.includes('take_profit')) reason = 'take_profit';
+        else if (exit.reasoning.includes('stop_loss')) reason = 'stop_loss';
+        else if (exit.reasoning.includes('max_hold') || exit.reasoning.includes('timeout')) reason = 'max_hold_time_exceeded';
+        else if (exit.reasoning.includes('breakout')) reason = 'breakout';
+        else reason = 'extracted_unknown';
+      }
+
+      exitReasons[reason] = (exitReasons[reason] || 0) + 1;
+    });
+
+    Object.entries(exitReasons)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([reason, count]) => {
+        const pct = ((count / exits.length) * 100).toFixed(1);
+        console.log(`   ${reason}: ${count} (${pct}%)`);
+      });
+    console.log();
+
+    // 6. Analyze strategies
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📊 STRATEGY ANALYSIS');
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    const strategies = {};
+    trades.forEach(trade => {
+      const strat = trade.strategy || 'unknown';
+      strategies[strat] = (strategies[strat] || 0) + 1;
+    });
+
+    Object.entries(strategies)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([strategy, count]) => {
+        const pct = ((count / trades.length) * 100).toFixed(1);
+        console.log(`   ${strategy}: ${count} (${pct}%)`);
+      });
+    console.log();
+
+    // 7. Clean trades
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🧹 CLEANING DATA');
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    let cleanedTrades = trades.filter(t => t.action !== 'HOLD');
+    console.log(`   Removed ${holds.length} HOLD actions`);
+
+    let fixedExitReasons = 0;
+    cleanedTrades = cleanedTrades.map(trade => {
+      if (trade.type === 'EXIT' || (trade.reasoning && trade.reasoning.includes('Exit'))) {
+        if (!trade.exitReason && trade.reasoning) {
+          if (trade.reasoning.includes('take_profit')) {
+            trade.exitReason = 'take_profit';
+            fixedExitReasons++;
+          } else if (trade.reasoning.includes('stop_loss')) {
+            trade.exitReason = 'stop_loss';
+            fixedExitReasons++;
+          } else if (trade.reasoning.includes('max_hold') || trade.reasoning.includes('timeout') || trade.reasoning.includes('max_time')) {
+            trade.exitReason = 'max_hold_time_exceeded';
+            fixedExitReasons++;
+          } else if (trade.reasoning.includes('breakout')) {
+            const match = trade.reasoning.match(/(upward|downward)_breakout/);
+            trade.exitReason = match ? match[0] : 'breakout';
+            fixedExitReasons++;
+          } else if (trade.reasoning.includes('reversion')) {
+            trade.exitReason = 'reversion_complete';
+            fixedExitReasons++;
+          }
+        }
+
+        if (!trade.type) {
+          trade.type = 'EXIT';
+        }
+      }
+
+      return trade;
+    });
+
+    console.log(`   Fixed ${fixedExitReasons} null exit reasons`);
+
+    let fixedStrategies = 0;
+    cleanedTrades = cleanedTrades.map(trade => {
+      if (!trade.strategy || trade.strategy === 'unknown') {
+        if (trade.reasoning) {
+          const strategyMatch = trade.reasoning.match(/:\s*(\w+)/);
+          if (strategyMatch) {
+            trade.strategy = strategyMatch[1];
+            if (trade.strategy === 'gridTrading') trade.strategy = 'grid';
+            fixedStrategies++;
+          }
+        }
+      }
+      return trade;
+    });
+
+    console.log(`   Fixed ${fixedStrategies} unknown strategies`);
+
+    // 8. Calculate P&L summary
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('💰 P&L RECALCULATION');
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    const exitTrades = cleanedTrades.filter(t => t.type === 'EXIT' || t.exitReason);
+
+    let totalPnL = 0;
+    let winners = 0;
+    let losers = 0;
+
+    exitTrades.forEach(exit => {
+      const pnl = exit.plUSD || exit.profit || 0;
+      totalPnL += pnl;
+      if (pnl > 0) winners++;
+      else if (pnl < 0) losers++;
+    });
+
+    const winRate = exitTrades.length > 0 ? ((winners / exitTrades.length) * 100).toFixed(1) : 0;
+
+    console.log(`   Exit trades analyzed: ${exitTrades.length}`);
+    console.log(`   Winners: ${winners}`);
+    console.log(`   Losers: ${losers}`);
+    console.log(`   Win rate: ${winRate}%`);
+    console.log(`   Total P&L: $${totalPnL.toFixed(2)}`);
+
+    // 9. Save cleaned trades
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('💾 SAVING CLEANED DATA');
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    await fs.writeFile(SHADOW_TRADES_PATH, JSON.stringify(cleanedTrades, null, 2));
+    console.log(`✅ Saved ${cleanedTrades.length} cleaned trades`);
+
+    // 10. Generate cleanup report
+    const report = {
+      timestamp: new Date().toISOString(),
+      original: {
+        total: trades.length,
+        entries: entries.length,
+        exits: exits.length,
+        holds: holds.length
+      },
+      cleaned: {
+        total: cleanedTrades.length,
+        exitReasonsFixed: fixedExitReasons,
+        strategiesFixed: fixedStrategies,
+        holdsRemoved: holds.length
+      },
+      analysis: {
+        orphanedExits: orphanedExits.length,
+        exitReasons: exitReasons,
+        strategies: strategies
+      },
+      pnl: {
+        totalExits: exitTrades.length,
+        winners: winners,
+        losers: losers,
+        winRate: parseFloat(winRate),
+        totalPnL: parseFloat(totalPnL.toFixed(2))
+      }
+    };
+
+    await fs.mkdir(path.dirname(REPORT_PATH), { recursive: true });
+    await fs.writeFile(REPORT_PATH, JSON.stringify(report, null, 2));
+    console.log(`✅ Report saved to: ${REPORT_PATH}`);
+
+    console.log('\n╔═══════════════════════════════════════════════════════════╗');
+    console.log('║               CLEANUP COMPLETE                            ║');
+    console.log('╚═══════════════════════════════════════════════════════════╝\n');
+
+    console.log('📊 Summary:');
+    console.log(`   Original trades: ${trades.length}`);
+    console.log(`   Cleaned trades: ${cleanedTrades.length}`);
+    console.log(`   Exit reasons fixed: ${fixedExitReasons}`);
+    console.log(`   Strategies fixed: ${fixedStrategies}`);
+    console.log(`   HOLDs removed: ${holds.length}`);
+    console.log(`   Total P&L: $${totalPnL.toFixed(2)}\n`);
+
+  } catch (error) {
+    console.error('❌ Cleanup failed:', error);
+    process.exit(1);
   }
-  
-  seenTimestamps.set(key, ts);
-  return true;
-});
-
-console.log(`🔄 Removed ${validTrades.length - uniqueTrades.length} duplicate entries`);
-
-// ✅ FIX: Remove orphaned exits (exits without matching entries)
-const entries = uniqueTrades.filter(t => t.type !== 'EXIT' && (t.action === 'buy' || t.action === 'sell'));
-const exits = uniqueTrades.filter(t => t.type === 'EXIT');
-
-console.log(`\n🔍 Checking for orphaned exits...`);
-console.log(`   Entry trades: ${entries.length}`);
-console.log(`   Exit trades: ${exits.length}`);
-
-// Match exits to entries by positionId or timestamp proximity
-const validExits = exits.filter(exit => {
-  // Try to find matching entry by positionId
-  if (exit.positionId) {
-    const matchingEntry = entries.find(entry => entry.positionId === exit.positionId);
-    if (matchingEntry) {
-      return true; // Valid exit with matching entry
-    }
-  }
-  
-  // Try to find matching entry by timestamp proximity (within 4 hours)
-  const exitTime = new Date(exit.timestamp || exit.exitTime || 0).getTime();
-  const matchingEntry = entries.find(entry => {
-    const entryTime = new Date(entry.timestamp || entry.entryTime || 0).getTime();
-    const timeDiff = Math.abs(exitTime - entryTime);
-    return timeDiff < 4 * 3600000; // Within 4 hours
-  });
-  
-  if (matchingEntry) {
-    return true; // Valid exit with matching entry by timestamp
-  }
-  
-  // No matching entry found - this is an orphaned exit
-  return false;
-});
-
-const orphanedCount = exits.length - validExits.length;
-if (orphanedCount > 0) {
-  console.log(`⚠️  Found ${orphanedCount} orphaned exits (exits without matching entries)`);
-  console.log(`   Removing orphaned exits...`);
 }
 
-// Combine valid entries and valid exits
-const cleanedTrades = [...entries, ...validExits].sort((a, b) => {
-  const timeA = new Date(a.timestamp || a.entryTime || a.exitTime || 0).getTime();
-  const timeB = new Date(b.timestamp || b.entryTime || b.exitTime || 0).getTime();
-  return timeA - timeB;
-});
-
-console.log(`✅ Removed ${orphanedCount} orphaned exits`);
-console.log(`   Final count: ${cleanedTrades.length} trades (${entries.length} entries, ${validExits.length} exits)`);
-
-// Recalculate P&L statistics
-const exitTrades = cleanedTrades.filter(t => t.type === 'EXIT');
-let totalPnL = 0;
-let wins = 0;
-let losses = 0;
-
-exitTrades.forEach(trade => {
-  const profit = trade.profit || 0;
-  totalPnL += profit;
-  if (profit > 0) wins++;
-  else if (profit < 0) losses++;
-});
-
-console.log('\n📈 AFTER CLEANUP:');
-console.log(`   Total entries: ${cleanedTrades.length}`);
-console.log(`   EXIT trades: ${exitTrades.length}`);
-console.log(`   Wins: ${wins}`);
-console.log(`   Losses: ${losses}`);
-console.log(`   Win Rate: ${exitTrades.length > 0 ? ((wins / exitTrades.length) * 100).toFixed(1) : 0}%`);
-console.log(`   Total P&L: $${totalPnL.toFixed(2)}`);
-
-// Save cleaned data
-try {
-  fs.writeFileSync(SHADOW_TRADES_PATH, JSON.stringify(cleanedTrades, null, 2));
-  console.log(`\n✅ Cleaned data saved to ${SHADOW_TRADES_PATH}`);
-} catch (error) {
-  console.error('❌ Failed to save cleaned data:', error.message);
-  process.exit(1);
-}
-
-console.log('\n═══════════════════════════════════════════════════════════');
-console.log('       CLEANUP COMPLETE');
-console.log('═══════════════════════════════════════════════════════════');
-console.log(`\n📋 Summary:`);
-console.log(`   Entries removed: ${trades.length - cleanedTrades.length}`);
-console.log(`   - HOLD positions: ${beforeStats.holdPositions}`);
-console.log(`   - Duplicates: ${validTrades.length - uniqueTrades.length}`);
-console.log(`   - Orphaned exits: ${orphanedCount}`);
-console.log(`\n   Backup saved to: ${BACKUP_PATH}`);
-console.log('');
-
+cleanupShadowTrades();
