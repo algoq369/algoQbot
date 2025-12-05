@@ -51,29 +51,33 @@ const REGIME_CONFIGS = {
 
   LOW: {
     name: 'LOW_VOLATILITY',
-    description: 'Low volatility - consolidation phase',
+    description: 'Low volatility - NO TRADING (BSC fees require 3.5%+ TP, unreachable at this volatility)',
     minVolatility: 0.3,
 
-    // Strategy selection (4-strategy system)
-    strategies: ['gridTrading', 'arbitrage'],
-    primaryStrategy: 'gridTrading',
+    // ═══════════════════════════════════════════════════════════════
+    // 🚨 CRITICAL: NO STRATEGIES - BSC fees make trading unprofitable
+    // At 0.3-0.8% volatility, market cannot move 3.5% within hold time
+    // Previously allowed gridTrading, but 59% of trades were timing out
+    // ═══════════════════════════════════════════════════════════════
+    strategies: [],              // NO TRADING - wait for MEDIUM regime
+    primaryStrategy: null,
 
-    // Position sizing
-    positionSizePercent: 0.03,  // 3% of portfolio
-    maxPositionSize: 0.06,      // Cap at 6%
+    // Position sizing (disabled)
+    positionSizePercent: 0.0,   // No positions in LOW regime
+    maxPositionSize: 0.0,       // No positions
 
-    // Take profit / Stop loss (PROFESSIONAL BSC STANDARDS)
+    // Take profit / Stop loss (kept for reference, but no trading)
     tpMultiplier: 10,            // TP = volatility × 10
     slMultiplier: 4,             // SL = volatility × 4
     minTP: 0.035,                // Minimum 3.5% TP (covers 2.5% BSC costs + 1% profit)
     minSL: 0.015,                // Minimum 1.5% SL (ATR-based protection)
 
     // Risk management
-    maxDailyTrades: 12,
-    cooldownMs: 60000,           // 1 minute between trades
+    maxDailyTrades: 0,           // NO TRADING in LOW regime
+    cooldownMs: 300000,          // 5 minutes between checks
 
     // Confidence adjustments
-    confidenceBoost: 0.95        // -5% confidence in low vol
+    confidenceBoost: 0.0         // No trading in low vol
   },
 
   MEDIUM: {
@@ -294,11 +298,11 @@ function getRegimeInfo(regime) {
     },
     LOW: {
       volatility: '0.3-0.8%',
-      description: 'Low volatility',
-      tp: `${(tpsl.tp * 100).toFixed(1)}%`,
-      sl: `${(tpsl.sl * 100).toFixed(1)}%`,
-      rationale: 'Professional standard minimums',
-      status: '✅ Trading with standard targets'
+      description: 'Low volatility - NO TRADING',
+      tp: 'N/A',
+      sl: 'N/A',
+      rationale: 'BSC fees (2.5-3.5%) require 3.5%+ TP - unreachable at this volatility',
+      status: '⚠️ Trading disabled - wait for MEDIUM (0.8%+) volatility'
     },
     MEDIUM: {
       volatility: '0.8-1.5%',

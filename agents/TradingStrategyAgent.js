@@ -161,6 +161,24 @@ class TradingStrategyAgent extends BaseAgent {
     // 🔥 FIX #2: Add trade cooldown to prevent spam (max 24 trades/day)
     this.lastTradeTime = 0;
     this.MIN_TIME_BETWEEN_TRADES = this.config.cooldownMs;
+
+    // ✅ OPTIMIZATION: Cache for price arrays to avoid repeated slice().map()
+    this.priceArrayCache = null;
+    this.priceArrayCacheTimestamp = 0;
+    this.priceArrayCacheTTL = 1000; // 1 second cache
+  }
+
+  /**
+   * ✅ OPTIMIZATION: Get cached price array to avoid repeated operations
+   */
+  _getCachedPriceArray(priceHistory) {
+    const now = Date.now();
+    if (this.priceArrayCache && (now - this.priceArrayCacheTimestamp) < this.priceArrayCacheTTL) {
+      return this.priceArrayCache;
+    }
+    this.priceArrayCache = priceHistory.map(p => p.price);
+    this.priceArrayCacheTimestamp = now;
+    return this.priceArrayCache;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -632,12 +650,30 @@ Return JSON only:
         const profitUSD = profit * position.size;
         const holdTime = now - position.timestamp;
 
-        // ═══ FIX: Force exit after max hold time ═══
-        const MAX_HOLD_TIME = 2 * 3600000; // 2 hours (reduced from 4h for faster testing)
+        // ═══════════════════════════════════════════════════════════════
+        // DYNAMIC MAX_HOLD_TIME based on regime at entry
+        // Higher volatility = faster moves = shorter hold time needed
+        // Lower volatility = slower moves = more time needed for TP
+        // ═══════════════════════════════════════════════════════════════
+        const regimeAtEntry = position.regimeAtEntry || this.currentRegime;
+        let MAX_HOLD_TIME;
+        switch (regimeAtEntry) {
+          case 'VERY_HIGH':
+            MAX_HOLD_TIME = 2 * 3600000;  // 2 hours - fast moves at 2.5%+ volatility
+            break;
+          case 'HIGH':
+            MAX_HOLD_TIME = 3 * 3600000;  // 3 hours - moderate moves at 1.5-2.5% volatility
+            break;
+          case 'MEDIUM':
+          default:
+            MAX_HOLD_TIME = 4 * 3600000;  // 4 hours - slower moves at 0.8-1.5% volatility
+            break;
+        }
 
         if (holdTime > MAX_HOLD_TIME) {
           const holdHours = (holdTime / 3600000).toFixed(1);
-          logger.warn(`⏰ FORCED EXIT: Position ${id} exceeded max hold time (${holdHours}h)`);
+          const maxHours = (MAX_HOLD_TIME / 3600000).toFixed(0);
+          logger.warn(`⏰ FORCED EXIT: Position ${id} exceeded max hold time (${holdHours}h > ${maxHours}h for ${regimeAtEntry} regime)`);
           logger.warn(`   Entry: ${position.entryPrice.toFixed(8)} | Current: ${currentPrice.toFixed(8)}`);
           logger.warn(`   P&L: ${(profit * 100).toFixed(2)}% | TP was: ${position.takeProfit ? position.takeProfit.toFixed(8) : 'NOT SET'}`);
 
@@ -646,10 +682,11 @@ Return JSON only:
         }
 
         // Log aging positions (warn before forced exit)
-        if (holdTime > 1800000) { // 30+ minutes
+        const halfwayTime = MAX_HOLD_TIME / 2;
+        if (holdTime > halfwayTime) {
           const ageMin = (holdTime / 60000).toFixed(1);
           const remainingMin = ((MAX_HOLD_TIME - holdTime) / 60000).toFixed(0);
-          logger.info(`⏳ Position ${id}: ${ageMin} min old | Force exit in ${remainingMin} min if not closed`);
+          logger.info(`⏳ Position ${id}: ${ageMin} min old | Force exit in ${remainingMin} min if not closed (${regimeAtEntry} regime)`);
         }
 
         logger.info(`📊 Monitoring position ${id}: profit ${(profit * 100).toFixed(2)}%, hold time ${(holdTime / 60000).toFixed(1)}min, current: ${currentPrice.toFixed(6)}, entry: ${position.entryPrice.toFixed(6)}`);
@@ -901,27 +938,67 @@ Return JSON only:
       const exitAction = position.side === 'buy' ? 'sell' : 'buy';
 
       if (global.shadowMode?.isActive) {
+        // ✅ P&L TRACKING: Calculate P&L before logging exit
+        const PNLCalculator = require('../utils/pnlCalculator');
+        const plPercent = PNLCalculator.calculatePLPercent(position.entryPrice, currentPrice, position.side);
+        const plUSD = PNLCalculator.calculatePLUSD(position.entryPrice, currentPrice, position.size, position.side);
+
+        // ✅ FIX: Calculate holdTime properly
+        const entryTime = position.timestamp || position.entryTime || Date.now();
+        const exitTime = Date.now();
+        const holdTimeMs = exitTime - entryTime;
+        const holdTimeMinutes = Math.floor(holdTimeMs / 60000);
+        const holdTimeHours = (holdTimeMs / 3600000).toFixed(2);
+
+        // ✅ P&L TRACKING: Log EXIT with positionId and P&L data
         await global.shadowMode.executeShadowTrade({
           action: exitAction,
           pair: 'USDT/BNB',
           amount: position.size,
           targetPrice: currentPrice,
           confidence: 0.95,
-          reasoning: `Exit ${reason}: ${position.strategy}`
+          reasoning: `Exit ${reason}: ${position.strategy}`,
+          // ✅ P&L TRACKING: Add exit type and position linking
+          type: 'EXIT',
+          positionId: position.id,
+          entryPrice: position.entryPrice,
+          entryTime: entryTime, // ✅ FIX: Store entry time
+          exitPrice: currentPrice,
+          exitTime: exitTime, // ✅ FIX: Store exit time
+          exitReason: reason || 'unknown', // ✅ FIX: Ensure exitReason is never null
+          holdTime: holdTimeMs, // ✅ FIX: Store holdTime in milliseconds
+          holdTimeMinutes: holdTimeMinutes, // ✅ FIX: Store holdTime in minutes for readability
+          plPercent: plPercent,
+          plUSD: plUSD,
+          profit: plUSD, // ✅ FIX: Also store as 'profit' for consistency
+          strategy: position.strategy || 'unknown', // ✅ FIX: Ensure strategy is never null
+          timestamp: exitTime
         });
 
-        // 🔥 NEW: Record detailed exit information for P&L tracking
-        await global.shadowMode.recordPositionExit({
-          positionId: position.id,
-          side: position.side,
-          entryPrice: position.entryPrice,
-          entryTime: position.timestamp,
-          exitPrice: currentPrice,
-          exitTime: Date.now(),
-          reason: reason,
-          size: position.size,
-          strategy: position.strategy || 'unknown'
-        });
+        // 🔥 NEW: Record detailed exit information for P&L tracking (backward compatibility)
+        if (global.shadowMode.recordPositionExit) {
+          const entryTime = position.timestamp || position.entryTime || Date.now();
+          const exitTime = Date.now();
+          const holdTimeMs = exitTime - entryTime;
+          
+          await global.shadowMode.recordPositionExit({
+            positionId: position.id,
+            side: position.side,
+            entryPrice: position.entryPrice,
+            entryTime: entryTime, // ✅ FIX: Use consistent entryTime
+            exitPrice: currentPrice,
+            exitTime: exitTime,
+            exitReason: reason || 'unknown', // ✅ FIX: Ensure exitReason is never null
+            holdTime: holdTimeMs, // ✅ FIX: Store holdTime
+            size: position.size,
+            strategy: position.strategy || 'unknown', // ✅ FIX: Ensure strategy is never null
+            plPercent: plPercent,
+            plUSD: plUSD,
+            profit: plUSD // ✅ FIX: Also store as 'profit'
+          });
+        }
+
+        logger.info(`📊 Exit logged: Position ${position.id} | P&L: ${plPercent.toFixed(2)}% (${plUSD >= 0 ? '+' : ''}$${plUSD.toFixed(2)}) | Reason: ${reason}`);
       } else {
         // Live trade execution
         await this.executeTradingDecision({
@@ -961,9 +1038,36 @@ Return JSON only:
         `);
       }
 
+      // ✅ POSITION MANAGEMENT: Update lifecycle state before removal
+      if (position.lifecycleState) {
+        // Determine final state based on exit reason
+        let finalState = 'CLOSED';
+        if (reason === 'take_profit' || reason === 'take_profit_fallback') {
+          finalState = 'TP_HIT';
+        } else if (reason === 'stop_loss') {
+          finalState = 'SL_HIT';
+        } else if (reason === 'max_hold_time_exceeded' || reason === 'max_time') {
+          finalState = 'TIMEOUT';
+        } else if (reason.includes('breakout')) {
+          finalState = 'BREAKOUT';
+        } else if (reason === 'reversion_complete') {
+          finalState = 'REVERSION_COMPLETE';
+        }
+
+        // Update state history
+        if (!position.stateHistory) position.stateHistory = [];
+        position.stateHistory.push({
+          state: finalState,
+          timestamp: Date.now(),
+          price: currentPrice,
+          reason: reason
+        });
+        position.lifecycleState = finalState;
+      }
+
       // Remove from active positions
       this.activePositions.delete(position.id);
-      logger.info(`✅ Position ${position.id} removed from tracking (Total exits: ${this.exitStats.total})`);
+      logger.info(`✅ Position ${position.id} removed from tracking | Final State: ${position.lifecycleState || 'CLOSED'} | Total exits: ${this.exitStats.total}`);
 
       // Record in history
       if (!this.positionHistory) this.positionHistory = [];
@@ -974,7 +1078,9 @@ Return JSON only:
         profit: profitUSD,
         profitPercent: profit * 100,
         exitReason: reason,
-        holdDuration: Date.now() - position.entryTime
+        holdDuration: Date.now() - position.entryTime,
+        lifecycleState: position.lifecycleState || 'CLOSED',
+        stateHistory: position.stateHistory || []
       });
 
       // Update strategy performance
@@ -996,7 +1102,9 @@ Return JSON only:
     const priceHistory = this.priceHistoryManager.getHistory();
     if (priceHistory.length < 50) return 0;
 
-    const last50 = priceHistory.slice(-50).map(p => p.price);
+    // ✅ OPTIMIZATION: Use cached price array
+    const priceArray = this._getCachedPriceArray(priceHistory);
+    const last50 = priceArray.slice(-50);
     const mean = last50.reduce((a, b) => a + b) / last50.length;
     const variance = last50.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / last50.length;
     const stdDev = Math.sqrt(variance);
@@ -1301,15 +1409,35 @@ Return JSON only:
         this.regimeHistory.shift();
       }
 
-      // Check if volatility too low for trading
-      if (this.currentRegime === 'VERY_LOW') {
+      // ═══════════════════════════════════════════════════════════════
+      // 🚨 CRITICAL FIX: Block ALL trading below MEDIUM regime (0.8%+)
+      // BSC fees are 2.5-3.5% round-trip, so TP must be 3.5%+ minimum
+      // At LOW volatility (0.3-0.8%), market cannot reach 3.5% TP in time
+      // Result: 59% of trades were timing out - this fixes that
+      // ═══════════════════════════════════════════════════════════════
+      if (this.currentRegime === 'VERY_LOW' || this.currentRegime === 'LOW') {
         const currentVol = (volatility4h * 100).toFixed(2);
-        const minVol = REGIME_THRESHOLDS.LOW;
+        const minVol = REGIME_THRESHOLDS.MEDIUM; // 0.8% - MEDIUM regime threshold
         const gap = (minVol - volatility4h * 100).toFixed(2);
 
-        logger.warn(`⚠️ [REGIME] Volatility too low: ${currentVol}%`);
-        logger.info(`💤 [REGIME] Minimum required: ${minVol}%`);
-        logger.info(`💤 [REGIME] Skipping trade - waiting for higher volatility`);
+        logger.warn(`⚠️ [REGIME] Volatility too low for profitable trading: ${currentVol}%`);
+        logger.info(`💤 [REGIME] Minimum required: ${minVol}% (MEDIUM regime)`);
+        logger.info(`💤 [REGIME] BSC fees require 3.5%+ TP - need ${gap}% more volatility`);
+        logger.info(`💤 [REGIME] Skipping trade - waiting for MEDIUM+ volatility`);
+
+        // ✅ Still calculate indicators for dashboard display (even when holding)
+        try {
+          const indicatorResult = await this.calculate8IndicatorConfidence(enhancedMarketData, 'hold');
+          this.lastIndicatorResults = {
+            timestamp: new Date().toISOString(),
+            finalConfidence: indicatorResult.confidence,
+            indicatorBreakdown: indicatorResult.indicatorBreakdown,
+            institutionalDetails: indicatorResult.institutionalDetails || {}
+          };
+          logger.info(`📊 [DASHBOARD] Indicators calculated for display (HOLD mode)`);
+        } catch (indicatorError) {
+          logger.warn(`⚠️ Indicator calculation failed: ${indicatorError.message}`);
+        }
 
         // Calculate TP/SL percentages for dashboard display
         const tpslConfig = calculateTPSL(this.currentRegime, volatility4h);
@@ -1317,23 +1445,23 @@ Return JSON only:
         return {
           action: 'HOLD',
           reason: 'volatility_too_low',
-          reasoning: `Volatility too low (${currentVol}% < ${minVol}% minimum) - need ${gap}% more volatility for trading`,  // ✅ FIX: Add reasoning field
+          reasoning: `Volatility too low (${currentVol}% < ${minVol}% MEDIUM minimum) - BSC fees require 3.5%+ TP, need ${gap}% more volatility`,
           regime: this.currentRegime,
           regimeConfig: {
             name: regimeConfig.name,
             volatility4h: volatility4h,
             strategy: 'none'
           },
-          confidence: 0.0,  // ✅ FIX: Add confidence for VERY_LOW regime
-          position_size: 0,  // ✅ FIX: Use underscore to match normal decisions
+          confidence: 0.0,
+          position_size: 0,
           takeProfit: 0,
           stopLoss: 0,
-          takeProfitPercent: tpslConfig.tp,  // ✅ For dashboard consistency
-          stopLossPercent: tpslConfig.sl     // ✅ For dashboard consistency
+          takeProfitPercent: tpslConfig.tp,
+          stopLossPercent: tpslConfig.sl
         };
       }
 
-      logger.info(`✅ [REGIME] Volatility sufficient for trading`);
+      logger.info(`✅ [REGIME] Volatility sufficient for trading (${this.currentRegime} >= MEDIUM)`);
 
       // ═══════════════════════════════════════════════════════════════
       // REGIME-BASED STRATEGY SELECTION
@@ -1388,6 +1516,14 @@ Return JSON only:
         decision.indicatorBreakdown = indicatorResult.indicatorBreakdown;
         decision.timeFactor = indicatorResult.timeFactor;
         decision.normalizedConfidence = indicatorResult.normalizedConfidence;
+        
+        // ✅ Store last indicator results for monitoring dashboard
+        this.lastIndicatorResults = {
+          timestamp: new Date().toISOString(),
+          finalConfidence: indicatorResult.confidence,
+          indicatorBreakdown: indicatorResult.indicatorBreakdown,
+          institutionalDetails: indicatorResult.institutionalDetails || {}
+        };
 
         // Update reasoning with 8-indicator contribution
         const indicatorAction = indicatorResult.action;
@@ -1609,8 +1745,16 @@ Return JSON only:
 
         logger.info(`✅ Position validated: ${position.id}, side: ${position.side}, TP: ${position.takeProfit.toFixed(8)}`);
 
+        // ✅ POSITION MANAGEMENT: Add lifecycle state tracking
+        position.lifecycleState = 'OPEN';
+        position.stateHistory = [{
+          state: 'OPEN',
+          timestamp: Date.now(),
+          price: position.entryPrice
+        }];
+
         this.activePositions.set(positionId, position);
-        logger.info(`📊 Position tracked: ${side.toUpperCase()} $${position.size.toFixed(0)} @ ${position.entryPrice.toFixed(6)} | Stop: ${position.stopLoss.toFixed(6)} | TP: ${position.takeProfit.toFixed(6)} (${(tpPercent * 100).toFixed(2)}%)`);
+        logger.info(`📊 Position tracked: ${side.toUpperCase()} $${position.size.toFixed(0)} @ ${position.entryPrice.toFixed(6)} | Stop: ${position.stopLoss.toFixed(6)} | TP: ${position.takeProfit.toFixed(6)} (${(tpPercent * 100).toFixed(2)}%) | State: OPEN`);
       }
 
       // Log the decision
@@ -2243,8 +2387,10 @@ Return JSON only:
   }
 
   _calculateSupportResistanceLevels(priceHistory) {
-    const last50 = priceHistory.slice(-50).map(p => p.price);
-    const last20 = priceHistory.slice(-20).map(p => p.price);
+    // ✅ OPTIMIZATION: Use cached price array
+    const priceArray = this._getCachedPriceArray(priceHistory);
+    const last50 = priceArray.slice(-50);
+    const last20 = priceArray.slice(-20);
 
     const high = Math.max(...last20);
     const low = Math.min(...last20);
@@ -2275,8 +2421,10 @@ Return JSON only:
   }
 
   _detectBreakout(currentPrice, levels, priceHistory) {
-    const recentPrices = priceHistory.slice(-10).map(p => p.price);
-    const last5Prices = priceHistory.slice(-5).map(p => p.price);
+    // ✅ OPTIMIZATION: Use cached price array
+    const priceArray = this._getCachedPriceArray(priceHistory);
+    const recentPrices = priceArray.slice(-10);
+    const last5Prices = priceArray.slice(-5);
 
     const momentum = (last5Prices[last5Prices.length - 1] - last5Prices[0]) / last5Prices[0];
     const momentumPercent = momentum * 100;

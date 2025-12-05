@@ -8,12 +8,16 @@ class CircuitBreaker {
   constructor() {
     this.isTripped = false;
     this.trippedAt = null;
-    this.cooldownMinutes = 30;
+    this.cooldownMinutes = 30; // ✅ FIX: Keep at 30 minutes - reasonable cooldown
 
+    // ✅ FIX: Adjusted thresholds to be more reasonable
     // Thresholds
-    this.maxConsecutiveLosses = 3;
+    this.maxConsecutiveLosses = 5; // ✅ FIX: Increased from 3 to 5 to reduce false positives
     this.maxHourlyLoss = 1000;
     this.maxDailyLoss = 3000;
+    
+    // ✅ FIX: Add minimum loss amount to prevent small losses from triggering
+    this.minLossAmount = 10; // Don't count losses under $10
 
     // Tracking
     this.consecutiveLosses = 0;
@@ -25,13 +29,22 @@ class CircuitBreaker {
     const now = Date.now();
 
     if (profit < 0) {
-      this.consecutiveLosses++;
       const loss = Math.abs(profit);
-      this.hourlyLosses.push({ time: now, loss });
-      this.dailyLosses.push({ time: now, loss });
+      
+      // ✅ FIX: Only count significant losses (above minimum threshold)
+      if (loss >= this.minLossAmount) {
+        this.consecutiveLosses++;
+        this.hourlyLosses.push({ time: now, loss });
+        this.dailyLosses.push({ time: now, loss });
 
-      logger.warn(`⚠️  Loss recorded: $${loss.toFixed(2)} (consecutive: ${this.consecutiveLosses})`);
+        logger.warn(`⚠️  Loss recorded: $${loss.toFixed(2)} (consecutive: ${this.consecutiveLosses}/${this.maxConsecutiveLosses})`);
+      } else {
+        // Small loss - reset consecutive counter (small losses are normal)
+        logger.debug(`📊 Small loss ignored: $${loss.toFixed(2)} < $${this.minLossAmount} threshold`);
+        this.consecutiveLosses = Math.max(0, this.consecutiveLosses - 1); // Reduce but don't reset completely
+      }
     } else {
+      // Profitable trade - reset consecutive losses
       this.consecutiveLosses = 0;
     }
 

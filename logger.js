@@ -200,22 +200,104 @@ setTimeout(() => {
   }
 }, 1000);
 
-// Add convenience methods for structured logging
+// ✅ ENHANCEMENT: Enhanced structured logging methods
 logger.trade = (action, details) => {
-  logger.info(`TRADE: ${action}`, { category: 'trade', ...details });
+  logger.info(`TRADE: ${action}`, { 
+    category: 'trade', 
+    timestamp: new Date().toISOString(),
+    ...details 
+  });
 };
 
 logger.position = (action, details) => {
-  logger.info(`POSITION: ${action}`, { category: 'position', ...details });
+  logger.info(`POSITION: ${action}`, { 
+    category: 'position', 
+    timestamp: new Date().toISOString(),
+    ...details 
+  });
 };
 
 logger.performance = (metric, value, details = {}) => {
-  logger.info(`PERFORMANCE: ${metric} = ${value}`, { category: 'performance', metric, value, ...details });
+  logger.info(`PERFORMANCE: ${metric} = ${value}`, { 
+    category: 'performance', 
+    metric, 
+    value, 
+    timestamp: new Date().toISOString(),
+    ...details 
+  });
 };
 
 logger.risk = (level, message, details = {}) => {
   const logLevel = level === 'critical' ? 'error' : level === 'high' ? 'warn' : 'info';
-  logger[logLevel](`RISK [${level.toUpperCase()}]: ${message}`, { category: 'risk', riskLevel: level, ...details });
+  logger[logLevel](`RISK [${level.toUpperCase()}]: ${message}`, { 
+    category: 'risk', 
+    riskLevel: level, 
+    timestamp: new Date().toISOString(),
+    ...details 
+  });
+};
+
+// ✅ NEW: Error tracking with context
+logger.errorWithContext = (error, context = {}) => {
+  const errorDetails = {
+    category: 'error',
+    timestamp: new Date().toISOString(),
+    error: {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    },
+    context,
+    ...context
+  };
+  logger.error(`ERROR: ${error.message}`, errorDetails);
+  return errorDetails;
+};
+
+// ✅ NEW: Performance metrics tracking
+logger.metric = (name, value, unit = '', tags = {}) => {
+  logger.info(`METRIC: ${name} = ${value}${unit ? ' ' + unit : ''}`, {
+    category: 'metric',
+    metricName: name,
+    metricValue: value,
+    metricUnit: unit,
+    timestamp: new Date().toISOString(),
+    ...tags
+  });
+};
+
+// ✅ NEW: Timing/performance measurement
+logger.timing = (operation, startTime, details = {}) => {
+  const duration = Date.now() - startTime;
+  logger.performance(`${operation}_duration`, duration, { 
+    unit: 'ms',
+    operation,
+    ...details 
+  });
+  return duration;
+};
+
+// ✅ NEW: Health check logging
+logger.health = (component, status, details = {}) => {
+  const level = status === 'healthy' ? 'info' : status === 'degraded' ? 'warn' : 'error';
+  logger[level](`HEALTH [${component.toUpperCase()}]: ${status}`, {
+    category: 'health',
+    component,
+    status,
+    timestamp: new Date().toISOString(),
+    ...details
+  });
+};
+
+// ✅ NEW: Audit logging for critical operations
+logger.audit = (action, details = {}) => {
+  logger.info(`AUDIT: ${action}`, {
+    category: 'audit',
+    action,
+    timestamp: new Date().toISOString(),
+    ...details
+  });
 };
 
 module.exports = logger;

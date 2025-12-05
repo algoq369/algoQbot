@@ -1,13 +1,32 @@
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../logger');
+const writeQueue = require('./writeQueue');
 
+/**
+ * PriceHistoryManager - Manages price history data with atomic file operations
+ * 
+ * Features:
+ * - Atomic writes to prevent corruption
+ * - Retry logic for file operations
+ * - Automatic directory creation
+ * - Rolling window (maxPoints) to limit memory usage
+ * 
+ * @class PriceHistoryManager
+ */
 class PriceHistoryManager {
+  /**
+   * Create a new PriceHistoryManager instance
+   * 
+   * @param {string} filePath - Path to price history JSON file (default: './data/price-history.json')
+   * @param {number} maxPoints - Maximum number of price points to keep in memory (default: 1000)
+   */
   constructor(filePath = './data/price-history.json', maxPoints = 1000) {
     this.filePath = filePath;
     this.maxPoints = maxPoints;
     this.priceHistory = [];
     this.isLoaded = false;
+    this.saveTimer = null; // ✅ OPTIMIZATION: Timer for debounced saves
   }
 
   async initialize() {
@@ -64,10 +83,8 @@ class PriceHistoryManager {
       this.priceHistory = this.priceHistory.slice(-this.maxPoints);
     }
 
-    // Save to disk (async, don't block)
-    this.saveHistory().catch(err =>
-      logger.debug('Error saving price history:', err.message)
-    );
+    // ✅ OPTIMIZATION: Use write queue for debounced writes
+    this.queueSave();
 
     logger.debug(`📊 Added price ${price}, volume ${volume} to history (${this.priceHistory.length} total)`);
   }
@@ -103,29 +120,105 @@ class PriceHistoryManager {
       this.priceHistory = this.priceHistory.slice(-this.maxPoints);
     }
 
-    // Save to disk (async, don't block)
-    this.saveHistory().catch(err =>
-      logger.debug('Error saving price history:', err.message)
-    );
+    // ✅ OPTIMIZATION: Use write queue for debounced writes
+    this.queueSave();
 
     logger.info(`📊 Added ${priceVolumeData.length} price/volume data points to history (${this.priceHistory.length} total)`);
   }
 
-  async saveHistory() {
-    try {
-      // Ensure directory exists
-      const dataDir = path.dirname(this.filePath);
-      await fs.mkdir(dataDir, { recursive: true });
-
-      // Atomic write
-      const tempPath = this.filePath + '.tmp';
-      await fs.writeFile(tempPath, JSON.stringify(this.priceHistory, null, 2));
-      await fs.rename(tempPath, this.filePath);
-
-    } catch (error) {
-      logger.error('❌ Error saving price history:', error);
-      throw error;
+  /**
+   * Queue save operation (debounced)
+   */
+  queueSave() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
     }
+    this.saveTimer = setTimeout(() => {
+      this.saveHistory().catch(err =>
+        logger.debug('Error saving price history:', err.message)
+      );
+    }, 5000); // 5 second debounce
+  }
+
+  async saveHistory() {
+    const maxRetries = 3;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // ✅ FIX: Resolve file path to absolute path to avoid directory issues
+        const resolvedPath = path.isAbsolute(this.filePath) 
+          ? this.filePath 
+          : path.resolve(process.cwd(), this.filePath);
+        
+        // ✅ FIX: Ensure directory exists with proper error handling
+        const dataDir = path.dirname(resolvedPath);
+        try {
+          await fs.mkdir(dataDir, { recursive: true, mode: 0o755 });
+          logger.debug(`📁 Directory ensured: ${dataDir}`);
+        } catch (mkdirError) {
+          // If directory creation fails, log but continue (might already exist)
+          if (mkdirError.code !== 'EEXIST') {
+            logger.warn(`⚠️ Directory creation warning: ${mkdirError.message}`);
+          }
+        }
+
+        // ✅ FIX: Atomic write with retry logic
+        const tempPath = resolvedPath + '.tmp';
+        
+        // ✅ CRITICAL FIX: Ensure directory exists RIGHT BEFORE rename (race condition fix)
+        // Double-check directory exists even if mkdir was called earlier
+        // Use mkdir with recursive: true - it won't error if directory already exists
+        try {
+          await fs.mkdir(dataDir, { recursive: true, mode: 0o755 });
+        } catch (mkdirError) {
+          // If mkdir fails (e.g., permission issue), log but continue
+          if (mkdirError.code !== 'EEXIST') {
+            logger.warn(`⚠️ Directory check warning: ${mkdirError.message}`);
+          }
+        }
+        
+        // Write to temp file first
+        await fs.writeFile(tempPath, JSON.stringify(this.priceHistory, null, 2), { encoding: 'utf8' });
+        
+        // Atomic rename - now safe because directory is guaranteed to exist
+        await fs.rename(tempPath, resolvedPath);
+        
+        logger.debug(`✅ Price history saved successfully (attempt ${attempt}/${maxRetries})`);
+        return; // Success - exit retry loop
+
+      } catch (error) {
+        lastError = error;
+        logger.warn(`⚠️ Error saving price history (attempt ${attempt}/${maxRetries}): ${error.message}`);
+        
+        // If it's a directory issue, try to create it again
+        if (error.code === 'ENOENT' && attempt < maxRetries) {
+          const resolvedPath = path.isAbsolute(this.filePath) 
+            ? this.filePath 
+            : path.resolve(process.cwd(), this.filePath);
+          const dataDir = path.dirname(resolvedPath);
+          try {
+            await fs.mkdir(dataDir, { recursive: true, mode: 0o755 });
+            logger.debug(`📁 Retry: Directory created: ${dataDir}`);
+            // Wait a bit before retrying
+            await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+            continue;
+          } catch (retryError) {
+            logger.error(`❌ Retry directory creation failed: ${retryError.message}`);
+          }
+        }
+        
+        // Wait before retrying (exponential backoff)
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 200 * attempt));
+        }
+      }
+    }
+
+    // All retries failed
+    logger.error('❌ Error saving price history after all retries:', lastError);
+    // Don't throw - allow bot to continue even if history save fails
+    // throw lastError;
   }
 
   getHistory() {

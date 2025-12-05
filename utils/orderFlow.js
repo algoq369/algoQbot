@@ -5,6 +5,8 @@ class ProductionOrderFlow {
     this.config = {
       maxHistory: config.maxHistory || 300,
       minSwapsForSignal: config.minSwapsForSignal || 10,
+      // Whale detection threshold (USDT) - simple, effective
+      whaleThreshold: config.whaleThreshold || 50000,
       confidenceThresholds: config.confidenceThresholds || {
         strongBuy: 0.15,
         moderateBuy: 0.05,
@@ -22,6 +24,8 @@ class ProductionOrderFlow {
       totalVolume: 0,
       confidence: 0.5,
       validSwaps: 0,
+      whaleBuys: 0,
+      whaleSells: 0,
       timestamp: Date.now(),
       status: 'NO_DATA'
     };
@@ -45,6 +49,8 @@ class ProductionOrderFlow {
       let sellVolume = 0;
       let validSwaps = 0;
       let malformedSwaps = 0;
+      let whaleBuys = 0;  // Whale detection (lean)
+      let whaleSells = 0;
 
       swapEvents.forEach((swap, index) => {
         try {
@@ -59,10 +65,13 @@ class ProductionOrderFlow {
           if (amount0Out > 0) {
             buyVolume += amount0Out;
             validSwaps++;
+            // Simple whale detection - no complex tracking
+            if (amount0Out >= this.config.whaleThreshold) whaleBuys++;
           }
           if (amount0In > 0) {
             sellVolume += amount0In;
             validSwaps++;
+            if (amount0In >= this.config.whaleThreshold) whaleSells++;
           }
 
         } catch (error) {
@@ -86,6 +95,10 @@ class ProductionOrderFlow {
       const totalVolume = buyVolume + sellVolume;
       const deltaPercent = totalVolume > 0 ? delta / totalVolume : 0;
 
+      // Whale alignment check (simple, effective)
+      const whaleAlignment = whaleBuys > whaleSells ? 'BUY' : 
+                            whaleSells > whaleBuys ? 'SELL' : 'NEUTRAL';
+
       const result = {
         delta,
         deltaPercent,
@@ -95,12 +108,17 @@ class ProductionOrderFlow {
         validSwaps,
         malformedSwaps,
         dataQuality,
+        // Lean whale metrics
+        whaleBuys,
+        whaleSells,
+        whaleAlignment,
+        whaleCount: whaleBuys + whaleSells,
         processingTime: Date.now() - startTime,
         timestamp: Date.now(),
         status: 'SUCCESS'
       };
 
-      logger.debug(`OrderFlow: Processed ${validSwaps} valid swaps, delta: ${(deltaPercent * 100).toFixed(2)}%`);
+      logger.debug(`OrderFlow: ${validSwaps} swaps, delta: ${(deltaPercent * 100).toFixed(2)}%, whales: ${whaleBuys}B/${whaleSells}S`);
 
       return result;
 
@@ -158,7 +176,7 @@ class ProductionOrderFlow {
     };
   }
 
-  getConfidence(deltaPercent, dataStatus = 'SUCCESS') {
+  getConfidence(deltaPercent, dataStatus = 'SUCCESS', flowData = {}) {
     if (dataStatus !== 'SUCCESS') {
       return {
         confidence: 0.5,
@@ -196,6 +214,21 @@ class ProductionOrderFlow {
       reasoning = `Neutral order flow (δ: ${(deltaPercent * 100).toFixed(1)}%)`;
     }
 
+    // Whale alignment boost (lean, effective)
+    const { whaleAlignment, whaleCount = 0 } = flowData;
+    if (whaleCount >= 2) {
+      const flowDirection = deltaPercent > 0 ? 'BUY' : 'SELL';
+      if (whaleAlignment === flowDirection) {
+        // Whales confirm flow direction - boost confidence
+        confidence = Math.min(1, confidence + 0.05);
+        reasoning += ` + ${whaleCount} whales aligned`;
+      } else if (whaleAlignment !== 'NEUTRAL' && whaleAlignment !== flowDirection) {
+        // Whales diverge from retail - caution
+        confidence = Math.max(0, confidence - 0.05);
+        reasoning += ` ⚠️ whales diverging`;
+      }
+    }
+
     return { confidence, reasoning, status: 'SUCCESS' };
   }
 
@@ -204,7 +237,7 @@ class ProductionOrderFlow {
 
     try {
       const flowData = this.calculateDelta(currentSwaps);
-      const confidenceResult = this.getConfidence(flowData.deltaPercent, flowData.status);
+      const confidenceResult = this.getConfidence(flowData.deltaPercent, flowData.status, flowData);
 
       const result = {
         confidence: confidenceResult.confidence,

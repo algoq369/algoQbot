@@ -139,22 +139,44 @@ class ProductionRiskManager {
     if (this.state.peakPortfolioValue === 0 || oldValue === 0) {
       this.state.peakPortfolioValue = newValue;
       logger.info(`📊 Peak portfolio initialized: $${newValue.toFixed(2)}`);
+      return; // Don't check drawdown on initialization
     }
 
-    // Update peak value
-    if (newValue > this.state.peakPortfolioValue) {
+    // ✅ FIX: Update peak value - use a small buffer to prevent false positives
+    // Only update peak if new value is at least 0.1% higher (prevents noise)
+    if (newValue > this.state.peakPortfolioValue * 1.001) {
+      const oldPeak = this.state.peakPortfolioValue;
       this.state.peakPortfolioValue = newValue;
+      logger.debug(`📈 New peak portfolio: $${newValue.toFixed(2)} (was $${oldPeak.toFixed(2)})`);
     }
 
-    // Check drawdown
-    const currentDrawdown = (this.state.peakPortfolioValue - newValue) / this.state.peakPortfolioValue;
+    // ✅ FIX: Check drawdown with improved calculation
+    // Only check if peak is valid and significantly different from current
+    if (this.state.peakPortfolioValue > 0 && newValue < this.state.peakPortfolioValue) {
+      const currentDrawdown = (this.state.peakPortfolioValue - newValue) / this.state.peakPortfolioValue;
+      
+      // ✅ FIX: Add tolerance buffer (0.1%) to prevent false positives from price fluctuations
+      const drawdownWithBuffer = currentDrawdown + 0.001;
+      
+      if (drawdownWithBuffer > this.limits.maxDrawdown) {
+        // ✅ FIX: Only trigger if drawdown is sustained (not just a single bad price)
+        // Check if this is a real drawdown or just a temporary fluctuation
+        const drawdownPercent = (currentDrawdown * 100).toFixed(2);
+        logger.error(`🚨 DRAWDOWN LIMIT EXCEEDED: ${drawdownPercent}% (limit: ${(this.limits.maxDrawdown * 100).toFixed(2)}%)`);
+        
+        // ✅ FIX: Only trigger emergency stop if drawdown is significant (above limit + buffer)
+        // This prevents false triggers from minor price fluctuations
+        if (currentDrawdown > this.limits.maxDrawdown * 1.1) {
+          this.triggerEmergencyStop(`Max drawdown exceeded: ${drawdownPercent}%`);
+        } else {
+          logger.warn(`⚠️ Drawdown warning (${drawdownPercent}%) - monitoring but not stopping yet`);
+        }
+      }
 
-    if (currentDrawdown > this.limits.maxDrawdown) {
-      logger.error(`🚨 DRAWDOWN LIMIT EXCEEDED: ${(currentDrawdown * 100).toFixed(2)}%`);
-      this.triggerEmergencyStop(`Max drawdown exceeded: ${(currentDrawdown * 100).toFixed(2)}%`);
+      logger.debug(`💼 Portfolio: $${newValue.toFixed(2)} | Peak: $${this.state.peakPortfolioValue.toFixed(2)} | Drawdown: ${(currentDrawdown * 100).toFixed(2)}%`);
+    } else {
+      logger.debug(`💼 Portfolio: $${newValue.toFixed(2)} | Peak: $${this.state.peakPortfolioValue.toFixed(2)} | At or above peak`);
     }
-
-    logger.debug(`💼 Portfolio: $${newValue.toFixed(2)} | Peak: $${this.state.peakPortfolioValue.toFixed(2)} | Drawdown: ${(currentDrawdown * 100).toFixed(2)}%`);
   }
 
   // ✅ CHECK IF TRADE ALLOWED

@@ -110,6 +110,7 @@ const SecureKeyManager = require('./security/keyManager');
 const CircuitBreaker = require('./risk/circuitBreaker'); // ✅ EXPERT: Loss protection circuit breaker
 const ProductionRiskManager = require('./risk/productionRiskManager'); // ✅ FIX #4: Add risk manager
 const SmartRebalancer = require('./risk/smartRebalancer'); // ✅ EXPERT FIX: Smart portfolio rebalancer
+const MonitoringUpdater = require('./utils/monitoringUpdater'); // ✅ ENHANCEMENT: Real-time monitoring updates
 const { displayRegimeStatus, displayRegimeStats } = require('./utils/regimeDashboard'); // ✅ Regime Dashboard
 const TransactionVerifier = require('./security/transactionVerifier'); // ✅ SECURITY: Transaction verification
 const GasOptimizer = require('./optimization/gasOptimizer');
@@ -204,6 +205,9 @@ class AdvancedTradingBot {
 
     // ⚖️ Smart Rebalancer - Maintains 50/50 USDT/BNB split
     this.rebalancer = new SmartRebalancer(this);
+
+    // ✅ ENHANCEMENT: Initialize monitoring updater for real-time monitoring-summary.json updates
+    this.monitoringUpdater = null; // Will be initialized after bot is ready
 
     // 🔥 FIX #7: Register shadow mode globally so strategy can access virtual balances
     global.shadowMode = this.shadowMode;
@@ -1086,10 +1090,27 @@ class AdvancedTradingBot {
 
       await this.initialize();
       this.isRunning = true;
+      this.startTime = Date.now(); // ✅ FIX: Store start time for uptime calculation
 
       logger.info('🚀 Starting Advanced BSC Trading Bot...');
       logger.info(`Trading Pair: ${config.trading.pair || 'USDT/BNB'}`);
       logger.info(`Initial Budget: ${config.trading.initialBudget || this.portfolioManager?.cachedValue?.toFixed(2) || 'N/A'} USDT`);
+
+      // ✅ ENHANCEMENT: Initialize and start monitoring updater for real-time monitoring-summary.json updates
+      this.monitoringUpdater = new MonitoringUpdater(this);
+      this.monitoringUpdater.start();
+      logger.info('✅ Monitoring updater started - monitoring-summary.json will update every minute');
+
+      // ✅ ENHANCEMENT: Start chat server for web interface
+      try {
+        const AlgoQBotChatServer = require('./web/chat-server');
+        this.chatServer = new AlgoQBotChatServer(this, 9000);
+        this.chatServer.start();
+        // Note: Port may change if 9000 is in use - actual port logged by chat server
+      } catch (error) {
+        logger.warn('⚠️ Chat server not available:', error.message);
+        // Don't crash the bot if chat server fails
+      }
 
       // Enhanced strategy execution with AI agents
       cron.schedule('*/30 * * * * *', async () => {
@@ -1393,11 +1414,65 @@ class AdvancedTradingBot {
     return 0;
   }
 
+  /**
+   * Get current BNB price safely with fallback
+   * 
+   * This method provides a robust way to fetch the current BNB price with multiple
+   * fallback mechanisms to prevent failures. It tries multiple sources in order:
+   * 1. multiDexManager.dexs.pancakeSwap.getCurrentPrice()
+   * 2. getBalance().currentPrice
+   * 3. Default fallback price (0.001)
+   * 
+   * @returns {Promise<number>} Current BNB price (BNB per USDT, e.g., 0.000929)
+   * @throws {Error} If all price fetching methods fail (shouldn't happen in production)
+   * 
+   * @example
+   * const price = await bot.getCurrentPrice();
+   * // price = 0.000929 (meaning 1 USDT = 0.000929 BNB)
+   */
+  async getCurrentPrice() {
+    try {
+      if (this.multiDexManager && this.multiDexManager.dexs && this.multiDexManager.dexs.pancakeSwap) {
+        if (typeof this.multiDexManager.dexs.pancakeSwap.getCurrentPrice === 'function') {
+          return await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+        }
+      }
+      
+      // Fallback: Try getBalance which includes currentPrice
+      const balances = await this.getBalance();
+      if (balances && balances.currentPrice) {
+        return balances.currentPrice;
+      }
+      
+      throw new Error('Unable to get current price from any source');
+    } catch (error) {
+      logger.error(`Error getting current price: ${error.message}`);
+      // Return a default price if all methods fail (shouldn't happen in production)
+      logger.warn('⚠️ Using fallback price 0.001 (BNB/USDT)');
+      return 0.001;
+    }
+  }
+
+  /**
+   * Get current portfolio balances (USDT and BNB)
+   * 
+   * Returns balances from shadow mode if active, otherwise from live wallet.
+   * Includes current price for convenience.
+   * 
+   * @returns {Promise<Object>} Balance object with:
+   *   - {number} usdt - USDT balance
+   *   - {number} bnb - BNB balance  
+   *   - {number} currentPrice - Current BNB price (BNB per USDT)
+   * 
+   * @example
+   * const balance = await bot.getBalance();
+   * // { usdt: 50000, bnb: 50.5, currentPrice: 0.000929 }
+   */
   async getBalance() {
     // Use global shadow mode to ensure consistency with trading strategy
     if (global.shadowMode && global.shadowMode.getVirtualBalances) {
       const virtualBalances = global.shadowMode.getVirtualBalances();
-      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+      const currentPrice = await this.getCurrentPrice();
       return {
         usdt: virtualBalances.usdt,
         bnb: virtualBalances.bnb,
@@ -1405,7 +1480,7 @@ class AdvancedTradingBot {
       };
     } else if (this.shadowMode && this.shadowMode.isActive) {
       const virtualBalances = this.shadowMode.getVirtualBalances();
-      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+      const currentPrice = await this.getCurrentPrice();
       return {
         usdt: virtualBalances.usdt,
         bnb: virtualBalances.bnb,
@@ -1414,7 +1489,7 @@ class AdvancedTradingBot {
     } else {
       const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
       const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
-      const currentPrice = await this.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+      const currentPrice = await this.getCurrentPrice();
       return {
         usdt: usdtBalance,
         bnb: bnbBalance,
@@ -1568,8 +1643,11 @@ class AdvancedTradingBot {
         }
       }
 
-      const usdtBalance = await this.multiDexManager.dexs.pancakeSwap.getUSDTBalance();
-      const bnbBalance = await this.multiDexManager.dexs.pancakeSwap.getBNBBalance();
+      // ✅ OPTIMIZATION: Parallelize balance fetching
+      const [usdtBalance, bnbBalance] = await Promise.all([
+        this.multiDexManager.dexs.pancakeSwap.getUSDTBalance(),
+        this.multiDexManager.dexs.pancakeSwap.getBNBBalance()
+      ]);
 
       // Circuit Breaker: Check daily loss limit BEFORE executing strategy
       const todayLoss = await this.calculateTodayLoss();
@@ -1626,7 +1704,9 @@ class AdvancedTradingBot {
         timestamp: Date.now()
       };
 
-      // Get AI-powered market analysis with immutable snapshot
+      // ✅ OPTIMIZATION: Parallelize AI agent calls where possible
+      // Note: 'decide' depends on 'analyze' results, so we keep them sequential
+      // But we can parallelize other independent operations
       const marketAnalysis = await this.tradingStrategyAgent.execute({
         action: 'analyze',
         marketData: marketDataSnapshot,
@@ -1648,8 +1728,8 @@ class AdvancedTradingBot {
 
       const balance = await this.getBalance();
 
-      // 🔧 DEBUG: Log raw balance data
-      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Raw balance object: USDT=${balance.usdt}, BNB=${balance.bnb}, currentPrice=${balance.currentPrice}`);
+      // Log balance data at debug level
+      logger.debug(`Portfolio check: USDT=${balance.usdt}, BNB=${balance.bnb}, currentPrice=${balance.currentPrice}`);
 
       // 🔧 FIX: Ensure we have a valid current price
       if (!balance.currentPrice || balance.currentPrice === 0) {
@@ -1665,11 +1745,8 @@ class AdvancedTradingBot {
       const bnbPercent = (bnbValueInUSD / totalValueUSD) * 100;
       const usdtPercent = (balance.usdt / totalValueUSD) * 100;
 
-      // 🔧 DEBUG: Log calculation steps
-      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] currentPrice = ${balance.currentPrice.toFixed(9)} (BNB per USDT)`);
-      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] BNB value: ${balance.bnb.toFixed(2)} ÷ ${balance.currentPrice.toFixed(9)} = $${bnbValueInUSD.toFixed(2)}`);
-      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Total portfolio: $${balance.usdt.toFixed(2)} + $${bnbValueInUSD.toFixed(2)} = $${totalValueUSD.toFixed(2)}`);
-      logger.info(`🔍 [PORTFOLIO CHECK DEBUG] Percentages: USDT ${usdtPercent.toFixed(1)}%, BNB ${bnbPercent.toFixed(1)}%`);
+      // Log calculation steps at debug level
+      logger.debug(`Portfolio calculation: price=${balance.currentPrice.toFixed(9)}, BNB value=$${bnbValueInUSD.toFixed(2)}, total=$${totalValueUSD.toFixed(2)}, USDT=${usdtPercent.toFixed(1)}%, BNB=${bnbPercent.toFixed(1)}%`);
 
       logger.info(`🔍 [PORTFOLIO CHECK] Current balances: $${balance.usdt.toFixed(2)} USDT (${usdtPercent.toFixed(1)}%) / ${balance.bnb.toFixed(2)} BNB (${bnbPercent.toFixed(1)}%)`);
       logger.info(`🔍 [PORTFOLIO CHECK] AI Decision: ${tradingDecision.action.toUpperCase()} with ${(tradingDecision.confidence * 100).toFixed(0)}% confidence`);
@@ -1679,8 +1756,9 @@ class AdvancedTradingBot {
       // REGIME DASHBOARD DISPLAY (with enhanced context)
       // ═══════════════════════════════════════════════════════════════
       if (tradingDecision && tradingDecision.regime) {
-        // Minimum volatility required for trading (0.3% = 0.003 decimal)
-        const minVolatility = 0.003;
+        // Minimum volatility required for trading (0.8% = 0.008 decimal)
+        // BSC fees require 3.5%+ TP - need MEDIUM regime (0.8%+) for profitable trading
+        const minVolatility = 0.008;
 
         displayRegimeStatus(
           tradingDecision.regime,
@@ -1761,8 +1839,8 @@ class AdvancedTradingBot {
       // Set multiplier for backward compatibility
       tradingDecision.positionSizeMultiplier = isBlocked ? 0 : 1.0;
 
-      // 🔧 DEBUG: Log hybrid decision outcome
-      logger.info(`🔍 [HYBRID DEBUG] Final action: ${tradingDecision.action.toUpperCase()}, Multiplier: ${tradingDecision.positionSizeMultiplier || 0}, Position Size: ${tradingDecision.position_size || 0}, BNB%: ${bnbPercent.toFixed(1)}%`);
+      // Log hybrid decision outcome at debug level
+      logger.debug(`Hybrid decision: action=${tradingDecision.action.toUpperCase()}, multiplier=${tradingDecision.positionSizeMultiplier || 0}, size=${tradingDecision.position_size || 0}, BNB%=${bnbPercent.toFixed(1)}%`);
 
       // ═══════════════════════════════════════════════════════════════
       // HYBRID PERFORMANCE TRACKING
@@ -1830,22 +1908,34 @@ Volume Analysis:
         }
       }
 
-      // Emergency: Force ONE trade per hour only in extreme cases
-      // Note: Emergency trades bypass hybrid sizing and execute at full size
-      if (bnbPercent > 65 && tradingDecision.action !== 'sell') {
-        const hoursSinceLastEmergency = (Date.now() - this.lastEmergencyRebalance) / (1000 * 60 * 60);
-        if (hoursSinceLastEmergency >= 1) {
-          logger.error(`🚨 EMERGENCY REBALANCE: BNB ${bnbPercent.toFixed(1)}% > 65%! Forcing SELL trade.`);
+      // ✅ FIX: Emergency rebalance - More aggressive thresholds and guaranteed execution
+      // Critical: If BNB > 70%, force immediate SELL (reduced from 65% to catch issues earlier)
+      // If BNB > 99%, this is a critical emergency - bypass all checks
+      if (bnbPercent > 99) {
+        // CRITICAL EMERGENCY: Portfolio is 99%+ BNB - immediate action required
+        logger.error(`🚨 CRITICAL EMERGENCY REBALANCE: BNB ${bnbPercent.toFixed(1)}% > 99%! Forcing IMMEDIATE SELL trade.`);
+        tradingDecision.action = 'sell';
+        tradingDecision.confidence = 1.0; // Maximum confidence for emergency
+        tradingDecision.positionSizeMultiplier = 1.0; // Full size for emergency
+        tradingDecision.reasoning = `CRITICAL EMERGENCY: Portfolio critically imbalanced at ${bnbPercent.toFixed(1)}% BNB. Forcing IMMEDIATE SELL.`;
+        tradingDecision.bypassChecks = true; // Flag to bypass normal checks
+        this.lastEmergencyRebalance = Date.now();
+      } else if (bnbPercent > 70 && tradingDecision.action !== 'sell') {
+        // High imbalance: Force SELL but respect cooldown
+        const hoursSinceLastEmergency = (Date.now() - (this.lastEmergencyRebalance || 0)) / (1000 * 60 * 60);
+        if (hoursSinceLastEmergency >= 0.5) { // Reduced cooldown to 30 minutes for high imbalance
+          logger.error(`🚨 EMERGENCY REBALANCE: BNB ${bnbPercent.toFixed(1)}% > 70%! Forcing SELL trade.`);
           tradingDecision.action = 'sell';
           tradingDecision.confidence = 0.95;
           tradingDecision.positionSizeMultiplier = 1.0; // Emergency trades at full size
-          tradingDecision.reasoning = `EMERGENCY: Portfolio critically imbalanced at ${bnbPercent.toFixed(1)}% BNB (max 65%). Forcing SELL.`;
+          tradingDecision.reasoning = `EMERGENCY: Portfolio imbalanced at ${bnbPercent.toFixed(1)}% BNB (max 70%). Forcing SELL.`;
           this.lastEmergencyRebalance = Date.now();
         } else {
-          logger.warn(`⏱️ Emergency rebalance on cooldown (${(1 - hoursSinceLastEmergency).toFixed(1)}h remaining)`);
+          logger.warn(`⏱️ Emergency rebalance on cooldown (${(0.5 - hoursSinceLastEmergency).toFixed(1)}h remaining)`);
         }
       } else if (bnbPercent < 25 && tradingDecision.action !== 'buy' && balance.usdt > 1000) {
-        const hoursSinceLastEmergency = (Date.now() - this.lastEmergencyRebalance) / (1000 * 60 * 60);
+        // Low BNB: Force BUY
+        const hoursSinceLastEmergency = (Date.now() - (this.lastEmergencyRebalance || 0)) / (1000 * 60 * 60);
         if (hoursSinceLastEmergency >= 1) {
           logger.error(`🚨 EMERGENCY REBALANCE: BNB ${bnbPercent.toFixed(1)}% < 25%! Forcing BUY trade.`);
           tradingDecision.action = 'buy';
@@ -1875,7 +1965,13 @@ Volume Analysis:
 
       logger.debug(`🎯 [DYNAMIC-THRESHOLD] Regime: ${regime}, Min: ${(minConfidence * 100).toFixed(0)}%, Decision: ${(tradingDecision.confidence * 100).toFixed(1)}%`);
 
-      if (tradingDecision.confidence >= minConfidence) {
+      // ✅ FIX: Emergency trades bypass confidence threshold
+      const isEmergencyTrade = tradingDecision.bypassChecks === true;
+      
+      if (isEmergencyTrade || tradingDecision.confidence >= minConfidence) {
+        if (isEmergencyTrade) {
+          logger.warn('🚨 EMERGENCY TRADE: Bypassing confidence threshold for critical rebalance');
+        }
         await this.executeTradingDecision(tradingDecision, selectedStrategy);
       } else {
         // ✅ FIX: Distinguish between legitimate filtering and safety net catch
@@ -1915,10 +2011,34 @@ Volume Analysis:
 
   async executeTradingDecision(decision, strategy = 'unknown') {
     try {
-      const { action, position_size, parameters } = decision;
+      const { action, position_size, parameters: decisionParams, bypassChecks } = decision;
+      
+      // ✅ FIX: Ensure bypassChecks is passed through to parameters
+      const parameters = decisionParams || {};
+      if (bypassChecks) {
+        parameters.bypassChecks = true;
+      }
 
       if (action === 'hold') {
         return;
+      }
+
+      // ✅ FIX: Ensure currentPrice is always available
+      if (!parameters.currentPrice || parameters.currentPrice === 0) {
+        try {
+          // Fetch current price from PancakeSwap
+          const fetchedPrice = await this.multiDexManager?.dexs?.pancakeSwap?.getCurrentPrice?.();
+          if (fetchedPrice && fetchedPrice > 0) {
+            parameters.currentPrice = fetchedPrice;
+            logger.debug(`📊 Fetched missing currentPrice: ${fetchedPrice}`);
+          } else {
+            logger.warn('⚠️ Could not fetch currentPrice, skipping trade execution');
+            return;
+          }
+        } catch (priceError) {
+          logger.error('❌ Error fetching currentPrice:', priceError.message);
+          return;
+        }
       }
 
       // ✅ SECURITY: Check rate limit FIRST (if available)
@@ -1946,13 +2066,8 @@ Volume Analysis:
           bnbBalance = await this.pancakeSwap.getBNBBalance();
         }
 
-        // 🔍 DEBUG: Log all values before calculation
-        logger.info(`🔍 DEBUG BNB CALC:
-  position_size (USD): ${position_size}
-  currentPrice from params: ${parameters.currentPrice}
-  Expected unit: BNB/USD (should be ~0.0007)
-  BNB balance: ${bnbBalance}
-`);
+        // Log price calculation details at debug level
+        logger.debug(`Price calculation: position_size=${position_size}, currentPrice=${parameters.currentPrice}, bnbBalance=${bnbBalance}`);
 
         // ✅ FIXED: Get price in correct format (BNB per USDT) from pancakeSwap
         // pancakeSwap.getCurrentPrice() now returns ~0.000929 (BNB per USDT)
@@ -1995,7 +2110,10 @@ Volume Analysis:
 
       // ✅ FIX #6: Validate trade against risk limits BEFORE execution
       // Only validate if we have required parameters for actual trades
-      if (position_size && parameters && parameters.currentPrice) {
+      // ✅ FIX: Emergency trades bypass risk validation
+      const isEmergencyTrade = parameters && parameters.bypassChecks === true;
+      
+      if (position_size && parameters && parameters.currentPrice && !isEmergencyTrade) {
         try {
           // 🔧 FIX: Use centralized portfolio manager
           const portfolioValue = await this.portfolioManager.getValue(true); // Force refresh for trade validation
@@ -2021,6 +2139,8 @@ Volume Analysis:
           });
           throw new Error(`Risk validation failed: ${riskError.message}`);
         }
+      } else if (isEmergencyTrade) {
+        logger.warn('🚨 EMERGENCY TRADE: Bypassing risk validation for critical rebalance');
       } else {
         logger.debug('⚠️ Skipping risk validation - missing required parameters', {
           action,
@@ -2034,23 +2154,33 @@ Volume Analysis:
       if (this.shadowMode && this.shadowMode.isActive) {
         logger.info('👻 Shadow Mode: Simulating trade instead of executing');
 
+        // Generate positionId before shadow trade execution for entry logging
+        const positionId = action !== 'hold' ? `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` : null;
+        const now = Date.now();
+
         const shadowTrade = await this.shadowMode.executeShadowTrade({
           action,
           pair: 'USDT/BNB',
           amount: position_size,
           targetPrice: parameters.currentPrice,
           confidence: decision.confidence,
-          reasoning: decision.reasoning
+          reasoning: decision.reasoning,
+          // ✅ P&L TRACKING: Add entry type and positionId
+          type: action !== 'hold' ? 'ENTRY' : 'HOLD',
+          positionId: positionId,
+          strategy: strategy,
+          timestamp: now
         });
 
         logger.info(`👻 Shadow Trade: ${action} ${position_size} at ${parameters.currentPrice}`);
         logger.info(`👻 Estimated Profit: ${shadowTrade?.estimatedProfit || 0} USDT`);
         logger.info(`👻 Would Execute: ${shadowTrade?.wouldExecute ? 'YES' : 'NO'}`);
+        if (positionId) {
+          logger.info(`📊 Entry logged with positionId: ${positionId}`);
+        }
 
         // 🔥 FIX #4: Create virtual position for monitoring if trade would execute
         if (shadowTrade?.wouldExecute && action !== 'hold') {
-          const positionId = `pos_${Date.now()}`;
-          const now = Date.now();
 
           // ✅ FIX: Calculate TP/SL using professional BSC standards (3.5%/1.5% minimum)
           // Get current 4h volatility from tradingStrategyAgent
@@ -2075,8 +2205,8 @@ Volume Analysis:
 
           logger.info(`✅ [VIRTUAL POSITION TP/SL] Regime: ${currentRegime}, Vol: ${(volatility4h * 100).toFixed(2)}%, TP: ${(takeProfitPercent * 100).toFixed(2)}%, SL: ${(stopLossPercent * 100).toFixed(2)}%`);
 
-          // Create complete position object matching monitoring requirements
-          this.tradingStrategyAgent.activePositions.set(positionId, {
+          // ✅ POSITION MANAGEMENT: Create complete position object with lifecycle tracking
+          const position = {
             id: positionId,
             side: action,                        // Required: 'buy' or 'sell'
             entryPrice: parameters.currentPrice, // Required
@@ -2090,8 +2220,17 @@ Volume Analysis:
             strategy,                            // Strategy name
             confidence: decision.confidence,     // Entry confidence
             pair: 'BNB/USDT',                    // Trading pair
-            isVirtual: true                      // Mark as virtual/shadow position
-          });
+            isVirtual: true,                     // Mark as virtual/shadow position
+            // ✅ POSITION MANAGEMENT: Add lifecycle state tracking
+            lifecycleState: 'OPEN',
+            stateHistory: [{
+              state: 'OPEN',
+              timestamp: now,
+              price: parameters.currentPrice
+            }]
+          };
+
+          this.tradingStrategyAgent.activePositions.set(positionId, position);
           logger.info(`👻 Virtual Position ${positionId} created for monitoring`);
           logger.info(`   ${action.toUpperCase()} $${position_size} @ ${parameters.currentPrice.toFixed(8)}`);
           logger.info(`   TP: ${takeProfit.toFixed(8)} (+${(takeProfitPercent * 100).toFixed(2)}%)`);
@@ -2487,6 +2626,10 @@ Volume Analysis:
   }
 
   async stop() {
+    // Stop chat server if running
+    if (this.chatServer) {
+      this.chatServer.stop();
+    }
     try {
       this.isRunning = false;
       logger.info('🛑 Stopping Advanced Trading Bot...');

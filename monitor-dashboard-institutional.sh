@@ -2,8 +2,12 @@
 # ═══════════════════════════════════════════════════════════════
 # algoQbot INSTITUTIONAL DASHBOARD
 # 6-Indicator Professional System with Institutional Tools
-# Updated: November 13, 2025
+# Updated: December 4, 2025
+# Auto-refresh: Every 30 seconds
 # ═══════════════════════════════════════════════════════════════
+
+# ✅ AUTO-REFRESH: Set refresh interval (30 seconds)
+REFRESH_INTERVAL=30
 
 # Colors
 GREEN='\033[0;32m'
@@ -15,10 +19,29 @@ MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
+# ✅ AUTO-REFRESH: Set refresh interval (30 seconds)
+REFRESH_INTERVAL=30
+
+# ✅ AUTO-REFRESH: Main loop - refresh every 30 seconds
+while true; do
 clear
 
+# ✅ FIX: Check both log files - .log.1 (rotated) and .log (current)
 # Use the numbered log file (.1 extension) which contains the actual runtime data
 LOGFILE="logs/combined-$(date +%Y-%m-%d).log.1"
+if [ ! -f "$LOGFILE" ] || [ ! -s "$LOGFILE" ]; then
+  # Fallback to main log file if .1 doesn't exist or is empty
+  LOGFILE="logs/combined-$(date +%Y-%m-%d).log"
+fi
+
+# ✅ ENHANCEMENT: If still no file, try to find the most recent log file
+if [ ! -f "$LOGFILE" ]; then
+  LOGFILE=$(ls -t logs/combined-*.log* 2>/dev/null | head -1)
+  if [ -z "$LOGFILE" ]; then
+    echo "⚠️  No log files found in logs/ directory"
+    exit 1
+  fi
+fi
 
 # Helper function to parse JSON log messages
 parse_log_json() {
@@ -43,10 +66,12 @@ echo ""
 echo -e "${CYAN}${BOLD}[1] BOT STATUS${NC}"
 echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
 
-if ps aux | grep "start-shadow-mode.js" | grep -v grep > /dev/null; then
-    PID=$(ps aux | grep "start-shadow-mode.js" | grep -v grep | awk '{print $2}' | head -1)
-    CPU=$(ps aux | grep "start-shadow-mode.js" | grep -v grep | awk '{print $3}' | head -1)
-    MEM=$(ps aux | grep "start-shadow-mode.js" | grep -v grep | awk '{print $4}' | head -1)
+# Check for both start-shadow-mode.js AND start-with-web-interface.js
+BOT_PROCESS=$(ps aux | grep -E "start-shadow-mode.js|start-with-web-interface.js" | grep -v grep | head -1)
+if [ ! -z "$BOT_PROCESS" ]; then
+    PID=$(echo "$BOT_PROCESS" | awk '{print $2}')
+    CPU=$(echo "$BOT_PROCESS" | awk '{print $3}')
+    MEM=$(echo "$BOT_PROCESS" | awk '{print $4}')
     UPTIME=$(ps -p $PID -o etime= 2>/dev/null | xargs)
     echo -e "  Status:      ${GREEN}●${NC} ${GREEN}Running${NC}"
     echo -e "  PID:         ${BLUE}$PID${NC}"
@@ -55,7 +80,7 @@ if ps aux | grep "start-shadow-mode.js" | grep -v grep > /dev/null; then
     echo -e "  Memory:      ${BLUE}${MEM}%${NC}"
 else
     echo -e "  Status:      ${RED}●${NC} ${RED}Not Running${NC}"
-    echo -e "  ${YELLOW}Start with: npm run start-shadow${NC}"
+    echo -e "  ${YELLOW}Start with: npm run start-web${NC}"
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -151,41 +176,45 @@ echo ""
 echo -e "${CYAN}  📊 INSTITUTIONAL TOOLS (56% total weight):${NC}"
 echo -e "${CYAN}  ────────────────────────────────────────────────────────────${NC}"
 
-# Order Flow (20%)
-ORDER_FLOW_LINE=$(grep "\[1/6\] Order Flow" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$ORDER_FLOW_LINE" ]; then
-    ORDER_FLOW_MSG=$(echo "$ORDER_FLOW_LINE" | jq -r '.message' 2>/dev/null)
-    TIMESTAMP=$(echo "$ORDER_FLOW_LINE" | jq -r '.timestamp' 2>/dev/null)
-    SCORE=$(echo "$ORDER_FLOW_MSG" | sed 's/.*Order Flow (20%): //' | sed 's/ |.*//')
-    DELTA=$(echo "$ORDER_FLOW_MSG" | sed 's/.*Delta: //')
-    echo -e "  ${BLUE}[1/6] Order Flow (20%):${NC}    $SCORE | Delta: $DELTA"
-    echo -e "       ${BLUE}Last updated: $TIMESTAMP${NC}"
+# ✅ FIX: Read from monitoring-summary.json first (more reliable)
+MONITORING_JSON="data/monitoring-summary.json"
+if [ -f "$MONITORING_JSON" ]; then
+    ORDER_FLOW_SCORE=$(jq -r '.institutionalIndicators.orderFlow.score // empty' "$MONITORING_JSON" 2>/dev/null)
+    ORDER_FLOW_DELTA=$(jq -r '.institutionalIndicators.orderFlow.delta // empty' "$MONITORING_JSON" 2>/dev/null)
+    
+    if [ ! -z "$ORDER_FLOW_SCORE" ] && [ "$ORDER_FLOW_SCORE" != "null" ] && [ "$ORDER_FLOW_SCORE" != "" ]; then
+        echo -e "  ${BLUE}[1/6] Order Flow (20%):${NC}    ${ORDER_FLOW_SCORE} | Delta: ${ORDER_FLOW_DELTA}%"
+    else
+        echo -e "  ${YELLOW}[1/6] Order Flow:${NC}           Waiting for data..."
+    fi
 else
     echo -e "  ${YELLOW}[1/6] Order Flow:${NC}           Waiting for data..."
 fi
 
-# Volume Profile (18%)
-VOL_PROF_LINE=$(grep "\[2/6\] Volume Profile" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$VOL_PROF_LINE" ]; then
-    VOL_PROF_MSG=$(echo "$VOL_PROF_LINE" | jq -r '.message' 2>/dev/null)
-    TIMESTAMP=$(echo "$VOL_PROF_LINE" | jq -r '.timestamp' 2>/dev/null)
-    SCORE=$(echo "$VOL_PROF_MSG" | sed 's/.*Volume Profile (18%): //' | sed 's/ |.*//')
-    POC=$(echo "$VOL_PROF_MSG" | sed 's/.*POC: //')
-    echo -e "  ${BLUE}[2/6] Volume Profile (18%):${NC} $SCORE | POC: $POC"
-    echo -e "       ${BLUE}Last updated: $TIMESTAMP${NC}"
+# ✅ FIX: Read from monitoring-summary.json
+if [ -f "$MONITORING_JSON" ]; then
+    VOL_PROF_SCORE=$(jq -r '.institutionalIndicators.volumeProfile.score // empty' "$MONITORING_JSON" 2>/dev/null)
+    VOL_PROF_POC=$(jq -r '.institutionalIndicators.volumeProfile.poc // empty' "$MONITORING_JSON" 2>/dev/null)
+    
+    if [ ! -z "$VOL_PROF_SCORE" ] && [ "$VOL_PROF_SCORE" != "null" ] && [ "$VOL_PROF_SCORE" != "" ]; then
+        echo -e "  ${BLUE}[2/6] Volume Profile (18%):${NC} ${VOL_PROF_SCORE} | POC: ${VOL_PROF_POC}"
+    else
+        echo -e "  ${YELLOW}[2/6] Volume Profile:${NC}       Waiting for data..."
+    fi
 else
     echo -e "  ${YELLOW}[2/6] Volume Profile:${NC}       Waiting for data..."
 fi
 
-# Liquidity (18%)
-LIQUIDITY_LINE=$(grep "\[3/6\] Liquidity" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$LIQUIDITY_LINE" ]; then
-    LIQUIDITY_MSG=$(echo "$LIQUIDITY_LINE" | jq -r '.message' 2>/dev/null)
-    TIMESTAMP=$(echo "$LIQUIDITY_LINE" | jq -r '.timestamp' 2>/dev/null)
-    SCORE=$(echo "$LIQUIDITY_MSG" | sed 's/.*Liquidity (18%): //' | sed 's/ |.*//')
-    RATIO=$(echo "$LIQUIDITY_MSG" | sed 's/.*Ratio: //')
-    echo -e "  ${BLUE}[3/6] Liquidity (18%):${NC}      $SCORE | Ratio: $RATIO"
-    echo -e "       ${BLUE}Last updated: $TIMESTAMP${NC}"
+# ✅ FIX: Read from monitoring-summary.json
+if [ -f "$MONITORING_JSON" ]; then
+    LIQUIDITY_SCORE=$(jq -r '.institutionalIndicators.liquidity.score // empty' "$MONITORING_JSON" 2>/dev/null)
+    LIQUIDITY_RATIO=$(jq -r '.institutionalIndicators.liquidity.ratio // empty' "$MONITORING_JSON" 2>/dev/null)
+    
+    if [ ! -z "$LIQUIDITY_SCORE" ] && [ "$LIQUIDITY_SCORE" != "null" ] && [ "$LIQUIDITY_SCORE" != "" ]; then
+        echo -e "  ${BLUE}[3/6] Liquidity (18%):${NC}      ${LIQUIDITY_SCORE} | Ratio: ${LIQUIDITY_RATIO}%"
+    else
+        echo -e "  ${YELLOW}[3/6] Liquidity:${NC}            Waiting for data..."
+    fi
 else
     echo -e "  ${YELLOW}[3/6] Liquidity:${NC}            Waiting for data..."
 fi
@@ -194,65 +223,58 @@ echo ""
 echo -e "${CYAN}  📊 TECHNICAL TOOLS (44% total weight):${NC}"
 echo -e "${CYAN}  ────────────────────────────────────────────────────────────${NC}"
 
-# VWAP (15%)
-VWAP_LINE=$(grep "\[4/6\] VWAP" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$VWAP_LINE" ]; then
-    VWAP_MSG=$(echo "$VWAP_LINE" | jq -r '.message' 2>/dev/null)
-    SCORE=$(echo "$VWAP_MSG" | sed 's/.*VWAP (15%): //')
-    echo -e "  ${BLUE}[4/6] VWAP (15%):${NC}           $SCORE"
+# ✅ FIX: Read from monitoring-summary.json
+if [ -f "$MONITORING_JSON" ]; then
+    VWAP_SCORE=$(jq -r '.institutionalIndicators.vwap.score // empty' "$MONITORING_JSON" 2>/dev/null)
+    if [ ! -z "$VWAP_SCORE" ] && [ "$VWAP_SCORE" != "null" ] && [ "$VWAP_SCORE" != "" ]; then
+        echo -e "  ${BLUE}[4/6] VWAP (15%):${NC}           ${VWAP_SCORE}"
+    else
+        echo -e "  ${YELLOW}[4/6] VWAP:${NC}                 Waiting for data..."
+    fi
+    
+    ATR_SCORE=$(jq -r '.institutionalIndicators.atr.score // empty' "$MONITORING_JSON" 2>/dev/null)
+    if [ ! -z "$ATR_SCORE" ] && [ "$ATR_SCORE" != "null" ] && [ "$ATR_SCORE" != "" ]; then
+        echo -e "  ${BLUE}[5/6] ATR (12%):${NC}            ${ATR_SCORE}"
+    else
+        echo -e "  ${YELLOW}[5/6] ATR:${NC}                  Waiting for data..."
+    fi
+    
+    REGIME_SCORE=$(jq -r '.institutionalIndicators.regime.score // empty' "$MONITORING_JSON" 2>/dev/null)
+    if [ ! -z "$REGIME_SCORE" ] && [ "$REGIME_SCORE" != "null" ] && [ "$REGIME_SCORE" != "" ]; then
+        echo -e "  ${BLUE}[6/6] Regime (9%):${NC}          ${REGIME_SCORE}"
+    else
+        echo -e "  ${YELLOW}[6/6] Regime:${NC}               Waiting for data..."
+    fi
 else
     echo -e "  ${YELLOW}[4/6] VWAP:${NC}                 Waiting for data..."
-fi
-
-# ATR (12%)
-ATR_LINE=$(grep "\[5/6\] ATR" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$ATR_LINE" ]; then
-    ATR_MSG=$(echo "$ATR_LINE" | jq -r '.message' 2>/dev/null)
-    SCORE=$(echo "$ATR_MSG" | sed 's/.*ATR (12%): //')
-    echo -e "  ${BLUE}[5/6] ATR (12%):${NC}            $SCORE"
-else
     echo -e "  ${YELLOW}[5/6] ATR:${NC}                  Waiting for data..."
-fi
-
-# Regime (9%)
-REGIME_IND_LINE=$(grep "\[6/6\] Regime" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$REGIME_IND_LINE" ]; then
-    REGIME_IND_MSG=$(echo "$REGIME_IND_LINE" | jq -r '.message' 2>/dev/null)
-    SCORE=$(echo "$REGIME_IND_MSG" | sed 's/.*Regime (9%): //')
-    echo -e "  ${BLUE}[6/6] Regime (9%):${NC}          $SCORE"
-else
     echo -e "  ${YELLOW}[6/6] Regime:${NC}               Waiting for data..."
 fi
 
-# Final Confidence
+# ✅ FIX: Final Confidence - Read from monitoring-summary.json
 echo ""
 echo -e "${CYAN}  ────────────────────────────────────────────────────────────${NC}"
-FINAL_CONF_LINE=$(grep "FINAL.*INSTITUTIONAL.*CONFIDENCE" "$LOGFILE" 2>/dev/null | tail -1)
-if [ ! -z "$FINAL_CONF_LINE" ]; then
-    FINAL_CONF_MSG=$(echo "$FINAL_CONF_LINE" | jq -r '.message' 2>/dev/null)
-    TIMESTAMP=$(echo "$FINAL_CONF_LINE" | jq -r '.timestamp' 2>/dev/null)
-    FINAL_CONF=$(echo "$FINAL_CONF_MSG" | sed 's/.*CONFIDENCE: //')
-
-    # Parse confidence value
-    CONF_VAL=$(echo "$FINAL_CONF" | tr -d '"%' | tr -d ',' | tr -d '"')
-
-    # Color code based on value
-    if (( $(echo "$CONF_VAL >= 70" | bc -l 2>/dev/null || echo 0) )); then
-        echo -e "  ${GREEN}✅ FINAL INSTITUTIONAL CONFIDENCE: $FINAL_CONF${NC}"
-    elif (( $(echo "$CONF_VAL >= 60" | bc -l 2>/dev/null || echo 0) )); then
-        echo -e "  ${YELLOW}✅ FINAL INSTITUTIONAL CONFIDENCE: $FINAL_CONF${NC}"
+if [ -f "$MONITORING_JSON" ]; then
+    FINAL_CONF=$(jq -r '.institutionalIndicators.finalConfidence // empty' "$MONITORING_JSON" 2>/dev/null)
+    CONF_VAL=$(echo "$FINAL_CONF" | grep -o '[0-9.]*' | head -1)
+    
+    if [ ! -z "$CONF_VAL" ] && [ "$CONF_VAL" != "null" ] && [ "$CONF_VAL" != "" ]; then
+        CONF_PERCENT="${CONF_VAL}%"
+        if (( $(echo "$CONF_VAL >= 70" | bc -l 2>/dev/null || echo 0) )); then
+            echo -e "  ${GREEN}✅ FINAL INSTITUTIONAL CONFIDENCE: ${CONF_PERCENT}${NC}"
+        elif (( $(echo "$CONF_VAL >= 60" | bc -l 2>/dev/null || echo 0) )); then
+            echo -e "  ${YELLOW}✅ FINAL INSTITUTIONAL CONFIDENCE: ${CONF_PERCENT}${NC}"
+        else
+            echo -e "  ${BLUE}✅ FINAL INSTITUTIONAL CONFIDENCE: ${CONF_PERCENT}${NC}"
+        fi
+        
+        # Show timestamp from JSON
+        JSON_TIMESTAMP=$(jq -r '.timestamp // empty' "$MONITORING_JSON" 2>/dev/null)
+        if [ ! -z "$JSON_TIMESTAMP" ] && [ "$JSON_TIMESTAMP" != "null" ]; then
+            echo -e "       ${BLUE}Last updated: $JSON_TIMESTAMP${NC}"
+        fi
     else
-        echo -e "  ${BLUE}✅ FINAL INSTITUTIONAL CONFIDENCE: $FINAL_CONF${NC}"
-    fi
-
-    echo -e "       ${BLUE}Last calculated: $TIMESTAMP${NC}"
-
-    # Show breakdown if available
-    INST_CONTRIB_LINE=$(grep "Institutional tools:" "$LOGFILE" 2>/dev/null | tail -1)
-    if [ ! -z "$INST_CONTRIB_LINE" ]; then
-        INST_CONTRIB_MSG=$(echo "$INST_CONTRIB_LINE" | jq -r '.message' 2>/dev/null)
-        INST_CONTRIB=$(echo "$INST_CONTRIB_MSG" | sed 's/.*Institutional tools: //' | sed 's/ .*//')
-        echo -e "  ${CYAN}📊 Institutional contribution: $INST_CONTRIB${NC}"
+        echo -e "  ${YELLOW}⏳ Waiting for confidence calculation...${NC}"
     fi
 else
     echo -e "  ${YELLOW}⏳ Waiting for confidence calculation...${NC}"
@@ -372,5 +394,10 @@ fi
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}Dashboard: monitor-dashboard-institutional.sh${NC}"
-echo -e "${BLUE}Refresh: watch -n 10 ./monitor-dashboard-institutional.sh${NC}"
+echo -e "${GREEN}Auto-refreshing every ${REFRESH_INTERVAL} seconds...${NC}"
+echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
 echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+
+# ✅ AUTO-REFRESH: Wait 30 seconds before next refresh
+sleep $REFRESH_INTERVAL
+done

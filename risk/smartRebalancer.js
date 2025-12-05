@@ -15,13 +15,49 @@ class SmartRebalancer {
   }
 
   /**
+   * Get current price safely with fallback
+   * 
+   * Provides robust price fetching with multiple fallback mechanisms.
+   * Used by rebalancer to ensure it can always get current price for calculations.
+   * 
+   * @returns {Promise<number>} Current BNB price (BNB per USDT)
+   * @throws {Error} Logs warning and returns fallback price if all methods fail
+   */
+  async getCurrentPrice() {
+    try {
+      // ✅ FIX: Try multiple methods to get current price
+      if (this.bot && this.bot.multiDexManager && this.bot.multiDexManager.dexs && this.bot.multiDexManager.dexs.pancakeSwap) {
+        if (typeof this.bot.multiDexManager.dexs.pancakeSwap.getCurrentPrice === 'function') {
+          return await this.bot.multiDexManager.dexs.pancakeSwap.getCurrentPrice();
+        }
+      }
+      
+      // Fallback: Try getBalance which includes currentPrice
+      const balances = await this.bot.getBalance();
+      if (balances && balances.currentPrice) {
+        return balances.currentPrice;
+      }
+      
+      throw new Error('Unable to get current price from any source');
+    } catch (error) {
+      logger.error(`Error getting current price: ${error.message}`);
+      // Return a default price if all methods fail (shouldn't happen in production)
+      logger.warn('⚠️ Using fallback price 0.001 (BNB/USDT)');
+      return 0.001;
+    }
+  }
+
+  /**
    * Check if portfolio needs rebalancing
    * @returns {boolean} True if rebalance needed
    */
   async shouldRebalance() {
     try {
-      const balances = await this.bot.getBalance();
-      const currentPrice = await this.bot.getCurrentPrice();
+      // ✅ OPTIMIZATION: Parallelize balance and price fetching
+      const [balances, currentPrice] = await Promise.all([
+        this.bot.getBalance(),
+        this.getCurrentPrice()
+      ]);
 
       const usdtValue = balances.usdt;
       const bnbValue = balances.bnb / currentPrice;
@@ -71,8 +107,11 @@ class SmartRebalancer {
     try {
       logger.info('🔄 Starting portfolio rebalance...');
 
-      const balances = await this.bot.getBalance();
-      const currentPrice = await this.bot.getCurrentPrice();
+      // ✅ OPTIMIZATION: Parallelize balance and price fetching
+      const [balances, currentPrice] = await Promise.all([
+        this.bot.getBalance(),
+        this.getCurrentPrice()
+      ]);
 
       const usdtValue = balances.usdt;
       const bnbValue = balances.bnb / currentPrice;
@@ -142,7 +181,7 @@ class SmartRebalancer {
   async getPortfolioStats() {
     try {
       const balances = await this.bot.getBalance();
-      const currentPrice = await this.bot.getCurrentPrice();
+      const currentPrice = await this.getCurrentPrice();
 
       const usdtValue = balances.usdt;
       const bnbValue = balances.bnb / currentPrice;
