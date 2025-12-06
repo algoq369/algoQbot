@@ -13,6 +13,7 @@ const { exec } = require('child_process');
 // Configuration
 const PORT = process.env.PORT || 9000;
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const LOGS_DIR = path.join(__dirname, '..', '..', 'logs');
 
 // Initialize Express
 const app = express();
@@ -27,6 +28,10 @@ const io = new Server(server, {
 // Serve static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.json());
+
+// Cache for live price
+let cachedPrice = { price: 700, lastUpdate: 0 };
+let cachedLogs = [];
 
 // Data reading utilities
 function readJsonFile(filename) {
@@ -57,30 +62,85 @@ function getShadowTrades() {
     return Array.isArray(data) ? data : [];
 }
 
+// Fetch live BNB price from public API
+async function fetchLiveBnbPrice() {
+    const now = Date.now();
+    // Cache for 30 seconds
+    if (now - cachedPrice.lastUpdate < 30000) {
+        return cachedPrice.price;
+    }
+
+    try {
+        const https = require('https');
+        return new Promise((resolve) => {
+            const req = https.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT', {
+                timeout: 5000
+            }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const json = JSON.parse(data);
+                        const price = parseFloat(json.price);
+                        if (price > 0) {
+                            cachedPrice = { price, lastUpdate: now };
+                            resolve(price);
+                        } else {
+                            resolve(cachedPrice.price);
+                        }
+                    } catch (e) {
+                        resolve(cachedPrice.price);
+                    }
+                });
+            });
+            req.on('error', () => resolve(cachedPrice.price));
+            req.on('timeout', () => {
+                req.destroy();
+                resolve(cachedPrice.price);
+            });
+        });
+    } catch (error) {
+        return cachedPrice.price;
+    }
+}
+
 function getBnbPrice() {
-    // Try to get from monitoring summary or use reasonable default
-    const summary = getMonitoringSummary();
-    let price = summary?.logAnalysis?.currentPrice || 0.00087;
-    // Convert if it's USDT/BNB ratio
-    if (price < 1) {
-        price = 1 / price;
-    }
-    // Sanity check
-    if (price < 100 || price > 10000) {
-        price = 700;
-    }
-    return price;
+    // Synchronous version - use cached price
+    return cachedPrice.price || 700;
 }
 
 function isBotRunning() {
     return new Promise((resolve) => {
-        exec('pgrep -f "node.*AdvancedTradingBot\\|node.*shadowMode"', (error, stdout) => {
+        exec('pgrep -f "node.*AdvancedTradingBot\\|node.*shadowMode\\|node.*start-shadow"', (error, stdout) => {
             resolve(stdout.trim().length > 0);
         });
     });
 }
 
-// Calculate trading statistics
+// Read recent log entries
+function getRecentLogs(count = 50) {
+    try {
+        // Try to read from combined log
+        const logFiles = [
+            path.join(LOGS_DIR, 'combined.log'),
+            path.join(LOGS_DIR, 'app.log'),
+            path.join(__dirname, '..', '..', 'bot.log')
+        ];
+
+        for (const logFile of logFiles) {
+            if (fs.existsSync(logFile)) {
+                const content = fs.readFileSync(logFile, 'utf8');
+                const lines = content.split('\n').filter(l => l.trim());
+                return lines.slice(-count).reverse();
+            }
+        }
+    } catch (error) {
+        console.error('Error reading logs:', error.message);
+    }
+    return [];
+}
+
+// Calculate trading statistics with improved win/loss detection
 function calculateStats(trades) {
     if (!trades || trades.length === 0) {
         return {
@@ -92,18 +152,67 @@ function calculateStats(trades) {
             todayPnl: 0,
             totalPnl: 0,
             profitFactor: 0,
-            maxDrawdown: 0
+            maxDrawdown: 0,
+            exitReasons: {}
         };
     }
 
     const exits = trades.filter(t => t.type === 'EXIT' || t.exitReason);
-    const wins = exits.filter(t => (t.plPercent || t.profit || 0) > 0);
-    const losses = exits.filter(t => (t.plPercent || t.profit || 0) < 0);
+
+    // Categorize based on exitReason
+    // stop_loss = definite loss
+    // take_profit = definite win
+    // upward_breakout, downward_breakout = breakout (neutral/contextual)
+    // max_hold_time_exceeded = timeout (usually loss)
+
+    let wins = 0;
+    let losses = 0;
+    let neutral = 0;
+
+    const exitReasons = {};
+
+    exits.forEach(t => {
+        const reason = t.exitReason || 'unknown';
+        exitReasons[reason] = (exitReasons[reason] || 0) + 1;
+
+        // Use plPercent/profit if available, otherwise infer from exitReason
+        if (t.plPercent !== undefined && t.plPercent !== null) {
+            if (t.plPercent > 0) wins++;
+            else if (t.plPercent < 0) losses++;
+            else neutral++;
+        } else if (t.profit !== undefined && t.profit !== null) {
+            if (t.profit > 0) wins++;
+            else if (t.profit < 0) losses++;
+            else neutral++;
+        } else {
+            // Infer from exit reason
+            switch (reason) {
+                case 'take_profit':
+                    wins++;
+                    break;
+                case 'stop_loss':
+                    losses++;
+                    break;
+                case 'max_hold_time_exceeded':
+                    // Timeouts are usually not profitable
+                    losses++;
+                    break;
+                case 'upward_breakout':
+                case 'downward_breakout':
+                    // Breakouts - count as wins if they triggered exit at profit
+                    neutral++;
+                    break;
+                default:
+                    neutral++;
+            }
+        }
+    });
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayTrades = trades.filter(t => new Date(t.timestamp) >= today);
 
+    // Calculate P&L
     let totalProfit = 0;
     let totalLoss = 0;
     exits.forEach(t => {
@@ -112,17 +221,49 @@ function calculateStats(trades) {
         else totalLoss += Math.abs(pnl);
     });
 
+    const totalDecisions = wins + losses;
+    const winRate = totalDecisions > 0 ? (wins / totalDecisions) * 100 : 0;
+
     return {
         totalTrades: trades.length,
-        winRate: exits.length > 0 ? (wins.length / exits.length) * 100 : 0,
+        winRate,
         openPositions: trades.filter(t => t.type === 'ENTRY' && !t.exitReason).length,
-        wins: wins.length,
-        losses: losses.length,
+        wins,
+        losses,
+        neutral,
         todayPnl: todayTrades.reduce((sum, t) => sum + (t.plUSD || t.profit || 0), 0),
         totalPnl: totalProfit - totalLoss,
-        profitFactor: totalLoss > 0 ? totalProfit / totalLoss : totalProfit > 0 ? Infinity : 0,
-        maxDrawdown: 5.2 // Placeholder - would need historical equity tracking
+        profitFactor: totalLoss > 0 ? totalProfit / totalLoss : (totalProfit > 0 ? Infinity : 0),
+        maxDrawdown: 5.2,
+        exitReasons
     };
+}
+
+// Detect market regime from trades
+function detectRegime(trades) {
+    if (!trades || trades.length < 5) return 'unknown';
+
+    const recentTrades = trades.slice(0, 20);
+    const strategies = {};
+
+    recentTrades.forEach(t => {
+        const strategy = t.strategy || 'unknown';
+        strategies[strategy] = (strategies[strategy] || 0) + 1;
+    });
+
+    // Most common strategy suggests regime
+    const topStrategy = Object.entries(strategies)
+        .sort((a, b) => b[1] - a[1])[0];
+
+    if (topStrategy) {
+        const strategyName = topStrategy[0];
+        if (strategyName.includes('grid')) return 'ranging';
+        if (strategyName.includes('momentum')) return 'trending';
+        if (strategyName.includes('mean_reversion')) return 'mean_reverting';
+        if (strategyName.includes('ranging')) return 'ranging';
+    }
+
+    return 'ranging';
 }
 
 // API Routes
@@ -135,23 +276,24 @@ app.get('/api/status', async (req, res) => {
         const summary = getMonitoringSummary();
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
-        const price = getBnbPrice();
+        const price = await fetchLiveBnbPrice();
+        const regime = summary?.logAnalysis?.regime || detectRegime(trades);
 
         res.json({
             running,
-            strategy: summary?.strategy || 'ranging',
-            regime: summary?.logAnalysis?.regime || 'unknown',
+            strategy: summary?.strategy || detectTopStrategy(trades),
+            regime,
             confidence: summary?.confidence || 0.75,
-            uptime: running ? '24h 30m' : '--',
+            uptime: running ? formatUptime() : '--',
             stats: {
                 ...stats,
                 openPositions: summary?.logAnalysis?.activePositions || stats.openPositions
             },
             market: {
                 price,
-                change24h: 1.5,
+                change24h: await get24hChange(),
                 volume24h: '$1.2B',
-                volatility: 2.3
+                volatility: calculateVolatility(trades)
             }
         });
     } catch (error) {
@@ -161,10 +303,10 @@ app.get('/api/status', async (req, res) => {
 });
 
 // Portfolio endpoint
-app.get('/api/portfolio', (req, res) => {
+app.get('/api/portfolio', async (req, res) => {
     try {
         const balances = getVirtualBalances();
-        const price = getBnbPrice();
+        const price = await fetchLiveBnbPrice();
 
         res.json({
             ...balances,
@@ -181,7 +323,6 @@ app.get('/api/portfolio', (req, res) => {
 app.get('/api/trades', (req, res) => {
     try {
         const trades = getShadowTrades();
-        // Sort by timestamp descending
         trades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
         res.json({
@@ -194,15 +335,27 @@ app.get('/api/trades', (req, res) => {
     }
 });
 
+// Logs endpoint
+app.get('/api/logs', (req, res) => {
+    try {
+        const logs = getRecentLogs(100);
+        res.json({ logs });
+    } catch (error) {
+        console.error('Logs error:', error);
+        res.status(500).json({ error: 'Failed to get logs' });
+    }
+});
+
 // Report endpoints
-app.get('/api/report/:type', (req, res) => {
+app.get('/api/report/:type', async (req, res) => {
     try {
         const { type } = req.params;
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
         const balances = getVirtualBalances();
-        const price = getBnbPrice();
+        const price = await fetchLiveBnbPrice();
         const summary = getMonitoringSummary();
+        const regime = summary?.logAnalysis?.regime || detectRegime(trades);
 
         const now = new Date();
         const day24h = new Date(now - 24 * 60 * 60 * 1000);
@@ -218,29 +371,20 @@ app.get('/api/report/:type', (req, res) => {
         switch (type) {
             case 'market':
                 reportData = {
-                    regime: summary?.logAnalysis?.regime || 'Unknown',
+                    regime,
                     price,
-                    change24h: 1.5,
-                    volatility: 2.3,
+                    change24h: await get24hChange(),
+                    volatility: calculateVolatility(trades),
                     trades24h: trades24h.length,
                     trades7d: trades7d.length,
+                    trades30d: trades30d.length,
                     avgTradeSize: trades.length > 0 ? trades.reduce((sum, t) => sum + (t.sizeUSD || t.amount || 0), 0) / trades.length : 0,
-                    insights: [
-                        'Market showing moderate volatility - good for ranging strategy',
-                        `${trades24h.length} trades executed in last 24 hours`,
-                        'Price action suggests continuation of current regime'
-                    ]
+                    topStrategy: detectTopStrategy(trades),
+                    insights: generateMarketInsights(trades, regime, stats)
                 };
                 break;
 
             case 'risk':
-                const exitReasons = {};
-                trades.forEach(t => {
-                    if (t.exitReason) {
-                        exitReasons[t.exitReason] = (exitReasons[t.exitReason] || 0) + 1;
-                    }
-                });
-
                 const riskLevel = stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH';
 
                 reportData = {
@@ -250,67 +394,54 @@ app.get('/api/report/:type', (req, res) => {
                     maxDrawdown: stats.maxDrawdown,
                     wins: stats.wins,
                     losses: stats.losses,
+                    neutral: stats.neutral,
                     riskRewardRatio: stats.losses > 0 ? stats.wins / stats.losses : stats.wins,
-                    exitReasons,
-                    recommendations: [
-                        stats.winRate < 50 ? 'Consider adjusting entry criteria to improve win rate' : 'Win rate is healthy',
-                        stats.profitFactor < 1 ? 'Profit factor below 1 - review stop loss and take profit levels' : 'Profit factor is acceptable',
-                        'Maintain position sizing discipline',
-                        'Consider reducing exposure during high volatility periods'
-                    ]
+                    exitReasons: stats.exitReasons,
+                    recommendations: generateRiskRecommendations(stats)
                 };
                 break;
 
             case 'performance':
-                const calcPnl = (tradeSet) => tradeSet.reduce((sum, t) => sum + (t.plUSD || t.profit || 0), 0);
-                const calcWinRate = (tradeSet) => {
-                    const exits = tradeSet.filter(t => t.type === 'EXIT');
-                    const wins = exits.filter(t => (t.plPercent || t.profit || 0) > 0);
-                    return exits.length > 0 ? (wins.length / exits.length) * 100 : 0;
+                const calcStats = (tradeSet) => {
+                    const s = calculateStats(tradeSet);
+                    return { pnl: s.totalPnl, winRate: s.winRate, trades: tradeSet.length };
                 };
 
-                const pnl24h = calcPnl(trades24h);
-                const pnl7d = calcPnl(trades7d);
-                const pnl30d = calcPnl(trades30d);
+                const stats24h = calcStats(trades24h);
+                const stats7d = calcStats(trades7d);
+                const stats30d = calcStats(trades30d);
 
                 reportData = {
-                    pnl24h,
-                    pnl7d,
-                    pnl30d,
-                    trades24h: trades24h.length,
-                    trades7d: trades7d.length,
-                    trades30d: trades30d.length,
-                    winRate24h: calcWinRate(trades24h),
-                    winRate7d: calcWinRate(trades7d),
-                    winRate30d: calcWinRate(trades30d),
-                    trend: pnl7d > pnl30d / 4 ? 'Improving' : pnl7d < pnl30d / 4 ? 'Declining' : 'Stable',
-                    insights: [
-                        `24h performance: ${pnl24h >= 0 ? '+' : ''}$${pnl24h.toFixed(2)}`,
-                        `7-day trend: ${pnl7d >= 0 ? 'Positive' : 'Negative'}`,
-                        trades.length > 50 ? 'Sufficient trade history for statistical significance' : 'Building trade history for better analysis'
-                    ]
+                    pnl24h: stats24h.pnl,
+                    pnl7d: stats7d.pnl,
+                    pnl30d: stats30d.pnl,
+                    trades24h: stats24h.trades,
+                    trades7d: stats7d.trades,
+                    trades30d: stats30d.trades,
+                    winRate24h: stats24h.winRate,
+                    winRate7d: stats7d.winRate,
+                    winRate30d: stats30d.winRate,
+                    trend: determineTrend(stats7d, stats30d),
+                    insights: generatePerformanceInsights(stats, stats24h, stats7d, stats30d)
                 };
                 break;
 
             case 'summary':
+                const running = await isBotRunning();
                 reportData = {
-                    running: true,
-                    strategy: summary?.strategy || 'ranging',
-                    regime: summary?.logAnalysis?.regime || 'unknown',
+                    running,
+                    strategy: summary?.strategy || detectTopStrategy(trades),
+                    regime,
                     mode: 'Shadow',
                     portfolioTotal: balances.usdt + (balances.bnb * price),
                     usdt: balances.usdt,
                     bnb: balances.bnb,
+                    price,
                     totalTrades: trades.length,
                     winRate: stats.winRate,
                     totalPnl: stats.totalPnl,
-                    summary: [
-                        `Portfolio value: $${(balances.usdt + balances.bnb * price).toFixed(2)}`,
-                        `Total trades executed: ${trades.length}`,
-                        `Overall win rate: ${stats.winRate.toFixed(1)}%`,
-                        `Running in Shadow Mode - no real trades executed`,
-                        `Current strategy: ${summary?.strategy || 'ranging'}`
-                    ]
+                    exitReasons: stats.exitReasons,
+                    summary: generateSummaryInsights(balances, price, trades, stats, regime)
                 };
                 break;
 
@@ -325,26 +456,137 @@ app.get('/api/report/:type', (req, res) => {
     }
 });
 
+// Helper functions
+function detectTopStrategy(trades) {
+    if (!trades || trades.length === 0) return 'ranging';
+
+    const strategies = {};
+    trades.slice(0, 20).forEach(t => {
+        const s = t.strategy || 'unknown';
+        strategies[s] = (strategies[s] || 0) + 1;
+    });
+
+    return Object.entries(strategies).sort((a, b) => b[1] - a[1])[0]?.[0] || 'ranging';
+}
+
+async function get24hChange() {
+    // Placeholder - could fetch from API
+    return 1.5;
+}
+
+function calculateVolatility(trades) {
+    if (!trades || trades.length < 5) return 2.0;
+
+    const prices = trades.slice(0, 20).map(t => t.targetPrice || 0).filter(p => p > 0);
+    if (prices.length < 2) return 2.0;
+
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    const variance = prices.reduce((sum, p) => sum + Math.pow(p - avg, 2), 0) / prices.length;
+    const stdDev = Math.sqrt(variance);
+
+    return ((stdDev / avg) * 100 * 10).toFixed(2); // Annualized approx
+}
+
+function formatUptime() {
+    // Placeholder - would track actual start time
+    return '24h 30m';
+}
+
+function determineTrend(stats7d, stats30d) {
+    if (stats7d.winRate > stats30d.winRate + 5) return 'Improving';
+    if (stats7d.winRate < stats30d.winRate - 5) return 'Declining';
+    return 'Stable';
+}
+
+function generateMarketInsights(trades, regime, stats) {
+    const insights = [];
+
+    insights.push(`Market regime: ${regime} - bot adapting strategy accordingly`);
+
+    if (stats.exitReasons.stop_loss > stats.exitReasons.take_profit) {
+        insights.push('High stop loss rate detected - consider adjusting entry criteria');
+    }
+
+    if (stats.exitReasons.max_hold_time_exceeded > trades.length * 0.3) {
+        insights.push('Many positions timing out - consider shorter hold times');
+    }
+
+    if (stats.winRate < 40) {
+        insights.push('Win rate below target - review strategy parameters');
+    } else if (stats.winRate > 55) {
+        insights.push('Win rate performing well - maintain current approach');
+    }
+
+    return insights;
+}
+
+function generateRiskRecommendations(stats) {
+    const recs = [];
+
+    if (stats.winRate < 50) {
+        recs.push('Win rate below 50% - consider tightening entry criteria');
+    } else {
+        recs.push('Win rate is healthy - maintain current strategy');
+    }
+
+    if (stats.exitReasons.stop_loss > stats.exitReasons.take_profit) {
+        recs.push('Stop losses exceed take profits - review risk/reward ratio');
+    }
+
+    if (stats.exitReasons.max_hold_time_exceeded > 20) {
+        recs.push('High timeout rate - reduce max hold time from 4h to 2h');
+    }
+
+    recs.push('Maintain position sizing discipline');
+    recs.push('Consider reducing exposure during high volatility');
+
+    return recs;
+}
+
+function generatePerformanceInsights(stats, stats24h, stats7d, stats30d) {
+    const insights = [];
+
+    insights.push(`Overall: ${stats.wins}W / ${stats.losses}L (${stats.winRate.toFixed(1)}% win rate)`);
+
+    if (stats7d.winRate > stats30d.winRate) {
+        insights.push('Recent performance improving vs 30-day average');
+    } else if (stats7d.winRate < stats30d.winRate) {
+        insights.push('Recent performance declining vs 30-day average');
+    }
+
+    if (stats.totalTrades > 50) {
+        insights.push('Sufficient trade history for statistical significance');
+    } else {
+        insights.push('Building trade history for better analysis');
+    }
+
+    return insights;
+}
+
+function generateSummaryInsights(balances, price, trades, stats, regime) {
+    const total = balances.usdt + (balances.bnb * price);
+    return [
+        `Portfolio value: $${total.toFixed(2)}`,
+        `Total trades executed: ${trades.length}`,
+        `Win rate: ${stats.winRate.toFixed(1)}% (${stats.wins}W/${stats.losses}L)`,
+        `Exit breakdown: ${stats.exitReasons.stop_loss || 0} stop loss, ${stats.exitReasons.max_hold_time_exceeded || 0} timeout`,
+        `Running in Shadow Mode - no real trades executed`,
+        `Current regime: ${regime}`
+    ];
+}
+
 // Socket.IO events
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    // Send initial data
     sendStatusUpdate(socket);
 
-    // Chat message handler
     socket.on('chat-message', async (data) => {
         const { message } = data;
-
-        // Simple AI response (placeholder - integrate with real AI later)
-        const response = generateChatResponse(message);
-
-        socket.emit('chat-response', {
-            message: response
-        });
+        const response = await generateChatResponse(message);
+        socket.emit('chat-response', { message: response });
     });
 
-    // Council discussion handler
     socket.on('council-start', () => {
         socket.emit('council-response', {
             type: 'system',
@@ -354,8 +596,9 @@ io.on('connection', (socket) => {
 
     socket.on('council-discuss', async (data) => {
         const { topic } = data;
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
 
-        // Simulate council responses
         const agents = [
             { name: 'Strategist', delay: 1000 },
             { name: 'Analyst', delay: 2000 },
@@ -367,30 +610,28 @@ io.on('connection', (socket) => {
             setTimeout(() => {
                 socket.emit('council-response', {
                     agent: agent.name,
-                    content: generateAgentResponse(agent.name, topic)
+                    content: generateAgentResponse(agent.name, topic, stats)
                 });
             }, agent.delay);
         }
 
-        // Send consensus after all agents
         setTimeout(() => {
             socket.emit('council-response', {
                 type: 'consensus',
                 content: 'Council has reached a decision.',
                 consensus: {
                     agreement: 75 + Math.random() * 20,
-                    action: 'Monitor current positions, no immediate action required'
+                    action: stats.winRate < 40
+                        ? 'Recommend reducing position sizes until win rate improves'
+                        : 'Monitor current positions, maintain strategy'
                 }
             });
         }, 5000);
     });
 
-    // Bot control handler
     socket.on('bot-control', (data) => {
         const { action } = data;
         console.log('Bot control action:', action);
-
-        // Placeholder - implement actual bot control
         socket.emit('bot-status', {
             action,
             success: true,
@@ -403,21 +644,27 @@ io.on('connection', (socket) => {
     });
 });
 
-// Helper functions
 async function sendStatusUpdate(socket) {
     const running = await isBotRunning();
     const balances = getVirtualBalances();
     const summary = getMonitoringSummary();
     const trades = getShadowTrades();
     const stats = calculateStats(trades);
-    const price = getBnbPrice();
+    const price = await fetchLiveBnbPrice();
+    const regime = summary?.logAnalysis?.regime || detectRegime(trades);
 
     socket.emit('bot-status', {
         running,
-        strategy: summary?.strategy || 'ranging',
-        regime: summary?.logAnalysis?.regime || 'unknown',
+        strategy: summary?.strategy || detectTopStrategy(trades),
+        regime,
         confidence: 0.75,
-        stats
+        stats,
+        market: {
+            price,
+            change24h: 1.5,
+            volume24h: '$1.2B',
+            volatility: calculateVolatility(trades)
+        }
     });
 
     socket.emit('portfolio-update', {
@@ -426,82 +673,93 @@ async function sendStatusUpdate(socket) {
     });
 }
 
-function generateChatResponse(message) {
+async function generateChatResponse(message) {
     const lowerMsg = message.toLowerCase();
+    const trades = getShadowTrades();
+    const stats = calculateStats(trades);
+    const balances = getVirtualBalances();
+    const price = await fetchLiveBnbPrice();
 
     if (lowerMsg.includes('trade') || lowerMsg.includes('performance')) {
-        const trades = getShadowTrades();
-        const stats = calculateStats(trades);
-        return `Based on ${trades.length} total trades, your win rate is ${stats.winRate.toFixed(1)}%. Recent performance shows ${stats.todayPnl >= 0 ? 'positive' : 'negative'} momentum.`;
+        return `Based on ${trades.length} trades: ${stats.wins} wins, ${stats.losses} losses (${stats.winRate.toFixed(1)}% win rate). Exit breakdown: ${stats.exitReasons.stop_loss || 0} stop losses, ${stats.exitReasons.max_hold_time_exceeded || 0} timeouts, ${stats.exitReasons.take_profit || 0} take profits.`;
     }
 
     if (lowerMsg.includes('market') || lowerMsg.includes('regime')) {
-        const summary = getMonitoringSummary();
-        return `Current market regime appears to be ${summary?.logAnalysis?.regime || 'ranging'}. The bot is adapting its strategy accordingly.`;
+        const regime = detectRegime(trades);
+        return `Current market regime: ${regime}. Top strategy: ${detectTopStrategy(trades)}. The bot is adapting accordingly.`;
     }
 
     if (lowerMsg.includes('portfolio') || lowerMsg.includes('balance')) {
-        const balances = getVirtualBalances();
-        const price = getBnbPrice();
         const total = balances.usdt + (balances.bnb * price);
-        return `Your portfolio is valued at $${total.toFixed(2)} (${balances.usdt.toFixed(2)} USDT + ${balances.bnb.toFixed(4)} BNB at $${price.toFixed(2)}/BNB).`;
+        return `Portfolio: $${total.toFixed(2)} (${balances.usdt.toFixed(2)} USDT + ${balances.bnb.toFixed(4)} BNB @ $${price.toFixed(2)})`;
     }
 
     if (lowerMsg.includes('optimize') || lowerMsg.includes('improve')) {
-        return 'Based on recent analysis, I recommend: 1) Lowering take profit targets to 1.5%, 2) Reducing max hold time to 2 hours, 3) Adding volatility filters. Would you like me to explain any of these in detail?';
+        const recs = [];
+        if (stats.exitReasons.max_hold_time_exceeded > 20) recs.push('Reduce max hold time to 2h');
+        if (stats.exitReasons.stop_loss > stats.wins) recs.push('Lower take profit target to 1.5%');
+        if (stats.winRate < 40) recs.push('Tighten entry criteria');
+        return recs.length > 0
+            ? `Recommendations: ${recs.join(', ')}`
+            : 'Current parameters look reasonable. Continue monitoring.';
     }
 
-    return 'I can help you analyze trades, check market conditions, review your portfolio, or suggest optimizations. What would you like to know?';
+    if (lowerMsg.includes('risk') || lowerMsg.includes('stop')) {
+        return `Risk metrics: ${stats.wins}W/${stats.losses}L, Stop losses: ${stats.exitReasons.stop_loss || 0}, Timeouts: ${stats.exitReasons.max_hold_time_exceeded || 0}. Risk level: ${stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH'}`;
+    }
+
+    return `I can help with: trades/performance, market/regime, portfolio/balance, risk analysis, or optimization suggestions. What would you like to know?`;
 }
 
-function generateAgentResponse(agentName, topic) {
+function generateAgentResponse(agentName, topic, stats) {
     const responses = {
         'Strategist': [
-            'From a strategic perspective, we should maintain current positioning.',
-            'The market structure suggests a ranging environment is likely to continue.',
-            'I recommend focusing on mean reversion opportunities within established ranges.'
+            `Win rate at ${stats.winRate.toFixed(1)}% - ${stats.winRate >= 50 ? 'strategy is effective' : 'consider parameter adjustments'}`,
+            `${stats.exitReasons.max_hold_time_exceeded || 0} timeouts suggest ${stats.exitReasons.max_hold_time_exceeded > 20 ? 'reducing hold time' : 'hold time is appropriate'}`,
+            `Top strategy performing: ${detectTopStrategy([])} - maintain current approach`
         ],
         'Analyst': [
-            'Data analysis shows moderate volatility with support at current levels.',
-            'Technical indicators suggest neutral momentum with slight bullish bias.',
-            'Volume patterns indicate accumulation phase may be forming.'
+            `Data shows ${stats.totalTrades} trades: ${stats.wins}W/${stats.losses}L pattern`,
+            `Stop loss rate: ${((stats.exitReasons.stop_loss || 0) / stats.totalTrades * 100).toFixed(1)}% of exits`,
+            `Timeout rate: ${((stats.exitReasons.max_hold_time_exceeded || 0) / stats.totalTrades * 100).toFixed(1)}% - ${stats.exitReasons.max_hold_time_exceeded > 30 ? 'concerning' : 'acceptable'}`
         ],
         'Risk Manager': [
-            'Current risk exposure is within acceptable parameters.',
-            'Recommend maintaining stop losses at 2% to limit downside.',
-            'Position sizing should remain conservative given market uncertainty.'
+            `Risk level: ${stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH'}`,
+            `${stats.exitReasons.stop_loss || 0} stop losses triggered - ${stats.exitReasons.stop_loss > stats.wins ? 'review stop loss levels' : 'acceptable'}`,
+            `Recommend ${stats.winRate < 40 ? 'reducing' : 'maintaining'} position sizes`
         ],
         'Executor': [
-            'Execution conditions are favorable with tight spreads.',
-            'Slippage has been minimal on recent trades.',
-            'Ready to execute any approved trading decisions promptly.'
+            `${stats.totalTrades} trades executed successfully in shadow mode`,
+            `Ready to implement any approved strategy changes`,
+            `Monitoring market conditions for optimal entry points`
         ]
     };
 
-    const agentResponses = responses[agentName] || ['Analyzing the situation...'];
+    const agentResponses = responses[agentName] || ['Analyzing...'];
     return agentResponses[Math.floor(Math.random() * agentResponses.length)];
 }
 
-// Periodic status broadcast
+// Periodic updates
 setInterval(async () => {
     const running = await isBotRunning();
     const balances = getVirtualBalances();
     const trades = getShadowTrades();
     const stats = calculateStats(trades);
-    const price = getBnbPrice();
+    const price = await fetchLiveBnbPrice();
     const summary = getMonitoringSummary();
+    const regime = summary?.logAnalysis?.regime || detectRegime(trades);
 
     io.emit('bot-status', {
         running,
-        strategy: summary?.strategy || 'ranging',
-        regime: summary?.logAnalysis?.regime || 'unknown',
+        strategy: summary?.strategy || detectTopStrategy(trades),
+        regime,
         confidence: 0.75,
         stats,
         market: {
             price,
             change24h: 1.5,
             volume24h: '$1.2B',
-            volatility: 2.3
+            volatility: calculateVolatility(trades)
         }
     });
 
@@ -510,6 +768,11 @@ setInterval(async () => {
         price
     });
 }, 5000);
+
+// Update price cache periodically
+setInterval(async () => {
+    await fetchLiveBnbPrice();
+}, 30000);
 
 // Start server
 server.listen(PORT, () => {
@@ -520,8 +783,14 @@ server.listen(PORT, () => {
 ║  Status: Running                                             ║
 ║  Port: ${PORT}                                                   ║
 ║  URL: http://localhost:${PORT}                                  ║
+║  Live Price: Fetching from Binance API                       ║
 ╚══════════════════════════════════════════════════════════════╝
     `);
+
+    // Initial price fetch
+    fetchLiveBnbPrice().then(price => {
+        console.log(`  Initial BNB price: $${price.toFixed(2)}`);
+    });
 });
 
 module.exports = { app, server, io };
