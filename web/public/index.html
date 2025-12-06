@@ -449,7 +449,7 @@
           </div>
           <table class="table">
             <thead>
-              <tr><th>TIME</th><th>TYPE</th><th>ENTRY</th><th>EXIT</th><th>P&L</th><th>DURATION</th></tr>
+              <tr><th>TIME</th><th>ACTION</th><th>PRICE</th><th>AMOUNT</th><th>CONF</th><th>REASON</th></tr>
             </thead>
             <tbody id="trades-table">
               <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading...</td></tr>
@@ -706,27 +706,32 @@
         return;
       }
 
-      let wins = 0, totalPnl = 0;
-      trades.forEach(t => {
-        if (t.profit > 0) wins++;
-        totalPnl += t.profit || 0;
-      });
+      // Calculate stats - handle actual data format
+      let holdTrades = trades.filter(t => t.action === 'HOLD' || t.action === 'hold');
+      let buyTrades = trades.filter(t => t.action === 'buy' || t.action === 'BUY');
+      let totalPnl = 0;
 
-      document.getElementById('win-rate').textContent = `${trades.length > 0 ? ((wins/trades.length)*100).toFixed(1) : 0}%`;
-      document.getElementById('total-pnl').textContent = `$${totalPnl.toFixed(2)}`;
-      document.getElementById('total-pnl').className = `status-value ${totalPnl >= 0 ? 'green' : 'red'}`;
-      document.getElementById('portfolio-pnl').textContent = `$${totalPnl.toFixed(2)}`;
-      document.getElementById('portfolio-winrate').textContent = `${trades.length > 0 ? ((wins/trades.length)*100).toFixed(1) : 0}%`;
+      document.getElementById('win-rate').textContent = `${((buyTrades.length / Math.max(trades.length, 1)) * 100).toFixed(1)}%`;
+      document.getElementById('total-pnl').textContent = `Shadow Mode`;
+      document.getElementById('total-pnl').className = `status-value yellow`;
+      document.getElementById('portfolio-pnl').textContent = `$0.00 (Shadow)`;
+      document.getElementById('portfolio-winrate').textContent = `${trades.length} signals`;
 
       tbody.innerHTML = trades.slice(-15).reverse().map(t => {
-        const pnl = t.profit || 0;
+        const action = (t.action || 'unknown').toUpperCase();
+        const isBuy = action === 'BUY';
+        const isHold = action === 'HOLD';
+        const price = t.targetPrice || 0;
+        const priceDisplay = price > 0.01 ? price.toFixed(4) : price.toFixed(8);
+        const amount = t.amount || 0;
+
         return `<tr>
-          <td>${new Date(t.timestamp || t.entryTime).toLocaleString()}</td>
-          <td style="color: ${t.type === 'BUY' ? 'var(--accent-green)' : 'var(--accent-red)'};">${t.status === 'closed' ? 'EXIT' : t.type}</td>
-          <td>${t.entryPrice?.toFixed(6) || '--'}</td>
-          <td>${t.exitPrice?.toFixed(6) || '--'}</td>
-          <td class="${pnl >= 0 ? 'green' : 'red'}">$${pnl.toFixed(2)}</td>
-          <td>${t.duration || '0m'}</td>
+          <td>${new Date(t.timestamp).toLocaleString()}</td>
+          <td style="color: ${isBuy ? 'var(--accent-green)' : isHold ? 'var(--accent-yellow)' : 'var(--accent-red)'};">${action}</td>
+          <td>${priceDisplay}</td>
+          <td>$${amount.toFixed(2)}</td>
+          <td style="color: var(--text-secondary);">${(t.confidence * 100).toFixed(0)}%</td>
+          <td title="${t.reasoning || ''}">${(t.reasoning || '').substring(0, 20)}...</td>
         </tr>`;
       }).join('');
     }
@@ -763,8 +768,15 @@
         : '<div style="color: var(--text-secondary);">No results found</div>';
     });
 
-    // Auto-refresh
+    // Auto-refresh and initial load
+    loadData(); // Load immediately on page start
     setInterval(loadData, 15000);
+
+    // Also load when socket connects
+    socket.on('connect', () => {
+      loadData();
+      addLog('success', 'Connected to AlgoQBot server');
+    });
   </script>
 </body>
 </html>
