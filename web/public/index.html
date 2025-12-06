@@ -38,10 +38,7 @@
       align-items: center;
       border-bottom: 1px solid var(--border);
     }
-    .header h1 {
-      font-size: 1.25rem;
-      color: var(--accent-purple);
-    }
+    .header h1 { font-size: 1.25rem; color: var(--accent-purple); }
     .connection-status {
       display: flex;
       align-items: center;
@@ -49,41 +46,54 @@
       padding: 0.5rem 1rem;
       background: var(--bg-input);
       border-radius: 20px;
-      font-size: 0.875rem;
+      font-size: 0.85rem;
     }
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
-      background: var(--accent-green);
+      background: var(--accent-red);
     }
-    .status-dot.offline { background: var(--accent-red); }
+    .status-dot.connected { background: var(--accent-green); }
+
     .main-container { display: flex; flex: 1; overflow: hidden; }
+
+    /* Sidebar */
     .sidebar {
-      width: 200px;
+      width: 220px;
       background: var(--bg-sidebar);
       border-right: 1px solid var(--border);
-      padding: 1rem 0.5rem;
+      padding: 1rem;
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.5rem;
     }
     .nav-item {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      padding: 0.75rem 1rem;
+      padding: 0.875rem 1rem;
       border-radius: 8px;
       cursor: pointer;
       transition: all 0.2s;
+      font-size: 0.9rem;
       color: var(--text-secondary);
-      font-size: 0.875rem;
+      border: 1px solid transparent;
     }
     .nav-item:hover { background: var(--bg-input); color: var(--text-primary); }
-    .nav-item.active { background: var(--accent-purple); color: white; }
-    .content { flex: 1; overflow-y: auto; padding: 1.5rem; }
+    .nav-item.active {
+      background: var(--accent-purple);
+      color: white;
+      border-color: var(--accent-purple);
+    }
+
+    /* Content Area */
+    .content { flex: 1; padding: 1.5rem; overflow-y: auto; }
     .panel { display: none; }
     .panel.active { display: block; }
+    .panel-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem; }
+
+    /* Cards */
     .card {
       background: var(--bg-card);
       border: 1px solid var(--border);
@@ -91,39 +101,88 @@
       padding: 1.25rem;
       margin-bottom: 1rem;
     }
-    .card-title {
-      font-size: 0.8rem;
-      color: var(--accent-purple);
-      text-transform: uppercase;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-    .status-value { font-size: 1.5rem; font-weight: 700; }
-    .status-label { font-size: 0.75rem; color: var(--text-secondary); }
-    .green { color: var(--accent-green); }
-    .red { color: var(--accent-red); }
-    .yellow { color: var(--accent-yellow); }
-    .stats-row {
+    .card-header {
       display: flex;
       justify-content: space-between;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.875rem;
+      align-items: center;
+      margin-bottom: 1rem;
     }
-    .stats-row:last-child { border-bottom: none; }
-    .volatility-badge {
-      display: inline-block;
-      padding: 0.5rem 1rem;
+    .card-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--bg-input);
       border-radius: 8px;
-      font-weight: 600;
-      font-size: 0.875rem;
+      padding: 1rem;
     }
-    .vol-very-low { background: rgba(234, 179, 8, 0.2); color: var(--accent-yellow); }
-    .vol-low { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
-    .vol-medium { background: rgba(249, 115, 22, 0.2); color: var(--accent-orange); }
-    .vol-high { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .stat-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem; }
+    .stat-value { font-size: 1.25rem; font-weight: 600; }
+    .stat-value.green { color: var(--accent-green); }
+    .stat-value.red { color: var(--accent-red); }
+    .stat-value.yellow { color: var(--accent-yellow); }
+    .stat-value.purple { color: var(--accent-purple); }
+
+    /* Table */
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; }
+    td { font-size: 0.875rem; }
+
+    /* Buttons */
+    .btn {
+      padding: 0.625rem 1.25rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent-purple); color: white; }
+    .btn-primary:hover { background: #7c3aed; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
+    .btn-outline:hover { background: var(--bg-input); }
+    .btn-success { background: var(--accent-green); color: white; }
+    .btn-danger { background: var(--accent-red); color: white; }
+
+    /* Messages / Chat */
+    .messages-container {
+      height: 400px;
+      overflow-y: auto;
+      padding: 1rem;
+      background: var(--bg-dark);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+    .message { padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 8px; }
+    .message.user { background: var(--accent-purple); margin-left: 20%; }
+    .message.ai { background: var(--bg-input); margin-right: 20%; }
+    .message.system { background: var(--bg-card); text-align: center; font-size: 0.85rem; color: var(--text-secondary); }
+    .message.claude { border-left: 3px solid #9B59B6; }
+    .message.deepseek { border-left: 3px solid var(--accent-green); }
+    .message.qwen { border-left: 3px solid var(--accent-blue); }
+
+    /* Input Group */
+    .input-group { display: flex; gap: 0.5rem; }
+    .input-group input, .input-group textarea {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+    .input-group input:focus, .input-group textarea:focus { outline: none; border-color: var(--accent-purple); }
+
+    /* Logs Container */
     .logs-container {
       background: var(--bg-dark);
       border-radius: 8px;
@@ -131,104 +190,66 @@
       height: 300px;
       overflow-y: auto;
       font-family: 'Monaco', 'Consolas', monospace;
-      font-size: 0.75rem;
-      line-height: 1.6;
+      font-size: 0.8rem;
     }
-    .log-entry { margin-bottom: 0.25rem; }
-    .log-info { color: var(--accent-blue); }
-    .log-warn { color: var(--accent-yellow); }
-    .log-error { color: var(--accent-red); }
-    .log-success { color: var(--accent-green); }
-    .chat-container { display: flex; flex-direction: column; height: calc(100vh - 200px); }
-    .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .message { padding: 1rem; border-radius: 12px; max-width: 80%; }
-    .message.user { align-self: flex-end; background: var(--accent-purple); }
-    .message.bot { background: var(--bg-input); border-left: 3px solid var(--accent-green); }
-    .message.system { align-self: center; background: var(--bg-input); font-size: 0.85rem; color: var(--text-secondary); }
-    .message.claude { border-left-color: var(--accent-purple); }
-    .message.deepseek { border-left-color: var(--accent-green); }
-    .message.qwen { border-left-color: var(--accent-blue); }
-    .input-area { padding: 1rem; background: var(--bg-card); border-top: 1px solid var(--border); }
-    .input-row { display: flex; gap: 0.5rem; }
-    .input-row input, .input-row textarea {
-      flex: 1;
-      padding: 0.875rem 1rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
+    .log-entry { padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
+    .log-entry.error { color: var(--accent-red); }
+    .log-entry.warn { color: var(--accent-yellow); }
+    .log-entry.success { color: var(--accent-green); }
+    .log-entry.info { color: var(--text-secondary); }
+
+    /* Token Usage */
+    .token-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+    .token-card {
       background: var(--bg-input);
-      color: var(--text-primary);
-      font-size: 0.875rem;
-    }
-    .input-row input:focus { outline: none; border-color: var(--accent-purple); }
-    .btn {
-      padding: 0.875rem 1.5rem;
-      border: none;
       border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
+      padding: 1rem;
+      text-align: center;
     }
-    .btn:hover { opacity: 0.9; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-primary { background: var(--accent-purple); color: white; }
-    .btn-success { background: var(--accent-green); color: white; }
-    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
-    .ai-badges { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-    .ai-badge { padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-    .ai-badge.claude { background: rgba(139, 92, 246, 0.2); color: var(--accent-purple); }
-    .ai-badge.deepseek { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
-    .ai-badge.qwen { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
-    .consensus-bar { height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
-    .consensus-fill { height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-purple)); transition: width 0.5s; }
-    .table { width: 100%; border-collapse: collapse; }
-    .table th, .table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
-    .table th { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
-    .notes-textarea {
+    .token-card .provider { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .token-card .count { font-size: 1.5rem; font-weight: 600; }
+    .token-card .cost { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Progress Bar */
+    .progress-bar { height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-purple)); transition: width 0.3s; }
+
+    /* Quick Action Buttons */
+    .quick-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .quick-actions .btn { flex: 1; min-width: 150px; }
+
+    /* Notes */
+    .notes-area {
       width: 100%;
-      min-height: 400px;
-      padding: 1rem;
+      min-height: 300px;
       background: var(--bg-input);
       border: 1px solid var(--border);
       border-radius: 8px;
+      padding: 1rem;
       color: var(--text-primary);
-      font-family: inherit;
-      font-size: 0.875rem;
+      font-size: 0.9rem;
       resize: vertical;
     }
-    .search-input {
-      width: 100%;
-      padding: 1rem;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-primary);
-      font-size: 1rem;
-      margin-bottom: 1rem;
+
+    /* Badge */
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
     }
-    .badge-live { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; }
-    .loading-dots { display: flex; gap: 4px; }
-    .loading-dots span { width: 8px; height: 8px; border-radius: 50%; animation: bounce 1s infinite; }
-    .loading-dots span:nth-child(1) { background: var(--accent-purple); }
-    .loading-dots span:nth-child(2) { background: var(--accent-green); animation-delay: 0.15s; }
-    .loading-dots span:nth-child(3) { background: var(--accent-blue); animation-delay: 0.3s; }
-    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .pulse { animation: pulse 2s infinite; }
+    .badge.idle { background: var(--bg-input); color: var(--text-secondary); }
+    .badge.active { background: var(--accent-green); color: white; }
+    .badge.deliberating { background: var(--accent-purple); color: white; }
   </style>
 </head>
 <body>
   <header class="header">
     <h1>🤖 AlgoQBot Intelligence Dashboard</h1>
     <div class="connection-status">
-      <div class="status-dot" id="connection-dot"></div>
-      <span id="connection-text">Connecting...</span>
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Disconnected</span>
     </div>
   </header>
 
@@ -237,7 +258,7 @@
       <div class="nav-item active" data-panel="monitor">📊 LIVE MONITOR</div>
       <div class="nav-item" data-panel="chat">💬 CHAT</div>
       <div class="nav-item" data-panel="intelligence">📈 INTELLIGENCE</div>
-      <div class="nav-item" data-panel="research">🧠 AGENT RESEARCH</div>
+      <div class="nav-item" data-panel="agent">🤖 AGENT RESEARCH</div>
       <div class="nav-item" data-panel="council">🏛️ AI COUNCIL</div>
       <div class="nav-item" data-panel="portfolio">💰 PORTFOLIO</div>
       <div class="nav-item" data-panel="notes">📝 NOTES</div>
@@ -247,234 +268,257 @@
     <main class="content">
       <!-- LIVE MONITOR -->
       <div class="panel active" id="panel-monitor">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h2>📊 Live Bot Monitoring</h2>
-          <span class="badge-live">🟢 Live</span>
-        </div>
-
-        <div class="grid-3">
-          <div class="card">
-            <div class="card-title">🤖 BOT STATUS</div>
-            <div style="text-align: center;">
-              <div id="bot-indicator" style="width: 60px; height: 60px; border-radius: 50%; background: var(--accent-purple); margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">⚡</div>
-              <div class="status-value green" id="bot-status">Checking...</div>
-            </div>
-            <div class="stats-row"><span>Uptime:</span><span id="uptime">0h 0m</span></div>
-            <div class="stats-row"><span>Portfolio:</span><span class="green" id="portfolio-value">$0</span></div>
-            <div class="stats-row"><span>Active Positions:</span><span id="active-positions">0</span></div>
+        <h2 class="panel-title">📊 Live Monitor</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Bot Status</div>
+            <div class="stat-value green" id="bot-status">--</div>
           </div>
-
-          <div class="card">
-            <div class="card-title">📊 VOLATILITY REGIME</div>
-            <div style="text-align: center; padding: 0.5rem 0;">
-              <div class="volatility-badge vol-very-low" id="volatility-badge">LOADING...</div>
-              <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;" id="volatility-desc">Checking market conditions...</p>
-            </div>
-            <div class="stats-row"><span>4H VOL:</span><span id="vol-4h">0.00%</span></div>
-            <div class="stats-row"><span>1H VOL:</span><span id="vol-1h">0.00%</span></div>
-            <div class="stats-row"><span>MIN REQ:</span><span id="vol-min">0.30%</span></div>
-            <div class="stats-row"><span>GAP:</span><span id="vol-gap">0.30%</span></div>
+          <div class="stat-card">
+            <div class="stat-label">Portfolio Value</div>
+            <div class="stat-value purple" id="portfolio-value">$0</div>
           </div>
-
-          <div class="card">
-            <div class="card-title">⚠️ RISK MANAGEMENT</div>
-            <div class="stats-row"><span>Daily Loss:</span><span class="green" id="daily-loss">$0.00</span></div>
-            <div class="stats-row"><span>Daily Trades:</span><span id="daily-trades">0/150</span></div>
-            <div class="stats-row"><span>Hourly Trades:</span><span id="hourly-trades">0/30</span></div>
-            <div class="stats-row"><span>Max Drawdown:</span><span id="max-drawdown">0%</span></div>
+          <div class="stat-card">
+            <div class="stat-label">Volatility Regime</div>
+            <div class="stat-value yellow" id="volatility-regime">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Strategy</div>
+            <div class="stat-value" id="strategy">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">4h Volatility</div>
+            <div class="stat-value" id="vol-4h">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Last Action</div>
+            <div class="stat-value" id="last-action">--</div>
           </div>
         </div>
-
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">⚡ PERFORMANCE</div>
-            <div class="stats-row"><span>CPU Usage:</span><span id="cpu-usage">0%</span></div>
-            <div class="stats-row"><span>Memory:</span><span id="mem-usage">0 MB</span></div>
-            <div class="stats-row"><span>API Calls/min:</span><span id="api-calls">0</span></div>
-          </div>
-          <div class="card">
-            <div class="card-title">📊 SHADOW TRADING</div>
-            <div style="display: flex; justify-content: space-around; text-align: center;">
-              <div><div class="status-value" id="total-trades">0</div><div class="status-label">TOTAL</div></div>
-              <div><div class="status-value" id="win-rate">0%</div><div class="status-label">WIN RATE</div></div>
-              <div><div class="status-value green" id="total-pnl">$0</div><div class="status-label">P&L</div></div>
-              <div><div class="status-value" id="strategy">ranging</div><div class="status-label">STRATEGY</div></div>
-            </div>
-          </div>
-        </div>
-
         <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-            <div class="card-title" style="margin: 0;">📜 LIVE LOGS</div>
-            <button class="btn btn-outline" onclick="clearLogs()" style="padding: 0.5rem 1rem; font-size: 0.75rem;">Clear</button>
+          <div class="card-header">
+            <span class="card-title">📋 Live Logs</span>
+            <button class="btn btn-outline" onclick="clearLogs()">Clear</button>
           </div>
           <div class="logs-container" id="logs-container">
-            <div class="log-entry log-info">[System] Connecting to AlgoQBot...</div>
+            <div class="log-entry info">[System] Connecting to AlgoQBot...</div>
           </div>
         </div>
       </div>
 
       <!-- CHAT -->
       <div class="panel" id="panel-chat">
-        <h2 style="margin-bottom: 1rem;">💬 Chat with AlgoQBot</h2>
-        <div class="chat-container">
-          <div class="chat-messages" id="chat-messages">
-            <div class="message system">Welcome! Ask me about trading, market analysis, or bot status.</div>
-          </div>
-          <div class="input-area">
-            <div class="input-row">
-              <input type="text" id="chat-input" placeholder="Ask AlgoQBot..." />
-              <button class="btn btn-primary" id="chat-send">Send</button>
-            </div>
+        <h2 class="panel-title">💬 Chat with AlgoQBot</h2>
+        <div class="card">
+          <div class="messages-container" id="chat-messages"></div>
+          <div class="input-group">
+            <input type="text" id="chat-input" placeholder="Ask AlgoQBot anything...">
+            <button class="btn btn-primary" id="chat-send">Send</button>
           </div>
         </div>
       </div>
 
       <!-- INTELLIGENCE -->
       <div class="panel" id="panel-intelligence">
-        <h2 style="margin-bottom: 1rem;">📈 Intelligence Reports</h2>
-        <div class="grid-3">
-          <div class="card">
-            <div class="card-title">Market Analysis</div>
-            <div id="market-analysis">Loading market data...</div>
+        <h2 class="panel-title">📈 Market Intelligence</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Confidence</div>
+            <div class="stat-value purple" id="confidence">--</div>
           </div>
-          <div class="card">
-            <div class="card-title">Risk Metrics</div>
-            <div id="risk-metrics">Calculating risk...</div>
+          <div class="stat-card">
+            <div class="stat-label">Order Flow</div>
+            <div class="stat-value" id="order-flow">--</div>
           </div>
-          <div class="card">
-            <div class="card-title">Performance</div>
-            <div id="performance-metrics">Analyzing performance...</div>
+          <div class="stat-card">
+            <div class="stat-label">VWAP</div>
+            <div class="stat-value" id="vwap">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">ATR</div>
+            <div class="stat-value" id="atr">--</div>
           </div>
         </div>
         <div class="card">
-          <div class="card-title">📊 Generate Report</div>
-          <div class="input-row" style="margin-bottom: 1rem;">
-            <select id="report-type" style="padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
-              <option value="market">Market Analysis</option>
-              <option value="strategy">Strategy Review</option>
-              <option value="risk">Risk Assessment</option>
-            </select>
-            <input type="text" id="report-query" placeholder="Optional: specific question..." />
-            <button class="btn btn-primary" id="generate-report">Generate</button>
-          </div>
-          <div id="report-output" style="background: var(--bg-input); padding: 1rem; border-radius: 8px; min-height: 100px;">
-            Select a report type and click Generate...
+          <div class="card-title">📊 Market Analysis</div>
+          <div id="market-analysis" style="padding: 1rem; color: var(--text-secondary);">
+            Loading market analysis...
           </div>
         </div>
       </div>
 
       <!-- AGENT RESEARCH -->
-      <div class="panel" id="panel-research">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h2>🧠 Agent Research & Analysis</h2>
-          <span class="badge-live" id="agent-status">Ready</span>
-        </div>
+      <div class="panel" id="panel-agent">
+        <h2 class="panel-title">🤖 Agent Research & Analysis</h2>
         <div class="card">
-          <div class="card-title">💬 Direct Agent Communication</div>
-          <div style="background: var(--bg-input); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; min-height: 150px;" id="agent-chat">
-            <div style="margin-bottom: 0.5rem;"><strong>AlgoQBot:</strong> Ready for research. What would you like me to analyze?</div>
+          <div class="card-header">
+            <span class="card-title">💬 Direct Agent Communication</span>
+            <span class="badge idle" id="agent-status">Ready</span>
           </div>
-          <div class="input-row">
-            <input type="text" id="agent-input" placeholder="Ask me to research, analyze, or check issues..." />
-            <button class="btn btn-primary" id="agent-send">SEND</button>
+          <div class="messages-container" id="agent-messages">
+            <div class="message system">AlgoQBot: Hello! I'm ready to research, analyze, and implement improvements. What would you like me to check or research?</div>
           </div>
-          <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+          <div class="quick-actions">
             <button class="btn btn-outline" onclick="agentCommand('research market')">🔍 RESEARCH MARKET</button>
             <button class="btn btn-outline" onclick="agentCommand('analyze data')">📊 ANALYZE DATA</button>
-            <button class="btn btn-outline" onclick="agentCommand('check issues')">⚠️ CHECK ISSUES</button>
-            <button class="btn btn-outline" onclick="agentCommand('suggest improvements')">✨ SUGGEST</button>
+            <button class="btn btn-outline" onclick="agentCommand('check issues')">🔧 CHECK ISSUES</button>
+            <button class="btn btn-outline" onclick="agentCommand('suggest improvements')">💡 SUGGEST ENHANCEMENTS</button>
+          </div>
+          <div class="input-group">
+            <input type="text" id="agent-input" placeholder="Ask me to research, analyze, check issues, or implement improvements...">
+            <button class="btn btn-primary" id="agent-send">SEND</button>
           </div>
         </div>
       </div>
 
       <!-- AI COUNCIL -->
       <div class="panel" id="panel-council">
-        <h2 style="margin-bottom: 1rem;">🏛️ AI Council - Multi-AI Consensus</h2>
-        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Claude, DeepSeek, and Qwen collaborate to analyze your question.</p>
-
-        <div class="ai-badges">
-          <div class="ai-badge claude">🟣 Claude (Architect)</div>
-          <div class="ai-badge deepseek">🟢 DeepSeek (Math)</div>
-          <div class="ai-badge qwen">🔵 Qwen (Strategy)</div>
+        <h2 class="panel-title">🏛️ AI Council</h2>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🏛️</span>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <span class="badge idle" id="council-status">Idle</span>
+              <span style="color: var(--text-secondary);">Waiting for decision...</span>
+            </div>
+          </div>
         </div>
 
-        <div class="card" style="height: 400px; overflow-y: auto;" id="council-messages">
-          <div class="message system">Ask a question to start a consensus session...</div>
+        <div class="card">
+          <div class="card-title">📊 Token Usage & Costs</div>
+          <div class="token-grid">
+            <div class="token-card">
+              <div class="provider"><span style="color: #9B59B6;">●</span> CLAUDE</div>
+              <div class="count" id="claude-tokens">0</div>
+              <div class="cost" id="claude-cost">$0.0000</div>
+            </div>
+            <div class="token-card">
+              <div class="provider"><span style="color: var(--accent-green);">●</span> DEEPSEEK</div>
+              <div class="count" id="deepseek-tokens">0</div>
+              <div class="cost" id="deepseek-cost">$0.0000</div>
+            </div>
+            <div class="token-card">
+              <div class="provider"><span style="color: var(--accent-blue);">●</span> QWEN</div>
+              <div class="count" id="qwen-tokens">0</div>
+              <div class="cost" id="qwen-cost">$0.0000</div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
+            <span>Total This Session:</span>
+            <span style="color: var(--accent-green);" id="total-tokens">0 tokens</span>
+            <span style="color: var(--accent-purple);" id="total-cost">$0.0000</span>
+          </div>
         </div>
 
-        <div class="input-area">
-          <div class="input-row">
-            <input type="text" id="council-input" placeholder="Ask the AI Council..." />
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🎯 Consensus Progress</span>
+            <span id="council-round">Round 0/5</span>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span>Agreement Score</span>
+              <span id="agreement-score">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="consensus-progress" style="width: 0%;"></div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary);">
+            <span>⏳</span>
+            <span id="consensus-status">Waiting for responses...</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">💬 Council Discussion</div>
+          <div class="messages-container" id="council-messages"></div>
+          <div class="input-group">
+            <input type="text" id="council-input" placeholder="Ask the AI Council for consensus...">
             <button class="btn btn-primary" id="council-send">Ask Council</button>
-          </div>
-        </div>
-
-        <div class="grid-3" style="margin-top: 1rem;">
-          <div class="card">
-            <div class="card-title">Consensus</div>
-            <div class="status-value" id="consensus-score">0%</div>
-            <div class="consensus-bar"><div class="consensus-fill" id="consensus-fill" style="width: 0%"></div></div>
-          </div>
-          <div class="card">
-            <div class="card-title">Round</div>
-            <div class="status-value"><span id="current-round">0</span>/3</div>
-          </div>
-          <div class="card">
-            <div class="card-title">Cost</div>
-            <div class="status-value" id="session-cost">$0.0000</div>
           </div>
         </div>
       </div>
 
       <!-- PORTFOLIO -->
       <div class="panel" id="panel-portfolio">
-        <h2 style="margin-bottom: 1rem;">💰 Portfolio Overview</h2>
-        <div class="card" style="background: linear-gradient(135deg, var(--bg-card), rgba(139, 92, 246, 0.2));">
-          <div style="display: flex; gap: 3rem; flex-wrap: wrap;">
-            <div><div class="status-label">USDT</div><div class="status-value" id="usdt-balance">$0</div></div>
-            <div><div class="status-label">BNB</div><div class="status-value" id="bnb-balance">0</div></div>
-            <div><div class="status-label">TOTAL</div><div class="status-value green" id="total-balance">$0</div></div>
-            <div><div class="status-label">P&L</div><div class="status-value" id="portfolio-pnl">$0</div></div>
-            <div><div class="status-label">WIN RATE</div><div class="status-value" id="portfolio-winrate">0%</div></div>
+        <h2 class="panel-title">💰 Portfolio Overview</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">USDT</div>
+            <div class="stat-value" id="usdt-balance">$0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">BNB</div>
+            <div class="stat-value" id="bnb-balance">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total</div>
+            <div class="stat-value green" id="total-balance">$0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Positions</div>
+            <div class="stat-value" id="positions">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">P&L</div>
+            <div class="stat-value green" id="pnl">$0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-value" id="win-rate">--</div>
           </div>
         </div>
+
         <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <div class="card-title" style="margin: 0;">📊 Trade History</div>
-            <div style="display: flex; gap: 0.5rem;">
-              <button class="btn btn-outline" id="export-trades">Export</button>
-              <button class="btn btn-success" id="refresh-trades">🔄 Refresh</button>
-            </div>
+          <div class="card-header">
+            <span class="card-title">📈 Trade History <span style="color: var(--text-secondary);" id="trade-count">(0 trades)</span></span>
+            <button class="btn btn-success" onclick="loadTrades()">🔄 REFRESH</button>
           </div>
-          <table class="table">
-            <thead>
-              <tr><th>TIME</th><th>ACTION</th><th>PRICE</th><th>AMOUNT</th><th>CONF</th><th>REASON</th></tr>
-            </thead>
-            <tbody id="trades-table">
-              <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading...</td></tr>
-            </tbody>
-          </table>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>TIME</th>
+                  <th>TYPE</th>
+                  <th>ENTRY</th>
+                  <th>EXIT</th>
+                  <th>P&L</th>
+                  <th>DURATION</th>
+                </tr>
+              </thead>
+              <tbody id="trades-table">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading trades...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <!-- NOTES -->
       <div class="panel" id="panel-notes">
-        <h2 style="margin-bottom: 1rem;">📝 Notes</h2>
+        <h2 class="panel-title">📝 Notes & Planning</h2>
         <div class="card">
-          <textarea class="notes-textarea" id="notes-content" placeholder="Write your trading notes, observations, and ideas here..."></textarea>
+          <div class="card-header">
+            <button class="btn btn-primary" onclick="newNote()">+ NEW NOTE</button>
+            <input type="text" id="notes-search" placeholder="Search notes..." style="width: 300px; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+          </div>
+          <textarea class="notes-area" id="notes-content" placeholder="Write your notes here..."></textarea>
           <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-            <button class="btn btn-primary" id="save-notes">💾 Save Notes</button>
-            <button class="btn btn-outline" id="clear-notes">🗑️ Clear</button>
+            <button class="btn btn-success" onclick="saveNotes()">💾 Save</button>
+            <button class="btn btn-outline" onclick="clearNotes()">🗑️ Clear</button>
           </div>
         </div>
       </div>
 
       <!-- SEARCH -->
       <div class="panel" id="panel-search">
-        <h2 style="margin-bottom: 1rem;">🔍 Search</h2>
+        <h2 class="panel-title">🔍 Search & Organize</h2>
         <div class="card">
-          <input type="text" class="search-input" id="search-input" placeholder="Search trades, logs, strategies..." />
+          <div class="input-group" style="margin-bottom: 1rem;">
+            <input type="text" id="search-input" placeholder="Search conversations, notes, reports...">
+            <button class="btn btn-primary">SEARCH</button>
+          </div>
           <div id="search-results"></div>
         </div>
       </div>
@@ -482,10 +526,24 @@
   </div>
 
   <script>
-    const socket = io();
+    // Socket connection
+    const socket = io('http://localhost:9000', { transports: ['websocket', 'polling'] });
     let logs = [];
-    let councilActive = false;
-    let totalCost = 0;
+    let trades = [];
+
+    // Connection status
+    socket.on('connect', () => {
+      document.getElementById('status-dot').classList.add('connected');
+      document.getElementById('status-text').textContent = 'Connected';
+      addLog('success', 'Connected to AlgoQBot server');
+      loadData();
+    });
+
+    socket.on('disconnect', () => {
+      document.getElementById('status-dot').classList.remove('connected');
+      document.getElementById('status-text').textContent = 'Disconnected';
+      addLog('error', 'Disconnected from server');
+    });
 
     // Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -493,133 +551,105 @@
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         item.classList.add('active');
-        document.getElementById(`panel-${item.dataset.panel}`).classList.add('active');
+        document.getElementById('panel-' + item.dataset.panel).classList.add('active');
       });
     });
 
-    // Socket connection
-    socket.on('connect', () => {
-      document.getElementById('connection-dot').classList.remove('offline');
-      document.getElementById('connection-text').textContent = 'Connected';
-      addLog('info', 'Connected to AlgoQBot server');
-      loadData();
-    });
-
-    socket.on('disconnect', () => {
-      document.getElementById('connection-dot').classList.add('offline');
-      document.getElementById('connection-text').textContent = 'Disconnected';
-      addLog('error', 'Disconnected from server');
-    });
-
-    socket.on('welcome', (data) => {
-      addLog('success', `Server: ${data.message}`);
-    });
-
-    // Live logs from bot
-    socket.on('bot:log', (data) => {
-      addLog(data.level || 'info', data.message);
-    });
-
-    socket.on('bot:status', (data) => {
-      updateBotStatus(data);
-    });
-
-    // Chat
-    document.getElementById('chat-send').addEventListener('click', sendChat);
-    document.getElementById('chat-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
-
-    function sendChat() {
-      const input = document.getElementById('chat-input');
-      const msg = input.value.trim();
-      if (!msg) return;
-      addChatMessage('user', msg);
-      socket.emit('chat:message', { message: msg });
-      input.value = '';
-    }
-
-    socket.on('chat:response', (data) => {
-      addChatMessage('bot', data.response);
-    });
-
-    function addChatMessage(type, content) {
-      const container = document.getElementById('chat-messages');
-      const div = document.createElement('div');
-      div.className = `message ${type}`;
-      div.textContent = content;
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
-    }
-
-    // AI Council
-    document.getElementById('council-send').addEventListener('click', sendCouncil);
-    document.getElementById('council-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendCouncil(); });
-
-    function sendCouncil() {
-      const input = document.getElementById('council-input');
-      const msg = input.value.trim();
-      if (!msg || councilActive) return;
-
-      councilActive = true;
-      totalCost = 0;
-      document.getElementById('council-send').disabled = true;
-      document.getElementById('council-send').textContent = 'Deliberating...';
-
-      addCouncilMessage('user', msg);
-      socket.emit('council:start', { task: msg });
-      input.value = '';
-    }
-
-    socket.on('council:event', (event) => {
-      if (event.type === 'message' && event.data.type === 'ai') {
-        const ai = event.data.provider;
-        const emoji = ai === 'claude' ? '🟣' : ai === 'deepseek' ? '🟢' : '🔵';
-        addCouncilMessage(ai, `${emoji} ${ai.toUpperCase()}: ${event.data.content}`);
-        if (event.data.tokens) {
-          totalCost += event.data.tokens.cost;
-          document.getElementById('session-cost').textContent = `$${totalCost.toFixed(4)}`;
+    // Load data from API
+    async function loadData() {
+      try {
+        const statusRes = await fetch('/api/status');
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          updateDashboard(data);
         }
-      } else if (event.type === 'status' && event.data.status === 'round_start') {
-        document.getElementById('current-round').textContent = event.data.round;
-        addCouncilMessage('system', `📢 Round ${event.data.round}/${event.data.maxRounds}`);
+        loadTrades();
+      } catch (e) {
+        addLog('error', 'Failed to load data: ' + e.message);
       }
-    });
+    }
 
-    socket.on('council:complete', (data) => {
-      councilActive = false;
-      document.getElementById('council-send').disabled = false;
-      document.getElementById('council-send').textContent = 'Ask Council';
-      const score = (data.consensus.score * 100).toFixed(1);
-      document.getElementById('consensus-score').textContent = `${score}%`;
-      document.getElementById('consensus-fill').style.width = `${score}%`;
-      addCouncilMessage('system', `${data.consensus.reached ? '✅ Consensus reached!' : '⚠️ Max rounds'} - ${score}%`);
-    });
+    function updateDashboard(data) {
+      document.getElementById('bot-status').textContent = data.running ? 'Running' : 'Stopped';
+      document.getElementById('bot-status').className = 'stat-value ' + (data.running ? 'green' : 'red');
 
-    socket.on('council:error', (data) => {
-      councilActive = false;
-      document.getElementById('council-send').disabled = false;
-      document.getElementById('council-send').textContent = 'Ask Council';
-      addCouncilMessage('system', `❌ Error: ${data.error}`);
-    });
+      if (data.portfolio) {
+        document.getElementById('portfolio-value').textContent = '$' + (data.portfolio.total || 0).toFixed(2);
+        document.getElementById('usdt-balance').textContent = '$' + (data.portfolio.usdt || 0).toFixed(2);
+        document.getElementById('bnb-balance').textContent = (data.portfolio.bnb || 0).toFixed(4);
+        document.getElementById('total-balance').textContent = '$' + (data.portfolio.total || 0).toFixed(2);
+      }
 
-    function addCouncilMessage(type, content) {
-      const container = document.getElementById('council-messages');
-      const div = document.createElement('div');
-      div.className = `message ${type}`;
-      div.innerHTML = content;
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
+      if (data.volatility) {
+        document.getElementById('volatility-regime').textContent = data.volatility.regime || '--';
+        document.getElementById('vol-4h').textContent = (data.volatility.vol4h || 0).toFixed(2) + '%';
+      }
+
+      document.getElementById('strategy').textContent = data.strategy || '--';
+      document.getElementById('last-action').textContent = data.lastAction || 'HOLD';
+      document.getElementById('confidence').textContent = (data.confidence || 0) + '%';
+
+      // Update market analysis
+      const analysis = `
+        <p><strong>Volatility Regime:</strong> ${data.volatility?.regime || 'UNKNOWN'}</p>
+        <p><strong>Description:</strong> ${data.volatility?.description || 'No description available'}</p>
+        <p><strong>4h Volatility:</strong> ${(data.volatility?.vol4h || 0).toFixed(2)}%</p>
+        <p><strong>1h Volatility:</strong> ${(data.volatility?.vol1h || 0).toFixed(2)}%</p>
+        <p><strong>Strategy:</strong> ${data.strategy || 'none'}</p>
+      `;
+      document.getElementById('market-analysis').innerHTML = analysis;
+    }
+
+    async function loadTrades() {
+      try {
+        const res = await fetch('/api/trades');
+        if (res.ok) {
+          const data = await res.json();
+          trades = data.trades || [];
+          document.getElementById('trade-count').textContent = `(${data.total || 0} trades)`;
+          renderTrades();
+        }
+      } catch (e) {
+        console.error('Error loading trades:', e);
+      }
+    }
+
+    function renderTrades() {
+      const tbody = document.getElementById('trades-table');
+      if (!trades.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No trades yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = trades.slice(-20).reverse().map(t => {
+        const action = (t.action || t.type || '--').toUpperCase();
+        const isExit = action.includes('EXIT') || t.exitPrice;
+        const isBuy = action === 'BUY';
+        const price = t.targetPrice || t.entryPrice || 0;
+        const exitPrice = t.exitPrice || '--';
+        const pnl = t.profit || 0;
+        const duration = t.duration || '0m';
+
+        return `<tr>
+          <td>${new Date(t.timestamp).toLocaleString()}</td>
+          <td style="color: ${isExit ? 'var(--accent-red)' : isBuy ? 'var(--accent-green)' : 'var(--accent-yellow)'};">${isExit ? 'EXIT' : action}</td>
+          <td>${price > 0.01 ? price.toFixed(6) : price.toFixed(8)}</td>
+          <td>${typeof exitPrice === 'number' ? exitPrice.toFixed(6) : exitPrice}</td>
+          <td style="color: ${pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">$${pnl.toFixed(2)} (${((pnl/100)*100).toFixed(2)}%)</td>
+          <td>${duration}</td>
+        </tr>`;
+      }).join('');
     }
 
     // Logs
     function addLog(level, message) {
       const time = new Date().toLocaleTimeString();
-      const entry = { time, level, message };
-      logs.push(entry);
+      logs.push({ time, level, message });
       if (logs.length > 200) logs.shift();
 
       const container = document.getElementById('logs-container');
       const div = document.createElement('div');
-      div.className = `log-entry log-${level}`;
+      div.className = 'log-entry ' + level;
       div.textContent = `[${time}] ${message}`;
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
@@ -627,8 +657,30 @@
 
     function clearLogs() {
       logs = [];
-      document.getElementById('logs-container').innerHTML = '<div class="log-entry log-info">[System] Logs cleared</div>';
+      document.getElementById('logs-container').innerHTML = '<div class="log-entry info">[System] Logs cleared</div>';
     }
+
+    socket.on('bot:log', (data) => {
+      addLog(data.level || 'info', data.message);
+    });
+
+    // Chat
+    document.getElementById('chat-send').addEventListener('click', () => {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      const container = document.getElementById('chat-messages');
+      container.innerHTML += `<div class="message user">${msg}</div>`;
+      socket.emit('chat:message', { message: msg });
+      input.value = '';
+    });
+
+    socket.on('chat:response', (data) => {
+      const container = document.getElementById('chat-messages');
+      container.innerHTML += `<div class="message ai">${data.response}</div>`;
+      container.scrollTop = container.scrollHeight;
+    });
 
     // Agent commands
     function agentCommand(cmd) {
@@ -641,118 +693,101 @@
       const msg = input.value.trim();
       if (!msg) return;
 
-      const chat = document.getElementById('agent-chat');
-      chat.innerHTML += `<div style="margin-bottom: 0.5rem; color: var(--accent-purple);"><strong>You:</strong> ${msg}</div>`;
+      const container = document.getElementById('agent-messages');
+      container.innerHTML += `<div class="message user">${msg}</div>`;
+      document.getElementById('agent-status').textContent = 'Processing...';
+      document.getElementById('agent-status').className = 'badge deliberating';
       socket.emit('agent:command', { command: msg });
       input.value = '';
     });
 
     socket.on('agent:response', (data) => {
-      const chat = document.getElementById('agent-chat');
-      chat.innerHTML += `<div style="margin-bottom: 0.5rem;"><strong>AlgoQBot:</strong> ${data.response}</div>`;
-      chat.scrollTop = chat.scrollHeight;
+      const container = document.getElementById('agent-messages');
+      container.innerHTML += `<div class="message ai">${data.response}</div>`;
+      container.scrollTop = container.scrollHeight;
+      document.getElementById('agent-status').textContent = 'Ready';
+      document.getElementById('agent-status').className = 'badge idle';
     });
 
-    // Load data
-    async function loadData() {
-      try {
-        // Load status
-        const statusRes = await fetch('/api/status');
-        if (statusRes.ok) {
-          const data = await statusRes.json();
-          updateBotStatus(data);
+    // AI Council
+    document.getElementById('council-send').addEventListener('click', () => {
+      const input = document.getElementById('council-input');
+      const task = input.value.trim();
+      if (!task) return;
+
+      const container = document.getElementById('council-messages');
+      container.innerHTML += `<div class="message user">${task}</div>`;
+      document.getElementById('council-status').textContent = 'Deliberating';
+      document.getElementById('council-status').className = 'badge deliberating';
+      document.getElementById('council-send').textContent = 'Deliberating...';
+      document.getElementById('council-send').disabled = true;
+
+      socket.emit('council:start', { task });
+      input.value = '';
+    });
+
+    socket.on('council_event', (event) => {
+      if (event.type === 'message' && event.data) {
+        const container = document.getElementById('council-messages');
+        const provider = event.provider || event.data.provider || 'system';
+        container.innerHTML += `<div class="message ai ${provider}">${event.data.content || event.data}</div>`;
+        container.scrollTop = container.scrollHeight;
+
+        // Update token counts
+        if (event.data.tokens) {
+          const tokens = event.data.tokens;
+          document.getElementById(provider + '-tokens').textContent = tokens.total || 0;
+          document.getElementById(provider + '-cost').textContent = '$' + (tokens.cost || 0).toFixed(4);
         }
-
-        // Load trades
-        const tradesRes = await fetch('/api/trades');
-        if (tradesRes.ok) {
-          const data = await tradesRes.json();
-          updateTrades(data.trades || []);
-          document.getElementById('total-trades').textContent = data.total || 0;
-        }
-      } catch (e) {
-        addLog('error', 'Failed to load data: ' + e.message);
-      }
-    }
-
-    function updateBotStatus(data) {
-      document.getElementById('bot-status').textContent = data.running ? 'Running' : 'Stopped';
-      document.getElementById('bot-status').className = `status-value ${data.running ? 'green' : 'yellow'}`;
-
-      if (data.portfolio) {
-        document.getElementById('portfolio-value').textContent = `$${(data.portfolio.total || data.portfolio.usdt || 0).toFixed(2)}`;
-        document.getElementById('usdt-balance').textContent = `$${(data.portfolio.usdt || 0).toFixed(2)}`;
-        document.getElementById('bnb-balance').textContent = (data.portfolio.bnb || 0).toFixed(4);
-        document.getElementById('total-balance').textContent = `$${(data.portfolio.total || 0).toFixed(2)}`;
       }
 
-      if (data.volatility) {
-        const badge = document.getElementById('volatility-badge');
-        badge.textContent = data.volatility.regime || 'UNKNOWN';
-        badge.className = `volatility-badge vol-${(data.volatility.regime || 'low').toLowerCase().replace('_', '-')}`;
-        document.getElementById('vol-4h').textContent = `${(data.volatility.vol4h || 0).toFixed(2)}%`;
-        document.getElementById('vol-1h').textContent = `${(data.volatility.vol1h || 0).toFixed(2)}%`;
+      if (event.type === 'status' && event.data.round) {
+        document.getElementById('council-round').textContent = `Round ${event.data.round}/${event.data.maxRounds || 5}`;
       }
 
-      if (data.strategy) {
-        document.getElementById('strategy').textContent = data.strategy;
+      if (event.type === 'consensus') {
+        const score = (event.data.score || 0) * 100;
+        document.getElementById('agreement-score').textContent = score.toFixed(1) + '%';
+        document.getElementById('consensus-progress').style.width = score + '%';
+        document.getElementById('consensus-status').textContent = event.data.reached ? 'Consensus reached!' : 'Voting by majority...';
       }
-    }
+    });
 
-    function updateTrades(trades) {
-      const tbody = document.getElementById('trades-table');
-      if (!trades || !trades.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No trades yet</td></tr>';
-        return;
-      }
+    socket.on('council:complete', () => {
+      document.getElementById('council-status').textContent = 'Complete';
+      document.getElementById('council-status').className = 'badge active';
+      document.getElementById('council-send').textContent = 'Ask Council';
+      document.getElementById('council-send').disabled = false;
+    });
 
-      // Calculate stats - handle actual data format
-      let holdTrades = trades.filter(t => t.action === 'HOLD' || t.action === 'hold');
-      let buyTrades = trades.filter(t => t.action === 'buy' || t.action === 'BUY');
-      let totalPnl = 0;
-
-      document.getElementById('win-rate').textContent = `${((buyTrades.length / Math.max(trades.length, 1)) * 100).toFixed(1)}%`;
-      document.getElementById('total-pnl').textContent = `Shadow Mode`;
-      document.getElementById('total-pnl').className = `status-value yellow`;
-      document.getElementById('portfolio-pnl').textContent = `$0.00 (Shadow)`;
-      document.getElementById('portfolio-winrate').textContent = `${trades.length} signals`;
-
-      tbody.innerHTML = trades.slice(-15).reverse().map(t => {
-        const action = (t.action || 'unknown').toUpperCase();
-        const isBuy = action === 'BUY';
-        const isHold = action === 'HOLD';
-        const price = t.targetPrice || 0;
-        const priceDisplay = price > 0.01 ? price.toFixed(4) : price.toFixed(8);
-        const amount = t.amount || 0;
-
-        return `<tr>
-          <td>${new Date(t.timestamp).toLocaleString()}</td>
-          <td style="color: ${isBuy ? 'var(--accent-green)' : isHold ? 'var(--accent-yellow)' : 'var(--accent-red)'};">${action}</td>
-          <td>${priceDisplay}</td>
-          <td>$${amount.toFixed(2)}</td>
-          <td style="color: var(--text-secondary);">${(t.confidence * 100).toFixed(0)}%</td>
-          <td title="${t.reasoning || ''}">${(t.reasoning || '').substring(0, 20)}...</td>
-        </tr>`;
-      }).join('');
-    }
-
-    document.getElementById('refresh-trades').addEventListener('click', loadData);
+    socket.on('council:error', (data) => {
+      document.getElementById('council-status').textContent = 'Error';
+      document.getElementById('council-status').className = 'badge';
+      document.getElementById('council-send').textContent = 'Ask Council';
+      document.getElementById('council-send').disabled = false;
+      addLog('error', 'Council error: ' + data.error);
+    });
 
     // Notes
     const savedNotes = localStorage.getItem('algoqbot-notes');
     if (savedNotes) document.getElementById('notes-content').value = savedNotes;
 
-    document.getElementById('save-notes').addEventListener('click', () => {
+    function saveNotes() {
       localStorage.setItem('algoqbot-notes', document.getElementById('notes-content').value);
       addLog('success', 'Notes saved');
-    });
+    }
 
-    document.getElementById('clear-notes').addEventListener('click', () => {
+    function clearNotes() {
       if (confirm('Clear all notes?')) {
         document.getElementById('notes-content').value = '';
         localStorage.removeItem('algoqbot-notes');
       }
-    });
+    }
+
+    function newNote() {
+      const content = document.getElementById('notes-content');
+      content.value = new Date().toLocaleString() + '\n---\n' + content.value;
+    }
 
     // Search
     document.getElementById('search-input').addEventListener('input', (e) => {
@@ -764,19 +799,13 @@
 
       const results = logs.filter(l => l.message.toLowerCase().includes(query));
       document.getElementById('search-results').innerHTML = results.length
-        ? results.slice(-20).map(r => `<div style="padding: 0.5rem; background: var(--bg-input); margin-bottom: 0.5rem; border-radius: 8px;">[${r.time}] ${r.message}</div>`).join('')
-        : '<div style="color: var(--text-secondary);">No results found</div>';
+        ? results.slice(-20).map(r => `<div class="card" style="padding: 0.5rem;">[${r.time}] ${r.message}</div>`).join('')
+        : '<div style="color: var(--text-secondary); padding: 1rem;">No results found</div>';
     });
 
-    // Auto-refresh and initial load
-    loadData(); // Load immediately on page start
-    setInterval(loadData, 15000);
-
-    // Also load when socket connects
-    socket.on('connect', () => {
-      loadData();
-      addLog('success', 'Connected to AlgoQBot server');
-    });
+    // Auto-refresh
+    setInterval(loadData, 30000);
+    loadData();
   </script>
 </body>
 </html>
