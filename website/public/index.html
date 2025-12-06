@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlgoQBot - Production Monitor</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <span class="logo-icon">🤖</span>
+            <h1>AlgoQBot</h1>
+            <span class="version">v2.0</span>
+        </div>
+        <div class="status-bar">
+            <div class="status-item" id="connection-status">
+                <span class="dot disconnected"></span>
+                <span>Disconnected</span>
+            </div>
+            <div class="status-item" id="bot-status">
+                <span class="dot"></span>
+                <span>Bot: Loading...</span>
+            </div>
+            <div class="status-item" id="mode-status">
+                <span class="mode-badge shadow">Shadow Mode</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav-tabs">
+        <button class="nav-tab active" data-section="monitor">
+            <span class="tab-icon">📡</span>
+            <span>Live Monitor</span>
+        </button>
+        <button class="nav-tab" data-section="chat">
+            <span class="tab-icon">💬</span>
+            <span>AI Chat</span>
+        </button>
+        <button class="nav-tab" data-section="reports">
+            <span class="tab-icon">📊</span>
+            <span>Intelligence</span>
+        </button>
+        <button class="nav-tab" data-section="council">
+            <span class="tab-icon">🏛️</span>
+            <span>AI Council</span>
+        </button>
+        <button class="nav-tab" data-section="portfolio">
+            <span class="tab-icon">💰</span>
+            <span>Portfolio</span>
+        </button>
+        <button class="nav-tab" data-section="settings">
+            <span class="tab-icon">⚙️</span>
+            <span>Settings</span>
+        </button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Live Monitor Section -->
+        <section id="monitor" class="section active">
+            <div class="section-header">
+                <h2>Live Monitor</h2>
+                <div class="refresh-indicator">
+                    <span class="pulse"></span>
+                    <span>Auto-refresh: 5s</span>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Bot Status Card -->
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h3>Bot Status</h3>
+                        <span class="card-icon">🤖</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="big-status" id="big-bot-status">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Loading...</span>
+                        </div>
+                        <div class="status-details">
+                            <div class="detail-row">
+                                <span class="label">Strategy:</span>
+                                <span class="value" id="current-strategy">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Regime:</span>
+                                <span class="value" id="current-regime">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Confidence:</span>
+                                <span class="value" id="current-confidence">--</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Uptime:</span>
+                                <span class="value" id="bot-uptime">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Portfolio Card -->
+                <div class="card portfolio-card">
+                    <div class="card-header">
+                        <h3>Portfolio Value</h3>
+                        <span class="card-icon">💼</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="portfolio-total">
+                            <span class="currency">$</span>
+                            <span class="amount" id="total-value">0.00</span>
+                        </div>
+                        <div class="portfolio-breakdown">
+                            <div class="asset">
+                                <span class="asset-icon">💵</span>
+                                <span class="asset-name">USDT</span>
+                                <span class="asset-value" id="usdt-balance">0.00</span>
+                            </div>
+                            <div class="asset">
+                                <span class="asset-icon">🔶</span>
+                                <span class="asset-name">BNB</span>
+                                <span class="asset-value" id="bnb-balance">0.0000</span>
+                            </div>
+                        </div>
+                        <div class="allocation-bar">
+                            <div class="usdt-bar" id="usdt-bar"></div>
+                            <div class="bnb-bar" id="bnb-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Data Card -->
+                <div class="card market-card">
+                    <div class="card-header">
+                        <h3>Market Data</h3>
+                        <span class="card-icon">📈</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="price-display">
+                            <span class="label">BNB/USDT</span>
+                            <span class="price" id="bnb-price">$0.00</span>
+                            <span class="change" id="price-change">+0.00%</span>
+                        </div>
+                        <div class="market-metrics">
+                            <div class="metric">
+                                <span class="label">24h Vol</span>
+                                <span class="value" id="volume-24h">--</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Volatility</span>
+                                <span class="value" id="volatility">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trading Stats Card -->
+                <div class="card stats-card">
+                    <div class="card-header">
+                        <h3>Trading Stats</h3>
+                        <span class="card-icon">📊</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="stats-grid">
+                            <div class="stat">
+                                <span class="stat-value" id="total-trades">0</span>
+                                <span class="stat-label">Total Trades</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="win-rate">0%</span>
+                                <span class="stat-label">Win Rate</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="open-positions">0</span>
+                                <span class="stat-label">Open Positions</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="today-pnl">$0.00</span>
+                                <span class="stat-label">Today P&L</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="card activity-card">
+                <div class="card-header">
+                    <h3>Activity Log</h3>
+                    <button class="btn-small" onclick="clearActivityLog()">Clear</button>
+                </div>
+                <div class="card-body">
+                    <div class="activity-log" id="activity-log">
+                        <div class="log-entry">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-message">Waiting for connection...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Chat Section -->
+        <section id="chat" class="section">
+            <div class="section-header">
+                <h2>AI Chat</h2>
+                <div class="chat-status">
+                    <span class="dot connected"></span>
+                    <span>AI Ready</span>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message system">
+                        <div class="message-content">
+                            <p>Welcome to AlgoQBot AI Assistant. I can help you:</p>
+                            <ul>
+                                <li>Analyze trading performance</li>
+                                <li>Generate reports and insights</li>
+                                <li>Adjust bot parameters</li>
+                                <li>Explain strategies and decisions</li>
+                            </ul>
+                            <p>Type your question or use the quick actions below.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="sendQuickMessage('Analyze my recent trades')">📊 Analyze Trades</button>
+                    <button class="quick-btn" onclick="sendQuickMessage('What is the current market regime?')">📈 Market Status</button>
+                    <button class="quick-btn" onclick="sendQuickMessage('Generate a performance report')">📋 Performance Report</button>
+                    <button class="quick-btn" onclick="sendQuickMessage('Suggest parameter optimizations')">⚡ Optimize</button>
+                </div>
+
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Ask anything about your trading bot..." onkeypress="handleChatKeypress(event)">
+                    <button class="send-btn" onclick="sendChatMessage()">
+                        <span>Send</span>
+                        <span class="send-icon">➤</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Intelligence Reports Section -->
+        <section id="reports" class="section">
+            <div class="section-header">
+                <h2>Intelligence Reports</h2>
+                <span class="section-desc">AI-powered analysis and insights</span>
+            </div>
+
+            <div class="report-types">
+                <button class="report-btn" onclick="generateReport('market')">
+                    <span class="report-icon">📈</span>
+                    <span class="report-name">Market Analysis</span>
+                    <span class="report-desc">Current market conditions & trends</span>
+                </button>
+                <button class="report-btn" onclick="generateReport('risk')">
+                    <span class="report-icon">🛡️</span>
+                    <span class="report-name">Risk Metrics</span>
+                    <span class="report-desc">Portfolio risk assessment</span>
+                </button>
+                <button class="report-btn" onclick="generateReport('performance')">
+                    <span class="report-icon">📊</span>
+                    <span class="report-name">Performance Trends</span>
+                    <span class="report-desc">Historical performance analysis</span>
+                </button>
+                <button class="report-btn" onclick="generateReport('summary')">
+                    <span class="report-icon">📋</span>
+                    <span class="report-name">Trading Summary</span>
+                    <span class="report-desc">Complete trading overview</span>
+                </button>
+            </div>
+
+            <div class="report-output" id="report-output">
+                <div class="report-placeholder">
+                    <span class="placeholder-icon">📄</span>
+                    <p>Select a report type above to generate AI-powered insights</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Council Section -->
+        <section id="council" class="section">
+            <div class="section-header">
+                <h2>AI Council</h2>
+                <span class="section-desc">Multi-agent decision making</span>
+            </div>
+
+            <div class="council-grid">
+                <!-- Council Members -->
+                <div class="council-members">
+                    <div class="member-card" data-agent="strategist">
+                        <div class="member-avatar">🎯</div>
+                        <div class="member-info">
+                            <h4>Strategist</h4>
+                            <span class="member-role">Strategy & Direction</span>
+                        </div>
+                        <div class="member-status ready">Ready</div>
+                    </div>
+                    <div class="member-card" data-agent="analyst">
+                        <div class="member-avatar">📊</div>
+                        <div class="member-info">
+                            <h4>Analyst</h4>
+                            <span class="member-role">Data Analysis</span>
+                        </div>
+                        <div class="member-status ready">Ready</div>
+                    </div>
+                    <div class="member-card" data-agent="risk">
+                        <div class="member-avatar">🛡️</div>
+                        <div class="member-info">
+                            <h4>Risk Manager</h4>
+                            <span class="member-role">Risk Assessment</span>
+                        </div>
+                        <div class="member-status ready">Ready</div>
+                    </div>
+                    <div class="member-card" data-agent="executor">
+                        <div class="member-avatar">⚡</div>
+                        <div class="member-info">
+                            <h4>Executor</h4>
+                            <span class="member-role">Trade Execution</span>
+                        </div>
+                        <div class="member-status ready">Ready</div>
+                    </div>
+                </div>
+
+                <!-- Council Discussion -->
+                <div class="council-discussion">
+                    <div class="discussion-header">
+                        <h3>Council Discussion</h3>
+                        <button class="btn-small" onclick="startCouncilSession()">New Session</button>
+                    </div>
+                    <div class="discussion-log" id="council-log">
+                        <div class="council-entry system">
+                            <span class="entry-content">AI Council is ready. Start a new session to discuss trading decisions.</span>
+                        </div>
+                    </div>
+
+                    <div class="council-input-container">
+                        <input type="text" id="council-input" placeholder="Propose a topic for council discussion..." onkeypress="handleCouncilKeypress(event)">
+                        <button class="council-btn" onclick="submitToCouncil()">Convene</button>
+                    </div>
+                </div>
+
+                <!-- Consensus Panel -->
+                <div class="consensus-panel">
+                    <h3>Current Consensus</h3>
+                    <div class="consensus-meter">
+                        <div class="meter-fill" id="consensus-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="consensus-value" id="consensus-value">--</div>
+                    <div class="consensus-action" id="consensus-action">
+                        <span class="action-label">Recommended Action:</span>
+                        <span class="action-value">Awaiting discussion</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Portfolio Section -->
+        <section id="portfolio" class="section">
+            <div class="section-header">
+                <h2>Portfolio</h2>
+                <button class="btn-small" onclick="refreshPortfolio()">Refresh</button>
+            </div>
+
+            <div class="portfolio-overview">
+                <div class="overview-card total">
+                    <span class="overview-label">Total Value</span>
+                    <span class="overview-value" id="portfolio-total">$0.00</span>
+                    <span class="overview-change positive" id="portfolio-change">+0.00%</span>
+                </div>
+                <div class="overview-card">
+                    <span class="overview-label">Available</span>
+                    <span class="overview-value" id="portfolio-available">$0.00</span>
+                </div>
+                <div class="overview-card">
+                    <span class="overview-label">In Positions</span>
+                    <span class="overview-value" id="portfolio-positions">$0.00</span>
+                </div>
+                <div class="overview-card">
+                    <span class="overview-label">Unrealized P&L</span>
+                    <span class="overview-value" id="unrealized-pnl">$0.00</span>
+                </div>
+            </div>
+
+            <!-- Open Positions -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Open Positions</h3>
+                    <span class="position-count" id="position-count">0 positions</span>
+                </div>
+                <div class="card-body">
+                    <div class="positions-table" id="positions-table">
+                        <div class="empty-state">No open positions</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade History -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Recent Trades</h3>
+                    <button class="btn-small" onclick="exportTrades()">Export</button>
+                </div>
+                <div class="card-body">
+                    <div class="trades-table" id="trades-table">
+                        <div class="empty-state">Loading trades...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="section">
+            <div class="section-header">
+                <h2>Settings</h2>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h3>Bot Configuration</h3>
+                    <div class="setting-item">
+                        <label>Trading Mode</label>
+                        <select id="trading-mode">
+                            <option value="shadow" selected>Shadow Mode</option>
+                            <option value="live">Live Trading</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Max Position Size ($)</label>
+                        <input type="number" id="max-position" value="1000">
+                    </div>
+                    <div class="setting-item">
+                        <label>Stop Loss (%)</label>
+                        <input type="number" id="stop-loss" value="2" step="0.1">
+                    </div>
+                    <div class="setting-item">
+                        <label>Take Profit (%)</label>
+                        <input type="number" id="take-profit" value="1.5" step="0.1">
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Notifications</h3>
+                    <div class="setting-item toggle">
+                        <label>Trade Alerts</label>
+                        <input type="checkbox" id="trade-alerts" checked>
+                    </div>
+                    <div class="setting-item toggle">
+                        <label>P&L Updates</label>
+                        <input type="checkbox" id="pnl-alerts" checked>
+                    </div>
+                    <div class="setting-item toggle">
+                        <label>Risk Warnings</label>
+                        <input type="checkbox" id="risk-alerts" checked>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Actions</h3>
+                    <button class="action-btn" onclick="pauseBot()">⏸️ Pause Bot</button>
+                    <button class="action-btn" onclick="resumeBot()">▶️ Resume Bot</button>
+                    <button class="action-btn danger" onclick="emergencyStop()">🛑 Emergency Stop</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <span>AlgoQBot Production Monitor</span>
+        <span id="last-update">Last update: --</span>
+    </footer>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

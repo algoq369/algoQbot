@@ -22,7 +22,9 @@
     "health-check": "node utils/healthCheck.js",
     "reset-emergency": "node utils/resetEmergency.js",
     "reset-emergency-force": "node utils/resetEmergency.js --force",
-    "report": "node scripts/shadow-report.js"
+    "report": "node scripts/shadow-report.js",
+    "monitor-web": "node website/server/index.js",
+    "web": "node website/server/index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
