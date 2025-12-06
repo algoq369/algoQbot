@@ -51,7 +51,7 @@ export default function AICouncilPage() {
 
   // Connect to AI Council WebSocket server
   useEffect(() => {
-    const newSocket = io('http://localhost:3030', {
+    const newSocket = io('http://localhost:9000', {
       transports: ['websocket', 'polling']
     })
 

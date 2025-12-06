@@ -15,7 +15,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const QWEN_API_KEY = process.env.QWEN_API_KEY || '';
 
-const PORT = process.env.COUNCIL_PORT || 3030;
+const PORT = process.env.COUNCIL_PORT || 9000;
 
 // Create Express app and Socket.IO server
 const app = express();
