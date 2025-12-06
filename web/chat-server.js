@@ -217,18 +217,37 @@ class UnifiedWebServer {
   }
 
   sendExistingLogs(socket) {
-    const logFile = path.join(__dirname, '..', 'logs', 'bot.log');
+    // Try multiple log file locations
+    const logDir = path.join(__dirname, '..', 'logs');
+    const today = new Date().toISOString().split('T')[0];
+    const logFiles = [
+      path.join(logDir, `combined-${today}.log`),  // Daily rotate format
+      path.join(logDir, 'combined.log'),            // Fallback format
+      path.join(logDir, 'bot.log')                  // Simple format
+    ];
+
     try {
-      if (fs.existsSync(logFile)) {
-        const content = fs.readFileSync(logFile, 'utf-8');
-        const lines = content.split('\n').filter(l => l.trim()).slice(-20); // Last 20 lines
+      let content = '';
+      for (const logFile of logFiles) {
+        if (fs.existsSync(logFile)) {
+          content = fs.readFileSync(logFile, 'utf-8');
+          console.log(`📋 Reading logs from: ${logFile}`);
+          break;
+        }
+      }
+
+      if (content) {
+        const lines = content.split('\n').filter(l => l.trim()).slice(-30); // Last 30 lines
         lines.forEach(line => {
           let level = 'info';
-          if (line.includes('error') || line.includes('❌')) level = 'error';
-          else if (line.includes('warn') || line.includes('⚠️')) level = 'warn';
-          else if (line.includes('✅') || line.includes('success')) level = 'success';
-          socket.emit('bot:log', { level, message: line.substring(0, 200) });
+          if (line.includes('error') || line.includes('❌') || line.includes('[error]')) level = 'error';
+          else if (line.includes('warn') || line.includes('⚠️') || line.includes('[warn]')) level = 'warn';
+          else if (line.includes('✅') || line.includes('success') || line.includes('[debug]')) level = 'success';
+          socket.emit('bot:log', { level, message: line.substring(0, 300) });
         });
+      } else {
+        // Send placeholder if no logs exist
+        socket.emit('bot:log', { level: 'info', message: '[System] Waiting for bot logs...' });
       }
     } catch (e) {
       console.error('Error sending existing logs:', e.message);
@@ -236,28 +255,40 @@ class UnifiedWebServer {
   }
 
   startLogStreaming() {
-    const logFile = path.join(__dirname, '..', 'logs', 'bot.log');
+    const logDir = path.join(__dirname, '..', 'logs');
 
     // Check for new log entries periodically
-    let lastSize = 0;
+    let lastSizes = {};
     setInterval(() => {
       try {
-        if (fs.existsSync(logFile)) {
-          const stats = fs.statSync(logFile);
-          if (stats.size > lastSize) {
-            const content = fs.readFileSync(logFile, 'utf-8');
-            const lines = content.split('\n').slice(-5); // Last 5 lines
-            lines.forEach(line => {
-              if (line.trim()) {
-                let level = 'info';
-                if (line.includes('error') || line.includes('❌')) level = 'error';
-                else if (line.includes('warn') || line.includes('⚠️')) level = 'warn';
-                else if (line.includes('✅') || line.includes('success')) level = 'success';
+        const today = new Date().toISOString().split('T')[0];
+        const logFiles = [
+          path.join(logDir, `combined-${today}.log`),
+          path.join(logDir, 'combined.log'),
+          path.join(logDir, 'bot.log')
+        ];
 
-                this.io.emit('bot:log', { level, message: line.substring(0, 200) });
-              }
-            });
-            lastSize = stats.size;
+        for (const logFile of logFiles) {
+          if (fs.existsSync(logFile)) {
+            const stats = fs.statSync(logFile);
+            const lastSize = lastSizes[logFile] || 0;
+
+            if (stats.size > lastSize) {
+              const content = fs.readFileSync(logFile, 'utf-8');
+              const lines = content.split('\n').slice(-10); // Last 10 lines
+              lines.forEach(line => {
+                if (line.trim()) {
+                  let level = 'info';
+                  if (line.includes('error') || line.includes('❌') || line.includes('[error]')) level = 'error';
+                  else if (line.includes('warn') || line.includes('⚠️') || line.includes('[warn]')) level = 'warn';
+                  else if (line.includes('✅') || line.includes('success') || line.includes('[debug]')) level = 'success';
+
+                  this.io.emit('bot:log', { level, message: line.substring(0, 300) });
+                }
+              });
+              lastSizes[logFile] = stats.size;
+            }
+            break; // Only read from the first existing log file
           }
         }
       } catch (e) {
