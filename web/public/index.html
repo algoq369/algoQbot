@@ -832,7 +832,7 @@
     }
 
     function formatReport(data) {
-      let html = `<div style="color: var(--accent-green); margin-bottom: 1rem;">📊 ${data.type.toUpperCase()} REPORT</div>`;
+      let html = `<div style="color: var(--accent-green); margin-bottom: 1rem;">📊 ${(data.title || data.type || 'REPORT').toUpperCase()}</div>`;
       html += `<div style="color: var(--text-secondary); margin-bottom: 1rem;">Generated: ${new Date(data.timestamp).toLocaleString()}</div>`;
       html += '<hr style="border-color: var(--border); margin: 1rem 0;">';
 
@@ -884,7 +884,7 @@
           reasoningEl.innerHTML = `
             <div style="color: var(--accent-green); margin-bottom: 0.5rem;">✅ ${action.toUpperCase()} Complete</div>
             <div style="margin-bottom: 0.5rem;"><strong>Action:</strong> ${data.action}</div>
-            <div style="margin-bottom: 0.5rem;"><strong>Reasoning:</strong> ${data.reasoning || 'Analyzed live bot data'}</div>
+            <div style="margin-bottom: 0.5rem;"><strong>Analysis:</strong> ${data.message || data.reasoning || 'Analyzed live bot data'}</div>
             <div style="color: var(--text-secondary);">Timestamp: ${new Date(data.timestamp).toLocaleString()}</div>
           `;
           document.getElementById('reasoning-status').textContent = 'Complete';
@@ -893,7 +893,7 @@
           outputsEl.innerHTML = `
             <div class="card" style="margin-bottom: 1rem; background: var(--bg-input);">
               <div style="color: var(--accent-green); margin-bottom: 0.5rem;">📋 ${action.toUpperCase()} Results</div>
-              <pre style="white-space: pre-wrap; font-size: 0.85rem;">${JSON.stringify(data.result, null, 2)}</pre>
+              <pre style="white-space: pre-wrap; font-size: 0.85rem;">${JSON.stringify(data.analysis || data.result || data, null, 2)}</pre>
             </div>
           ` + outputsEl.innerHTML;
 
