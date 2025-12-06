@@ -1,0 +1,25 @@
+{
+  "audit_time": "2025-12-06T07:37:02.524Z",
+  "period": {
+    "start": "2025-12-05T19:37:02.524Z",
+    "end": "2025-12-06T07:37:02.524Z"
+  },
+  "trades": {
+    "total": 0,
+    "winners": 0,
+    "losers": 0,
+    "win_rate": 0,
+    "total_pnl": "0.00"
+  },
+  "positions": {
+    "open": 0,
+    "details": []
+  },
+  "insights": [
+    {
+      "type": "✅ GOOD",
+      "message": "No trades executed - bot correctly held during unfavorable conditions",
+      "recommendation": "Continue monitoring for volatility increase"
+    }
+  ]
+}
