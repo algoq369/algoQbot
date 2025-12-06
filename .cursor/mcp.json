@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "algoqbot": {
+      "command": "node",
+      "args": ["./mcp-server/dist/index.js"],
+      "env": { "NODE_ENV": "production" },
+      "description": "algoQbot MCP server - bot status, trades, codebase search, file operations"
+    },
+    "ai-council": {
+      "command": "node",
+      "args": ["./ai-council/dist/mcp/server.js"],
+      "env": { "NODE_ENV": "production" },
+      "description": "AI Council MCP - Multi-AI consensus with Claude, DeepSeek, Qwen"
+    }
+  }
+}
