@@ -339,6 +339,25 @@
             <div class="stat-value" id="atr">--</div>
           </div>
         </div>
+
+        <!-- Report Generation Section -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📊 Intelligence Reports</span>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <select id="report-type" style="padding: 0.5rem 1rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+                <option value="market">Market Analysis</option>
+                <option value="risk">Risk Assessment</option>
+                <option value="performance">Performance Report</option>
+              </select>
+              <button class="btn btn-primary" onclick="generateReport()">📄 GENERATE REPORT</button>
+            </div>
+          </div>
+          <div id="report-output" style="padding: 1rem; background: var(--bg-dark); border-radius: 8px; min-height: 200px; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem;">
+            <span style="color: var(--text-secondary);">Select a report type and click GENERATE REPORT to view live bot intelligence...</span>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-title">📊 Market Analysis</div>
           <div id="market-analysis" style="padding: 1rem; color: var(--text-secondary);">
@@ -350,23 +369,53 @@
       <!-- AGENT RESEARCH -->
       <div class="panel" id="panel-agent">
         <h2 class="panel-title">🤖 Agent Research & Analysis</h2>
+
+        <!-- Agent Control Header -->
         <div class="card">
           <div class="card-header">
             <span class="card-title">💬 Direct Agent Communication</span>
-            <span class="badge idle" id="agent-status">Ready</span>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <span id="agent-timestamp" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+              <span class="badge idle" id="agent-status">Ready</span>
+              <button class="btn btn-danger" id="agent-pause" onclick="toggleAgentPause()" style="display: none;">⏸️ PAUSE</button>
+            </div>
           </div>
-          <div class="messages-container" id="agent-messages">
-            <div class="message system">AlgoQBot: Hello! I'm ready to research, analyze, and implement improvements. What would you like me to check or research?</div>
-          </div>
+
+          <!-- Quick Action Buttons -->
           <div class="quick-actions">
-            <button class="btn btn-outline" onclick="agentCommand('research market')">🔍 RESEARCH MARKET</button>
-            <button class="btn btn-outline" onclick="agentCommand('analyze data')">📊 ANALYZE DATA</button>
-            <button class="btn btn-outline" onclick="agentCommand('check issues')">🔧 CHECK ISSUES</button>
-            <button class="btn btn-outline" onclick="agentCommand('suggest improvements')">💡 SUGGEST ENHANCEMENTS</button>
+            <button class="btn btn-outline" onclick="runAgentAction('research-market')">🔍 RESEARCH MARKET</button>
+            <button class="btn btn-outline" onclick="runAgentAction('analyze-data')">📊 ANALYZE DATA</button>
+            <button class="btn btn-outline" onclick="runAgentAction('check-issues')">🔧 CHECK ISSUES</button>
+            <button class="btn btn-outline" onclick="runAgentAction('suggest-enhancements')">💡 SUGGEST ENHANCEMENTS</button>
           </div>
-          <div class="input-group">
+
+          <div class="input-group" style="margin-top: 1rem;">
             <input type="text" id="agent-input" placeholder="Ask me to research, analyze, check issues, or implement improvements...">
             <button class="btn btn-primary" id="agent-send">SEND</button>
+          </div>
+        </div>
+
+        <!-- Agent Reasoning Process -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🧠 Agent Reasoning Process</span>
+            <span id="reasoning-status" style="color: var(--text-secondary);">Waiting...</span>
+          </div>
+          <div id="agent-reasoning" style="padding: 1rem; background: var(--bg-dark); border-radius: 8px; min-height: 150px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.85rem;">
+            <div style="color: var(--text-secondary);">Agent reasoning will appear here when processing commands...</div>
+          </div>
+        </div>
+
+        <!-- Research Outputs -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📋 Research Outputs</span>
+            <button class="btn btn-outline" onclick="clearResearchOutputs()">🗑️ Clear</button>
+          </div>
+          <div id="research-outputs" style="padding: 1rem; background: var(--bg-dark); border-radius: 8px; min-height: 200px; max-height: 400px; overflow-y: auto;">
+            <div style="color: var(--text-secondary); text-align: center; padding: 2rem;">
+              Research outputs will appear here after running agent commands...
+            </div>
           </div>
         </div>
       </div>
@@ -443,37 +492,51 @@
       <!-- PORTFOLIO -->
       <div class="panel" id="panel-portfolio">
         <h2 class="panel-title">💰 Portfolio Overview</h2>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">USDT</div>
-            <div class="stat-value" id="usdt-balance">$0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">BNB</div>
-            <div class="stat-value" id="bnb-balance">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Total</div>
-            <div class="stat-value green" id="total-balance">$0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Positions</div>
-            <div class="stat-value" id="positions">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">P&L</div>
-            <div class="stat-value green" id="pnl">$0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Win Rate</div>
-            <div class="stat-value" id="win-rate">--</div>
+
+        <!-- Horizontal Stats Bar -->
+        <div class="card" style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">USDT</div>
+              <div style="font-size: 1.25rem; font-weight: 600;" id="usdt-balance">$0</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">BNB</div>
+              <div style="font-size: 1.25rem; font-weight: 600;" id="bnb-balance">0</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">TOTAL VALUE</div>
+              <div style="font-size: 1.5rem; font-weight: 600; color: var(--accent-green);" id="total-balance">$0</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">OPEN POSITIONS</div>
+              <div style="font-size: 1.25rem; font-weight: 600;" id="positions">0</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">TOTAL P&L</div>
+              <div style="font-size: 1.25rem; font-weight: 600; color: var(--accent-green);" id="pnl">$0</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">WIN RATE</div>
+              <div style="font-size: 1.25rem; font-weight: 600; color: var(--accent-purple);" id="win-rate">--</div>
+            </div>
           </div>
         </div>
 
+        <!-- Trade History -->
         <div class="card">
           <div class="card-header">
             <span class="card-title">📈 Trade History <span style="color: var(--text-secondary);" id="trade-count">(0 trades)</span></span>
-            <button class="btn btn-success" onclick="loadTrades()">🔄 REFRESH</button>
+            <div style="display: flex; gap: 0.5rem;">
+              <select id="trade-filter" style="padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);" onchange="filterTrades()">
+                <option value="all">All Trades</option>
+                <option value="open">Open Only</option>
+                <option value="closed">Closed Only</option>
+                <option value="wins">Wins Only</option>
+                <option value="losses">Losses Only</option>
+              </select>
+              <button class="btn btn-success" onclick="loadTrades()">🔄 REFRESH</button>
+            </div>
           </div>
           <div class="table-container">
             <table>
@@ -481,14 +544,15 @@
                 <tr>
                   <th>TIME</th>
                   <th>TYPE</th>
-                  <th>ENTRY</th>
-                  <th>EXIT</th>
+                  <th>ENTRY PRICE</th>
+                  <th>EXIT PRICE</th>
                   <th>P&L</th>
                   <th>DURATION</th>
+                  <th>STATUS</th>
                 </tr>
               </thead>
               <tbody id="trades-table">
-                <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading trades...</td></tr>
+                <tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading trades...</td></tr>
               </tbody>
             </table>
           </div>
@@ -500,13 +564,25 @@
         <h2 class="panel-title">📝 Notes & Planning</h2>
         <div class="card">
           <div class="card-header">
-            <button class="btn btn-primary" onclick="newNote()">+ NEW NOTE</button>
-            <input type="text" id="notes-search" placeholder="Search notes..." style="width: 300px; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-primary" onclick="newNote()">+ NEW NOTE</button>
+              <button class="btn btn-outline" onclick="addBotActivityNote()">📊 Add Bot Activity</button>
+            </div>
+            <input type="text" id="notes-search" placeholder="Search notes..." style="width: 300px; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);" oninput="searchNotes()">
           </div>
-          <textarea class="notes-area" id="notes-content" placeholder="Write your notes here..."></textarea>
-          <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-            <button class="btn btn-success" onclick="saveNotes()">💾 Save</button>
-            <button class="btn btn-outline" onclick="clearNotes()">🗑️ Clear</button>
+
+          <!-- Notes List -->
+          <div id="notes-list" style="margin-bottom: 1rem; max-height: 200px; overflow-y: auto; display: none;">
+            <!-- Dynamic notes will appear here -->
+          </div>
+
+          <textarea class="notes-area" id="notes-content" placeholder="Write your notes here... (linked to bot activity)"></textarea>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: space-between;">
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-success" onclick="saveNotes()">💾 Save</button>
+              <button class="btn btn-outline" onclick="clearNotes()">🗑️ Clear</button>
+            </div>
+            <span id="notes-status" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
           </div>
         </div>
       </div>
@@ -515,11 +591,34 @@
       <div class="panel" id="panel-search">
         <h2 class="panel-title">🔍 Search & Organize</h2>
         <div class="card">
-          <div class="input-group" style="margin-bottom: 1rem;">
-            <input type="text" id="search-input" placeholder="Search conversations, notes, reports...">
-            <button class="btn btn-primary">SEARCH</button>
+          <div class="card-header">
+            <span class="card-title">Search All Bot Data</span>
+            <select id="search-type" style="padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+              <option value="all">All Sources</option>
+              <option value="trades">Trades</option>
+              <option value="logs">Logs</option>
+              <option value="notes">Notes</option>
+            </select>
           </div>
-          <div id="search-results"></div>
+          <div class="input-group" style="margin-bottom: 1rem;">
+            <input type="text" id="search-input" placeholder="Search trades, logs, notes...">
+            <button class="btn btn-primary" onclick="performSearch()">🔍 SEARCH</button>
+          </div>
+
+          <!-- Search Results -->
+          <div id="search-results" style="min-height: 200px;">
+            <div style="color: var(--text-secondary); text-align: center; padding: 2rem;">
+              Enter a search term to find trades, logs, or notes...
+            </div>
+          </div>
+
+          <!-- Search Stats -->
+          <div id="search-stats" style="margin-top: 1rem; padding: 1rem; background: var(--bg-dark); border-radius: 8px; display: none;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Results Found: <strong id="results-count">0</strong></span>
+              <span>Search Time: <strong id="search-time">0ms</strong></span>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -614,14 +713,25 @@
       }
     }
 
+    let allTrades = [];
+    let tradeStats = { wins: 0, losses: 0, totalPnl: 0 };
+
     function renderTrades() {
       const tbody = document.getElementById('trades-table');
-      if (!trades.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No trades yet</td></tr>';
+      const filter = document.getElementById('trade-filter')?.value || 'all';
+
+      let filtered = [...trades];
+      if (filter === 'open') filtered = trades.filter(t => t.status === 'open');
+      else if (filter === 'closed') filtered = trades.filter(t => t.status === 'closed');
+      else if (filter === 'wins') filtered = trades.filter(t => t.profit > 0);
+      else if (filter === 'losses') filtered = trades.filter(t => t.profit < 0);
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No trades matching filter</td></tr>';
         return;
       }
 
-      tbody.innerHTML = trades.slice(-20).reverse().map(t => {
+      tbody.innerHTML = filtered.slice(-20).reverse().map(t => {
         const action = (t.action || t.type || '--').toUpperCase();
         const isExit = action.includes('EXIT') || t.exitPrice;
         const isBuy = action === 'BUY';
@@ -629,16 +739,35 @@
         const exitPrice = t.exitPrice || '--';
         const pnl = t.profit || 0;
         const duration = t.duration || '0m';
+        const status = t.status || 'pending';
+        const statusColor = status === 'open' ? 'var(--accent-yellow)' : status === 'closed' ? 'var(--accent-green)' : 'var(--text-secondary)';
 
         return `<tr>
           <td>${new Date(t.timestamp).toLocaleString()}</td>
           <td style="color: ${isExit ? 'var(--accent-red)' : isBuy ? 'var(--accent-green)' : 'var(--accent-yellow)'};">${isExit ? 'EXIT' : action}</td>
           <td>${price > 0.01 ? price.toFixed(6) : price.toFixed(8)}</td>
           <td>${typeof exitPrice === 'number' ? exitPrice.toFixed(6) : exitPrice}</td>
-          <td style="color: ${pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">$${pnl.toFixed(2)} (${((pnl/100)*100).toFixed(2)}%)</td>
+          <td style="color: ${pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">$${pnl.toFixed(2)}</td>
           <td>${duration}</td>
+          <td><span class="badge" style="background: ${statusColor}; color: white;">${status.toUpperCase()}</span></td>
         </tr>`;
       }).join('');
+
+      // Update stats
+      const closed = trades.filter(t => t.status === 'closed');
+      const wins = closed.filter(t => t.profit > 0).length;
+      const losses = closed.length - wins;
+      const totalPnl = closed.reduce((sum, t) => sum + (t.profit || 0), 0);
+      const winRate = closed.length > 0 ? ((wins / closed.length) * 100).toFixed(1) : 0;
+
+      document.getElementById('win-rate').textContent = winRate + '%';
+      document.getElementById('pnl').textContent = '$' + totalPnl.toFixed(2);
+      document.getElementById('pnl').style.color = totalPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+      document.getElementById('positions').textContent = trades.filter(t => t.status === 'open').length;
+    }
+
+    function filterTrades() {
+      renderTrades();
     }
 
     // Logs
@@ -682,29 +811,152 @@
       container.scrollTop = container.scrollHeight;
     });
 
-    // Agent commands
-    function agentCommand(cmd) {
-      document.getElementById('agent-input').value = cmd;
-      document.getElementById('agent-send').click();
+    // Intelligence Report Generation
+    async function generateReport() {
+      const reportType = document.getElementById('report-type').value;
+      const output = document.getElementById('report-output');
+      output.innerHTML = '<span style="color: var(--accent-purple);">⏳ Generating ' + reportType + ' report from live bot data...</span>';
+
+      try {
+        const res = await fetch('/api/intelligence/report?type=' + reportType);
+        if (res.ok) {
+          const data = await res.json();
+          output.innerHTML = formatReport(data);
+          addLog('success', 'Generated ' + reportType + ' report');
+        } else {
+          output.innerHTML = '<span style="color: var(--accent-red);">Error generating report</span>';
+        }
+      } catch (e) {
+        output.innerHTML = '<span style="color: var(--accent-red);">Failed to connect: ' + e.message + '</span>';
+      }
     }
 
+    function formatReport(data) {
+      let html = `<div style="color: var(--accent-green); margin-bottom: 1rem;">📊 ${data.type.toUpperCase()} REPORT</div>`;
+      html += `<div style="color: var(--text-secondary); margin-bottom: 1rem;">Generated: ${new Date(data.timestamp).toLocaleString()}</div>`;
+      html += '<hr style="border-color: var(--border); margin: 1rem 0;">';
+
+      if (data.portfolio) {
+        html += `<div style="margin-bottom: 0.5rem;"><strong>Portfolio:</strong> $${data.portfolio.total.toFixed(2)}</div>`;
+        html += `<div style="margin-bottom: 0.5rem;">  USDT: $${data.portfolio.usdt.toFixed(2)} | BNB: ${data.portfolio.bnb.toFixed(4)}</div>`;
+      }
+      if (data.volatility) {
+        html += `<div style="margin-bottom: 0.5rem;"><strong>Volatility:</strong> ${data.volatility.regime} (${data.volatility.vol4h}%)</div>`;
+      }
+      if (data.strategy) {
+        html += `<div style="margin-bottom: 0.5rem;"><strong>Strategy:</strong> ${data.strategy}</div>`;
+      }
+      if (data.trades) {
+        html += `<div style="margin-bottom: 0.5rem;"><strong>Trades:</strong> ${data.trades.total} total, ${data.trades.wins}W/${data.trades.losses}L (${data.trades.winRate}%)</div>`;
+      }
+      if (data.recommendation) {
+        html += `<div style="margin-top: 1rem; padding: 1rem; background: var(--bg-input); border-radius: 8px;"><strong>📋 Recommendation:</strong><br>${data.recommendation}</div>`;
+      }
+      return html;
+    }
+
+    // Agent Research Functions
+    let agentPaused = false;
+
+    async function runAgentAction(action) {
+      const statusEl = document.getElementById('agent-status');
+      const reasoningEl = document.getElementById('agent-reasoning');
+      const outputsEl = document.getElementById('research-outputs');
+      const timestampEl = document.getElementById('agent-timestamp');
+      const pauseBtn = document.getElementById('agent-pause');
+
+      // Update UI
+      statusEl.textContent = 'Processing...';
+      statusEl.className = 'badge deliberating';
+      timestampEl.textContent = new Date().toLocaleTimeString();
+      pauseBtn.style.display = 'inline-block';
+
+      // Show reasoning
+      reasoningEl.innerHTML = `<div style="color: var(--accent-purple);">🔄 Starting ${action} analysis...</div>`;
+      document.getElementById('reasoning-status').textContent = 'Processing...';
+
+      try {
+        const res = await fetch('/api/agent-research/' + action, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+
+          // Update reasoning
+          reasoningEl.innerHTML = `
+            <div style="color: var(--accent-green); margin-bottom: 0.5rem;">✅ ${action.toUpperCase()} Complete</div>
+            <div style="margin-bottom: 0.5rem;"><strong>Action:</strong> ${data.action}</div>
+            <div style="margin-bottom: 0.5rem;"><strong>Reasoning:</strong> ${data.reasoning || 'Analyzed live bot data'}</div>
+            <div style="color: var(--text-secondary);">Timestamp: ${new Date(data.timestamp).toLocaleString()}</div>
+          `;
+          document.getElementById('reasoning-status').textContent = 'Complete';
+
+          // Update outputs
+          outputsEl.innerHTML = `
+            <div class="card" style="margin-bottom: 1rem; background: var(--bg-input);">
+              <div style="color: var(--accent-green); margin-bottom: 0.5rem;">📋 ${action.toUpperCase()} Results</div>
+              <pre style="white-space: pre-wrap; font-size: 0.85rem;">${JSON.stringify(data.result, null, 2)}</pre>
+            </div>
+          ` + outputsEl.innerHTML;
+
+          addLog('success', 'Agent completed: ' + action);
+        } else {
+          reasoningEl.innerHTML = '<div style="color: var(--accent-red);">❌ Error running agent action</div>';
+        }
+      } catch (e) {
+        reasoningEl.innerHTML = `<div style="color: var(--accent-red);">❌ Error: ${e.message}</div>`;
+      }
+
+      statusEl.textContent = 'Ready';
+      statusEl.className = 'badge idle';
+      pauseBtn.style.display = 'none';
+    }
+
+    function toggleAgentPause() {
+      agentPaused = !agentPaused;
+      const btn = document.getElementById('agent-pause');
+      if (agentPaused) {
+        btn.textContent = '▶️ RESUME';
+        btn.className = 'btn btn-success';
+        document.getElementById('agent-status').textContent = 'Paused';
+        document.getElementById('agent-status').className = 'badge';
+      } else {
+        btn.textContent = '⏸️ PAUSE';
+        btn.className = 'btn btn-danger';
+      }
+    }
+
+    function clearResearchOutputs() {
+      document.getElementById('research-outputs').innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Research outputs cleared</div>';
+    }
+
+    // Agent Chat Commands
     document.getElementById('agent-send').addEventListener('click', () => {
       const input = document.getElementById('agent-input');
       const msg = input.value.trim();
       if (!msg) return;
 
-      const container = document.getElementById('agent-messages');
-      container.innerHTML += `<div class="message user">${msg}</div>`;
-      document.getElementById('agent-status').textContent = 'Processing...';
-      document.getElementById('agent-status').className = 'badge deliberating';
-      socket.emit('agent:command', { command: msg });
+      // Check for built-in commands
+      const cmd = msg.toLowerCase();
+      if (cmd.includes('research market')) {
+        runAgentAction('research-market');
+      } else if (cmd.includes('analyze data')) {
+        runAgentAction('analyze-data');
+      } else if (cmd.includes('check issues')) {
+        runAgentAction('check-issues');
+      } else if (cmd.includes('suggest')) {
+        runAgentAction('suggest-enhancements');
+      } else {
+        // Send to backend
+        document.getElementById('agent-status').textContent = 'Processing...';
+        document.getElementById('agent-status').className = 'badge deliberating';
+        socket.emit('agent:command', { command: msg });
+      }
       input.value = '';
     });
 
     socket.on('agent:response', (data) => {
-      const container = document.getElementById('agent-messages');
-      container.innerHTML += `<div class="message ai">${data.response}</div>`;
-      container.scrollTop = container.scrollHeight;
+      const reasoningEl = document.getElementById('agent-reasoning');
+      reasoningEl.innerHTML += `<div class="message ai" style="margin: 0.5rem 0; padding: 0.5rem; background: var(--bg-input); border-radius: 8px;">${data.response}</div>`;
+      reasoningEl.scrollTop = reasoningEl.scrollHeight;
       document.getElementById('agent-status').textContent = 'Ready';
       document.getElementById('agent-status').className = 'badge idle';
     });
@@ -790,17 +1042,130 @@
     }
 
     // Search
-    document.getElementById('search-input').addEventListener('input', (e) => {
-      const query = e.target.value.trim().toLowerCase();
+    async function performSearch() {
+      const query = document.getElementById('search-input').value.trim();
+      const type = document.getElementById('search-type').value;
+      const resultsEl = document.getElementById('search-results');
+      const statsEl = document.getElementById('search-stats');
+
       if (query.length < 2) {
-        document.getElementById('search-results').innerHTML = '';
+        resultsEl.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Enter at least 2 characters to search...</div>';
+        statsEl.style.display = 'none';
         return;
       }
 
-      const results = logs.filter(l => l.message.toLowerCase().includes(query));
-      document.getElementById('search-results').innerHTML = results.length
-        ? results.slice(-20).map(r => `<div class="card" style="padding: 0.5rem;">[${r.time}] ${r.message}</div>`).join('')
-        : '<div style="color: var(--text-secondary); padding: 1rem;">No results found</div>';
+      resultsEl.innerHTML = '<div style="color: var(--accent-purple); text-align: center; padding: 2rem;">🔍 Searching...</div>';
+      const startTime = Date.now();
+
+      try {
+        const res = await fetch(`/api/search?query=${encodeURIComponent(query)}&type=${type}`);
+        if (res.ok) {
+          const data = await res.json();
+          const elapsed = Date.now() - startTime;
+
+          let html = '';
+
+          // Trades results
+          if (data.trades && data.trades.length > 0) {
+            html += '<div style="margin-bottom: 1rem;"><strong style="color: var(--accent-green);">📈 Trades (' + data.trades.length + ')</strong></div>';
+            data.trades.forEach(t => {
+              html += `<div class="card" style="padding: 0.75rem; margin-bottom: 0.5rem; background: var(--bg-input);">
+                <div style="display: flex; justify-content: space-between;">
+                  <span>${t.action || t.type} - Entry: ${(t.entryPrice || t.targetPrice || 0).toFixed(6)}</span>
+                  <span style="color: ${(t.profit || 0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">$${(t.profit || 0).toFixed(2)}</span>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">${new Date(t.timestamp).toLocaleString()}</div>
+              </div>`;
+            });
+          }
+
+          // Logs results
+          if (data.logs && data.logs.length > 0) {
+            html += '<div style="margin-bottom: 1rem; margin-top: 1rem;"><strong style="color: var(--accent-yellow);">📋 Logs (' + data.logs.length + ')</strong></div>';
+            data.logs.slice(0, 10).forEach(l => {
+              html += `<div class="card" style="padding: 0.5rem; margin-bottom: 0.25rem; background: var(--bg-input); font-family: monospace; font-size: 0.8rem;">${l}</div>`;
+            });
+          }
+
+          // Notes results
+          if (data.notes && data.notes.length > 0) {
+            html += '<div style="margin-bottom: 1rem; margin-top: 1rem;"><strong style="color: var(--accent-purple);">📝 Notes (' + data.notes.length + ')</strong></div>';
+            data.notes.forEach(n => {
+              html += `<div class="card" style="padding: 0.75rem; margin-bottom: 0.5rem; background: var(--bg-input);">${n.content.substring(0, 200)}...</div>`;
+            });
+          }
+
+          if (!html) {
+            html = '<div style="color: var(--text-secondary); text-align: center; padding: 2rem;">No results found for "' + query + '"</div>';
+          }
+
+          resultsEl.innerHTML = html;
+          statsEl.style.display = 'block';
+          document.getElementById('results-count').textContent = (data.trades?.length || 0) + (data.logs?.length || 0) + (data.notes?.length || 0);
+          document.getElementById('search-time').textContent = elapsed + 'ms';
+        }
+      } catch (e) {
+        resultsEl.innerHTML = '<div style="color: var(--accent-red); text-align: center; padding: 2rem;">Search failed: ' + e.message + '</div>';
+      }
+    }
+
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') performSearch();
+    });
+
+    // Notes with bot activity linking
+    function searchNotes() {
+      const query = document.getElementById('notes-search').value.trim().toLowerCase();
+      const content = document.getElementById('notes-content').value;
+      // Simple highlight for now
+      if (query.length > 1 && content.toLowerCase().includes(query)) {
+        document.getElementById('notes-status').textContent = 'Found match!';
+        document.getElementById('notes-status').style.color = 'var(--accent-green)';
+      } else if (query.length > 1) {
+        document.getElementById('notes-status').textContent = 'No match';
+        document.getElementById('notes-status').style.color = 'var(--text-secondary)';
+      } else {
+        document.getElementById('notes-status').textContent = '';
+      }
+    }
+
+    async function addBotActivityNote() {
+      try {
+        const statusRes = await fetch('/api/status');
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          const content = document.getElementById('notes-content');
+          const activityNote = `
+📊 Bot Activity Snapshot - ${new Date().toLocaleString()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Status: ${data.running ? '🟢 Running' : '🔴 Stopped'}
+Strategy: ${data.strategy || 'none'}
+Volatility: ${data.volatility?.regime || 'unknown'} (${data.volatility?.vol4h || 0}%)
+Portfolio: $${(data.portfolio?.total || 0).toFixed(2)}
+  - USDT: $${(data.portfolio?.usdt || 0).toFixed(2)}
+  - BNB: ${(data.portfolio?.bnb || 0).toFixed(4)}
+Confidence: ${data.confidence || 0}%
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+`;
+          content.value = activityNote + content.value;
+          saveNotes();
+          addLog('success', 'Added bot activity snapshot to notes');
+        }
+      } catch (e) {
+        addLog('error', 'Failed to get bot activity: ' + e.message);
+      }
+    }
+
+    // Real-time log streaming
+    socket.on('status:update', (data) => {
+      updateDashboard(data);
+      addLog('info', 'Status update received');
+    });
+
+    socket.on('bot:trade', (data) => {
+      addLog('success', `Trade: ${data.action} at ${data.price}`);
+      loadTrades();
     });
 
     // Auto-refresh
