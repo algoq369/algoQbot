@@ -18,7 +18,8 @@
     "tailwind-merge": "^2.2.0",
     "class-variance-authority": "^0.7.0",
     "lucide-react": "^0.303.0",
-    "zustand": "^4.4.7"
+    "zustand": "^4.4.7",
+    "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
