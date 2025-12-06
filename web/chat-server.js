@@ -70,7 +70,7 @@ class UnifiedWebServer {
         const virtualBalances = path.join(dataPath, 'virtual_balances.json');
         if (fs.existsSync(virtualBalances)) {
           const data = JSON.parse(fs.readFileSync(virtualBalances, 'utf-8'));
-          const price = data.currentPrice || 600;
+          const price = data.currentPrice || 715; // Updated BNB price default
           const bnbValue = (data.bnb || 0) * price;
           status.portfolio = {
             usdt: data.usdt || 0,
@@ -148,6 +148,9 @@ class UnifiedWebServer {
         timestamp: new Date().toISOString()
       });
 
+      // Send existing logs immediately on connect
+      this.sendExistingLogs(socket);
+
       // Regular chat with bot
       socket.on('chat:message', async (data) => {
         console.log('Chat message:', data.message);
@@ -211,6 +214,25 @@ class UnifiedWebServer {
 
     // Stream bot logs to all connected clients
     this.startLogStreaming();
+  }
+
+  sendExistingLogs(socket) {
+    const logFile = path.join(__dirname, '..', 'logs', 'bot.log');
+    try {
+      if (fs.existsSync(logFile)) {
+        const content = fs.readFileSync(logFile, 'utf-8');
+        const lines = content.split('\n').filter(l => l.trim()).slice(-20); // Last 20 lines
+        lines.forEach(line => {
+          let level = 'info';
+          if (line.includes('error') || line.includes('❌')) level = 'error';
+          else if (line.includes('warn') || line.includes('⚠️')) level = 'warn';
+          else if (line.includes('✅') || line.includes('success')) level = 'success';
+          socket.emit('bot:log', { level, message: line.substring(0, 200) });
+        });
+      }
+    } catch (e) {
+      console.error('Error sending existing logs:', e.message);
+    }
   }
 
   startLogStreaming() {
