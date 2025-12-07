@@ -1185,6 +1185,62 @@ body {
     background: var(--text-muted);
 }
 
+/* Live Log Styles */
+.log-entry {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    font-size: 0.8rem;
+    font-family: 'Consolas', 'Monaco', monospace;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-time {
+    color: var(--text-muted);
+    min-width: 70px;
+}
+
+.log-level {
+    min-width: 50px;
+    font-weight: 600;
+}
+
+.log-entry.error .log-level { color: var(--accent-red); }
+.log-entry.warning .log-level { color: var(--accent-orange); }
+.log-entry.success .log-level { color: var(--accent-green); }
+.log-entry.trade .log-level { color: var(--accent-purple); }
+.log-entry.info .log-level { color: var(--accent-cyan); }
+
+.log-message {
+    flex: 1;
+    color: var(--text-secondary);
+    word-break: break-word;
+}
+
+.log-entry.error .log-message { color: var(--accent-red); }
+.log-entry.trade .log-message { color: var(--accent-purple); }
+
+/* Status dot animations */
+.status-dot.running,
+.dot.running {
+    background: var(--accent-green);
+    animation: pulse 2s infinite;
+}
+
+.status-dot.stopped,
+.dot.stopped {
+    background: var(--accent-red);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .header {

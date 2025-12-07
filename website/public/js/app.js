@@ -86,6 +86,16 @@ function initSocket() {
     socket.on('report-data', (data) => {
         displayReport(data);
     });
+
+    // Dashboard update handler
+    socket.on('dashboard-update', (data) => {
+        updateInstitutionalDashboard(data);
+    });
+
+    // Logs update handler
+    socket.on('logs-update', (data) => {
+        updateLiveLogs(data.logs);
+    });
 }
 
 function updateConnectionStatus(connected) {
@@ -102,14 +112,7 @@ function updateConnectionStatus(connected) {
     }
 }
 
-// Auto refresh
-function startAutoRefresh() {
-    setInterval(() => {
-        if (state.connected) {
-            fetchStatus();
-        }
-    }, 5000);
-}
+// Auto refresh - defined at end of file
 
 // API calls
 async function fetchInitialData() {
@@ -719,4 +722,168 @@ function emergencyStop() {
         socket.emit('bot-control', { action: 'emergency-stop' });
         addActivityLog('Emergency stop activated!', 'error');
     }
+}
+
+// ============== INSTITUTIONAL DASHBOARD ==============
+function updateInstitutionalDashboard(data) {
+    if (!data) return;
+
+    // [1] Bot Status
+    if (data.botStatus) {
+        const bigStatus = document.getElementById('big-bot-status');
+        if (bigStatus) {
+            const statusDot = bigStatus.querySelector('.status-dot');
+            const statusText = bigStatus.querySelector('.status-text');
+
+            if (data.botStatus.running) {
+                statusDot.className = 'status-dot running';
+                statusText.textContent = 'Running';
+            } else {
+                statusDot.className = 'status-dot stopped';
+                statusText.textContent = 'Stopped';
+            }
+        }
+
+        // Update header status
+        const headerDot = document.querySelector('#bot-status .dot');
+        const headerText = document.querySelector('#bot-status span:last-child');
+        if (headerDot && headerText) {
+            if (data.botStatus.running) {
+                headerDot.className = 'dot running';
+                headerText.textContent = `Bot: Running (PID: ${data.botStatus.pid})`;
+            } else {
+                headerDot.className = 'dot stopped';
+                headerText.textContent = 'Bot: Stopped';
+            }
+        }
+
+        // Update uptime
+        const uptimeEl = document.getElementById('bot-uptime');
+        if (uptimeEl) uptimeEl.textContent = data.botStatus.uptime || '--';
+    }
+
+    // [2] Portfolio
+    if (data.portfolio) {
+        const total = data.portfolio.totalValue || 0;
+        document.getElementById('total-value').textContent = total.toFixed(2);
+        document.getElementById('usdt-balance').textContent = (data.portfolio.usdt || 0).toFixed(2);
+        document.getElementById('bnb-balance').textContent = (data.portfolio.bnb || 0).toFixed(4);
+
+        // Allocation bars
+        const usdtPct = total > 0 ? ((data.portfolio.usdt || 0) / total) * 100 : 50;
+        const bnbPct = 100 - usdtPct;
+        document.getElementById('usdt-bar').style.width = `${usdtPct}%`;
+        document.getElementById('bnb-bar').style.width = `${bnbPct}%`;
+    }
+
+    // [3] Market
+    if (data.market) {
+        document.getElementById('bnb-price').textContent = `$${(data.market.price || 0).toFixed(2)}`;
+        const changeEl = document.getElementById('price-change');
+        const change = data.market.change24h || 0;
+        changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+        changeEl.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
+
+        // Regime
+        const regimeEl = document.getElementById('current-regime');
+        if (regimeEl) regimeEl.textContent = data.market.regime || '--';
+
+        // Volatility
+        const volEl = document.getElementById('volatility');
+        if (volEl) {
+            const vol = typeof data.market.volatility === 'number'
+                ? `${data.market.volatility.toFixed(2)}%`
+                : data.market.volatility || '--';
+            volEl.textContent = vol;
+        }
+    }
+
+    // [4] Stats
+    if (data.stats) {
+        document.getElementById('total-trades').textContent = data.stats.totalTrades || 0;
+        document.getElementById('win-rate').textContent = `${(data.stats.winRate || 0).toFixed(1)}%`;
+    }
+
+    // Trading activity
+    if (data.tradingActivity) {
+        const tradesTodayEl = document.getElementById('open-positions');
+        if (tradesTodayEl) tradesTodayEl.textContent = data.tradingActivity.tradesToday || 0;
+    }
+
+    // Update last update time
+    updateLastUpdate();
+}
+
+// ============== LIVE LOGS ==============
+function updateLiveLogs(logs) {
+    if (!logs || logs.length === 0) return;
+
+    const logContainer = document.getElementById('activity-log');
+    if (!logContainer) return;
+
+    // Clear existing logs except first entry
+    logContainer.innerHTML = '';
+
+    // Add log entries
+    logs.slice(0, 50).forEach(log => {
+        const entry = document.createElement('div');
+
+        // Determine log type based on level or content
+        let type = 'info';
+        if (log.level === 'error') type = 'error';
+        else if (log.level === 'warn') type = 'warning';
+        else if (log.message && log.message.includes('Shadow Trade')) type = 'trade';
+        else if (log.message && log.message.includes('✅')) type = 'success';
+
+        entry.className = `log-entry ${type}`;
+
+        // Format timestamp
+        let timeStr = '--:--:--';
+        if (log.timestamp) {
+            try {
+                const date = new Date(log.timestamp);
+                timeStr = date.toLocaleTimeString();
+            } catch (e) {
+                timeStr = log.timestamp;
+            }
+        }
+
+        // Format message - strip emoji for cleaner display or keep them
+        const message = log.message || JSON.stringify(log);
+
+        entry.innerHTML = `
+            <span class="log-time">${timeStr}</span>
+            <span class="log-level">[${log.level || 'info'}]</span>
+            <span class="log-message">${message}</span>
+        `;
+
+        logContainer.appendChild(entry);
+    });
+}
+
+// Request initial logs
+function requestLogs() {
+    if (socket && state.connected) {
+        socket.emit('request-logs');
+    }
+}
+
+// Fetch dashboard data
+async function fetchDashboard() {
+    try {
+        const response = await fetch('/api/dashboard');
+        const data = await response.json();
+        updateInstitutionalDashboard(data);
+    } catch (error) {
+        console.error('Failed to fetch dashboard:', error);
+    }
+}
+
+// Enhanced auto-refresh
+function startAutoRefresh() {
+    setInterval(() => {
+        if (state.connected) {
+            fetchDashboard();
+        }
+    }, 10000); // Every 10 seconds
 }

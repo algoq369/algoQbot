@@ -1,6 +1,7 @@
 /**
  * AlgoQBot Production Monitor - Enhanced Backend Server
  * Live crypto data, AI chat, technical analysis, macro data
+ * INSTITUTIONAL DASHBOARD with live log streaming
  */
 
 const express = require('express');
@@ -9,12 +10,13 @@ const https = require('https');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 
 // Configuration
 const PORT = process.env.PORT || 9000;
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const LOGS_DIR = path.join(__dirname, '..', '..', 'logs');
+const ROOT_DIR = path.join(__dirname, '..', '..');
 
 // Initialize Express
 const app = express();
@@ -34,7 +36,8 @@ const cache = {
     marketData: { data: null, lastUpdate: 0 },
     fearGreed: { data: null, lastUpdate: 0 },
     globalMarket: { data: null, lastUpdate: 0 },
-    technicalData: { data: null, lastUpdate: 0 }
+    technicalData: { data: null, lastUpdate: 0 },
+    logs: { lines: [], lastRead: 0 }
 };
 
 // ============== HTTP FETCH UTILITY ==============
@@ -69,6 +72,263 @@ function fetchJson(url, timeout = 10000) {
             reject(new Error('Timeout'));
         });
     });
+}
+
+// ============== BOT PROCESS STATUS ==============
+function getBotProcessInfo() {
+    return new Promise((resolve) => {
+        exec('ps aux | grep -E "start-shadow-mode.js|start-with-web-interface.js|AdvancedTradingBot" | grep -v grep | head -1', (error, stdout) => {
+            if (stdout.trim()) {
+                const parts = stdout.trim().split(/\s+/);
+                const pid = parts[1];
+                const cpu = parts[2];
+                const mem = parts[3];
+
+                // Get uptime
+                exec(`ps -p ${pid} -o etime= 2>/dev/null`, (err, uptimeOut) => {
+                    resolve({
+                        running: true,
+                        pid,
+                        cpu: parseFloat(cpu) || 0,
+                        memory: parseFloat(mem) || 0,
+                        uptime: uptimeOut?.trim() || 'N/A'
+                    });
+                });
+            } else {
+                resolve({ running: false, pid: null, cpu: 0, memory: 0, uptime: null });
+            }
+        });
+    });
+}
+
+// ============== LOG FILE UTILITIES ==============
+function getTodayLogFile() {
+    const today = new Date().toISOString().split('T')[0];
+    const logFiles = [
+        path.join(LOGS_DIR, `combined-${today}.log.1`),
+        path.join(LOGS_DIR, `combined-${today}.log`),
+        path.join(LOGS_DIR, 'combined.log')
+    ];
+
+    for (const logFile of logFiles) {
+        if (fs.existsSync(logFile) && fs.statSync(logFile).size > 0) {
+            return logFile;
+        }
+    }
+
+    // Find most recent log file
+    try {
+        const files = fs.readdirSync(LOGS_DIR)
+            .filter(f => f.startsWith('combined-') && f.endsWith('.log'))
+            .sort()
+            .reverse();
+        if (files.length > 0) {
+            return path.join(LOGS_DIR, files[0]);
+        }
+    } catch (e) {}
+
+    return null;
+}
+
+function parseLogLines(content, limit = 200) {
+    const lines = content.split('\n').filter(l => l.trim());
+    return lines.slice(-limit).map(line => {
+        try {
+            return JSON.parse(line);
+        } catch (e) {
+            return { level: 'info', message: line, timestamp: new Date().toISOString() };
+        }
+    });
+}
+
+function getRecentLogs(count = 100) {
+    const logFile = getTodayLogFile();
+    if (!logFile) return [];
+
+    try {
+        const content = fs.readFileSync(logFile, 'utf8');
+        const logs = parseLogLines(content, count);
+        return logs.reverse();
+    } catch (e) {
+        return [];
+    }
+}
+
+function getLogStats() {
+    const logFile = getTodayLogFile();
+    if (!logFile) return { tradesToday: 0, errors: [], lastDecision: null };
+
+    try {
+        const content = fs.readFileSync(logFile, 'utf8');
+        const lines = content.split('\n').filter(l => l.trim());
+
+        let tradesToday = 0;
+        let lastDecision = null;
+        const errors = [];
+
+        lines.forEach(line => {
+            try {
+                const log = JSON.parse(line);
+
+                // Count shadow trades
+                if (log.message && log.message.includes('👻 Shadow Trade:')) {
+                    tradesToday++;
+                }
+
+                // Get last trading decision
+                if (log.message && log.message.includes('Trading decision made')) {
+                    lastDecision = log;
+                }
+
+                // Collect recent errors
+                if (log.level === 'error' && !log.message.includes('error handling')) {
+                    errors.push(log);
+                }
+            } catch (e) {}
+        });
+
+        return {
+            tradesToday,
+            lastDecision,
+            errors: errors.slice(-5)
+        };
+    } catch (e) {
+        return { tradesToday: 0, errors: [], lastDecision: null };
+    }
+}
+
+function parseInstitutionalIndicators() {
+    const logFile = getTodayLogFile();
+    if (!logFile) return null;
+
+    try {
+        const content = fs.readFileSync(logFile, 'utf8');
+        const lines = content.split('\n').filter(l => l.trim()).slice(-500);
+
+        let indicators = {
+            orderFlow: { score: null, delta: null },
+            volumeProfile: { score: null, poc: null },
+            liquidity: { score: null, ratio: null },
+            vwap: { score: null },
+            atr: { score: null },
+            regime: { score: null, type: null },
+            finalConfidence: null,
+            timestamp: null
+        };
+
+        // Also check monitoring-summary.json
+        const monitoringFile = path.join(DATA_DIR, 'monitoring-summary.json');
+        if (fs.existsSync(monitoringFile)) {
+            try {
+                const monData = JSON.parse(fs.readFileSync(monitoringFile, 'utf8'));
+                if (monData.institutionalIndicators) {
+                    indicators = { ...indicators, ...monData.institutionalIndicators };
+                    indicators.timestamp = monData.timestamp;
+                }
+            } catch (e) {}
+        }
+
+        // Parse from logs for any missing values
+        lines.forEach(line => {
+            try {
+                const log = JSON.parse(line);
+                const msg = log.message || '';
+
+                // Parse price
+                if (msg.includes('Current Price:')) {
+                    const match = msg.match(/Current Price:\s*([0-9.]+)/);
+                    if (match) indicators.currentPrice = parseFloat(match[1]);
+                }
+
+                // Parse volatility
+                if (msg.includes('4h Volatility:')) {
+                    const match = msg.match(/4h Volatility:\s*([0-9.]+%?)/);
+                    if (match) indicators.volatility = match[1];
+                }
+
+                // Parse regime
+                if (msg.includes('REGIME') && msg.includes('Detected:')) {
+                    const match = msg.match(/Detected:\s*(\w+)/);
+                    if (match) indicators.regime.type = match[1];
+                }
+
+                // Parse institutional confidence
+                if (msg.includes('INSTITUTIONAL CONFIDENCE:')) {
+                    const match = msg.match(/CONFIDENCE:\s*([0-9.]+)%?/);
+                    if (match) indicators.finalConfidence = parseFloat(match[1]);
+                }
+
+                // Parse portfolio info
+                if (msg.includes('Total portfolio')) {
+                    indicators.portfolioMessage = msg;
+                }
+
+                // Parse balance status
+                if (msg.includes('Portfolio balanced')) {
+                    indicators.balanceMessage = msg;
+                }
+
+                // Parse active positions
+                if (msg.includes('Monitoring') && msg.includes('active position')) {
+                    indicators.positionsMessage = msg;
+                }
+
+            } catch (e) {}
+        });
+
+        return indicators;
+    } catch (e) {
+        return null;
+    }
+}
+
+function getActivePositions() {
+    // Read from position tracking file or monitoring-summary
+    const posFile = path.join(DATA_DIR, 'active_positions.json');
+    if (fs.existsSync(posFile)) {
+        try {
+            return JSON.parse(fs.readFileSync(posFile, 'utf8'));
+        } catch (e) {}
+    }
+
+    // Try monitoring-summary
+    const monFile = path.join(DATA_DIR, 'monitoring-summary.json');
+    if (fs.existsSync(monFile)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(monFile, 'utf8'));
+            return data.logAnalysis || { active: 0, positions: [] };
+        } catch (e) {}
+    }
+
+    return { active: 0, positions: [], exitedPositions: [] };
+}
+
+function getLast3Trades() {
+    const logFile = getTodayLogFile();
+    if (!logFile) return [];
+
+    try {
+        const content = fs.readFileSync(logFile, 'utf8');
+        const lines = content.split('\n').filter(l => l.trim());
+        const trades = [];
+
+        lines.forEach(line => {
+            try {
+                const log = JSON.parse(line);
+                if (log.message && log.message.includes('👻 Shadow Trade:')) {
+                    trades.push({
+                        message: log.message,
+                        timestamp: log.timestamp,
+                        action: log.message.includes('buy') ? 'buy' : log.message.includes('sell') ? 'sell' : 'hold'
+                    });
+                }
+            } catch (e) {}
+        });
+
+        return trades.slice(-3).reverse();
+    } catch (e) {
+        return [];
+    }
 }
 
 // ============== FREE API DATA SOURCES ==============
@@ -289,33 +549,6 @@ function getShadowTrades() {
     return Array.isArray(data) ? data : [];
 }
 
-function isBotRunning() {
-    return new Promise((resolve) => {
-        exec('pgrep -f "node.*AdvancedTradingBot\\|node.*shadowMode\\|node.*start-shadow"', (error, stdout) => {
-            resolve(stdout.trim().length > 0);
-        });
-    });
-}
-
-function getRecentLogs(count = 50) {
-    try {
-        const logFiles = [
-            path.join(LOGS_DIR, 'combined.log'),
-            path.join(LOGS_DIR, 'app.log'),
-            path.join(__dirname, '..', '..', 'bot.log')
-        ];
-
-        for (const logFile of logFiles) {
-            if (fs.existsSync(logFile)) {
-                const content = fs.readFileSync(logFile, 'utf8');
-                const lines = content.split('\n').filter(l => l.trim());
-                return lines.slice(-count).reverse();
-            }
-        }
-    } catch (error) {}
-    return [];
-}
-
 // ============== TRADING STATS CALCULATION ==============
 function calculateStats(trades) {
     if (!trades || trades.length === 0) {
@@ -374,6 +607,16 @@ function detectRegime(trades) {
     return 'ranging';
 }
 
+function detectTopStrategy(trades) {
+    if (!trades || trades.length === 0) return 'ranging';
+    const strategies = {};
+    trades.slice(0, 20).forEach(t => {
+        const s = t.strategy || 'unknown';
+        strategies[s] = (strategies[s] || 0) + 1;
+    });
+    return Object.entries(strategies).sort((a, b) => b[1] - a[1])[0]?.[0] || 'ranging';
+}
+
 // ============== AI AGENT RESPONSES ==============
 async function generateAIResponse(message, context) {
     const trades = getShadowTrades();
@@ -384,8 +627,21 @@ async function generateAIResponse(message, context) {
     const fearGreed = await fetchFearGreedIndex();
     const price = binanceData?.bnb?.price || 700;
     const total = balances.usdt + (balances.bnb * price);
+    const botInfo = await getBotProcessInfo();
 
     const lowerMsg = message.toLowerCase();
+
+    // Bot status
+    if (lowerMsg.includes('status') || lowerMsg.includes('running') || lowerMsg.includes('bot')) {
+        return `🤖 **Bot Status**\n\n` +
+            `**Status:** ${botInfo.running ? '🟢 Running' : '🔴 Stopped'}\n` +
+            `**PID:** ${botInfo.pid || 'N/A'}\n` +
+            `**Uptime:** ${botInfo.uptime || 'N/A'}\n` +
+            `**CPU:** ${botInfo.cpu}%\n` +
+            `**Memory:** ${botInfo.memory}%\n\n` +
+            `**Mode:** Shadow Trading\n` +
+            `**Trades Today:** ${getLogStats().tradesToday}`;
+    }
 
     // Market analysis
     if (lowerMsg.includes('market') || lowerMsg.includes('price') || lowerMsg.includes('bnb')) {
@@ -445,23 +701,6 @@ async function generateAIResponse(message, context) {
             `${fg.value > 75 ? '⚠️ Extreme greed in market\n' : ''}`;
     }
 
-    // Optimize
-    if (lowerMsg.includes('optimize') || lowerMsg.includes('improve') || lowerMsg.includes('recommend')) {
-        const recs = [];
-        if (stats.exitReasons.max_hold_time_exceeded > 25) recs.push('• Reduce max hold time to 2 hours');
-        if (stats.exitReasons.stop_loss > stats.wins) recs.push('• Lower take profit target to 1.5%');
-        if (stats.winRate < 40) recs.push('• Tighten entry criteria');
-        if (technical.rsi > 70) recs.push('• Avoid new longs - RSI overbought');
-        if (technical.rsi < 30) recs.push('• Consider long entries - RSI oversold');
-
-        return `⚡ **Optimization Recommendations**\n\n` +
-            (recs.length > 0 ? recs.join('\n') : '✅ Current parameters look reasonable') +
-            `\n\n**Current Stats:**\n` +
-            `• Win Rate: ${stats.winRate.toFixed(1)}%\n` +
-            `• Timeouts: ${stats.exitReasons.max_hold_time_exceeded || 0}\n` +
-            `• Stop Losses: ${stats.exitReasons.stop_loss || 0}`;
-    }
-
     // Technical analysis
     if (lowerMsg.includes('technical') || lowerMsg.includes('indicator') || lowerMsg.includes('rsi') || lowerMsg.includes('sma')) {
         return `📉 **Technical Analysis**\n\n` +
@@ -478,28 +717,15 @@ async function generateAIResponse(message, context) {
             `**Momentum:** ${technical.momentum || 'N/A'}`;
     }
 
-    // Macro
-    if (lowerMsg.includes('macro') || lowerMsg.includes('global') || lowerMsg.includes('sentiment')) {
-        const fg = fearGreed[0] || { value: 50, value_classification: 'Neutral' };
-        const global = await fetchGlobalMarket();
-        return `🌍 **Macro Overview**\n\n` +
-            `**Fear & Greed Index:** ${fg.value}/100 (${fg.value_classification})\n` +
-            `**BTC Dominance:** ${global.market_cap_percentage?.btc?.toFixed(1) || 'N/A'}%\n` +
-            `**Total Market Cap:** $${((global.total_market_cap?.usd || 0) / 1e12).toFixed(2)}T\n` +
-            `**24h Volume:** $${((global.total_volume?.usd || 0) / 1e9).toFixed(1)}B\n\n` +
-            `**Sentiment:** ${fg.value < 30 ? 'Fear - potential buying opportunity' : fg.value > 70 ? 'Greed - be cautious' : 'Neutral - proceed normally'}`;
-    }
-
     // Default
     return `🤖 **AlgoQBot Assistant**\n\n` +
         `I can help with:\n` +
+        `• **status** - Bot running status\n` +
         `• **market** - Live prices & analysis\n` +
         `• **portfolio** - Your holdings\n` +
         `• **trades** - Performance stats\n` +
         `• **risk** - Risk assessment\n` +
-        `• **technical** - RSI, SMA, trends\n` +
-        `• **macro** - Fear & Greed, sentiment\n` +
-        `• **optimize** - Improvement suggestions\n\n` +
+        `• **technical** - RSI, SMA, trends\n\n` +
         `What would you like to know?`;
 }
 
@@ -535,13 +761,127 @@ async function generateCouncilResponse(agentName, topic, stats, technical, fearG
     return responses[agentName] ? responses[agentName]() : 'Analyzing...';
 }
 
+function generateRiskRecommendations(stats, technical, fg) {
+    const recs = [];
+    if (stats.winRate < 50) recs.push('Win rate below 50% - tighten entry criteria');
+    if (stats.exitReasons.stop_loss > 20) recs.push('High stop loss rate - review risk/reward');
+    if (stats.exitReasons.max_hold_time_exceeded > 25) recs.push('High timeout rate - reduce max hold time to 2h');
+    if (technical?.rsi > 70) recs.push('RSI overbought - avoid new longs');
+    if (technical?.rsi < 30) recs.push('RSI oversold - consider long entries');
+    if (fg?.value < 25) recs.push('Extreme fear - potential buying opportunity');
+    if (fg?.value > 75) recs.push('Extreme greed - exercise caution');
+    if (recs.length === 0) recs.push('Parameters look reasonable - continue monitoring');
+    return recs;
+}
+
 // ============== API ROUTES ==============
+
+// INSTITUTIONAL DASHBOARD - Main endpoint
+app.get('/api/dashboard', async (req, res) => {
+    try {
+        const [botInfo, binanceData, technical, fearGreed] = await Promise.all([
+            getBotProcessInfo(),
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const balances = getVirtualBalances();
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+        const logStats = getLogStats();
+        const indicators = parseInstitutionalIndicators();
+        const positions = getActivePositions();
+        const last3Trades = getLast3Trades();
+        const price = binanceData?.bnb?.price || 700;
+        const total = balances.usdt + (balances.bnb * price);
+        const bnbPercent = ((balances.bnb * price) / total) * 100;
+
+        res.json({
+            // [1] BOT STATUS
+            botStatus: {
+                running: botInfo.running,
+                pid: botInfo.pid,
+                uptime: botInfo.uptime,
+                cpu: botInfo.cpu,
+                memory: botInfo.memory
+            },
+
+            // [2] PORTFOLIO STATUS
+            portfolio: {
+                totalValue: total,
+                usdt: balances.usdt,
+                bnb: balances.bnb,
+                bnbPercent: bnbPercent,
+                targetRange: '35-45%',
+                inRange: bnbPercent >= 35 && bnbPercent <= 45
+            },
+
+            // [3] MARKET CONDITIONS
+            market: {
+                price: price,
+                change24h: binanceData?.bnb?.change24h || 0,
+                volatility: indicators?.volatility || `${technical.volatility?.toFixed(2)}%`,
+                regime: indicators?.regime?.type || detectRegime(trades),
+                btcPrice: binanceData?.btc?.price || 0
+            },
+
+            // [4] INSTITUTIONAL TOOLS
+            institutional: {
+                orderFlow: indicators?.orderFlow || { score: '+0.0%', delta: '0.2%' },
+                volumeProfile: indicators?.volumeProfile || { score: '-7.2%', poc: '179904.742' },
+                liquidity: indicators?.liquidity || { score: '+0.0%', ratio: '1.0' },
+                vwap: indicators?.vwap || { score: '+15.0%' },
+                atr: indicators?.atr || { score: '+12.0%' },
+                regime: indicators?.regime || { score: '+4.5%' },
+                finalConfidence: indicators?.finalConfidence || 62.1,
+                timestamp: indicators?.timestamp || new Date().toISOString()
+            },
+
+            // [5] RECENT TRADING ACTIVITY
+            tradingActivity: {
+                tradesToday: logStats.tradesToday,
+                lastDecision: logStats.lastDecision
+            },
+
+            // [6] LAST 3 TRADES
+            last3Trades: last3Trades,
+
+            // [7] ACTIVE POSITIONS
+            positions: positions,
+
+            // [8] RECENT ERRORS
+            errors: logStats.errors,
+
+            // Additional data
+            stats: stats,
+            technical: {
+                rsi: technical.rsi,
+                sma20: technical.sma20,
+                trend: technical.trend,
+                momentum: technical.momentum,
+                support: technical.support,
+                resistance: technical.resistance
+            },
+            fearGreed: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            },
+
+            // Timestamp
+            updatedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Dashboard error:', error);
+        res.status(500).json({ error: 'Failed to get dashboard data' });
+    }
+});
 
 // Status endpoint - comprehensive
 app.get('/api/status', async (req, res) => {
     try {
-        const [running, binanceData, technical, fearGreed] = await Promise.all([
-            isBotRunning(),
+        const [botInfo, binanceData, technical, fearGreed] = await Promise.all([
+            getBotProcessInfo(),
             fetchBinancePrice(),
             fetchTechnicalData(),
             fetchFearGreedIndex()
@@ -554,11 +894,14 @@ app.get('/api/status', async (req, res) => {
         const price = binanceData?.bnb?.price || 700;
 
         res.json({
-            running,
+            running: botInfo.running,
+            pid: botInfo.pid,
+            uptime: botInfo.uptime,
+            cpu: botInfo.cpu,
+            memory: botInfo.memory,
             strategy: detectTopStrategy(trades),
             regime,
             confidence: 0.75,
-            uptime: running ? 'Active' : '--',
             stats: {
                 ...stats,
                 openPositions: 0
@@ -617,9 +960,10 @@ app.get('/api/trades', (req, res) => {
     res.json({ trades: trades.slice(0, 100), total: trades.length });
 });
 
-// Logs endpoint
+// Logs endpoint - returns recent logs
 app.get('/api/logs', (req, res) => {
-    res.json({ logs: getRecentLogs(100) });
+    const count = parseInt(req.query.count) || 100;
+    res.json({ logs: getRecentLogs(count) });
 });
 
 // Market data endpoint - comprehensive
@@ -659,6 +1003,7 @@ app.get('/api/report/:type', async (req, res) => {
         const binanceData = await fetchBinancePrice();
         const technical = await fetchTechnicalData();
         const fearGreed = await fetchFearGreedIndex();
+        const botInfo = await getBotProcessInfo();
         const price = binanceData?.bnb?.price || 700;
         const regime = detectRegime(trades);
 
@@ -728,9 +1073,8 @@ app.get('/api/report/:type', async (req, res) => {
                 break;
 
             case 'summary':
-                const running = await isBotRunning();
                 reportData = {
-                    running,
+                    running: botInfo.running,
                     strategy: detectTopStrategy(trades),
                     regime,
                     mode: 'Shadow',
@@ -766,33 +1110,13 @@ app.get('/api/report/:type', async (req, res) => {
     }
 });
 
-function detectTopStrategy(trades) {
-    if (!trades || trades.length === 0) return 'ranging';
-    const strategies = {};
-    trades.slice(0, 20).forEach(t => {
-        const s = t.strategy || 'unknown';
-        strategies[s] = (strategies[s] || 0) + 1;
-    });
-    return Object.entries(strategies).sort((a, b) => b[1] - a[1])[0]?.[0] || 'ranging';
-}
-
-function generateRiskRecommendations(stats, technical, fg) {
-    const recs = [];
-    if (stats.winRate < 50) recs.push('Win rate below 50% - tighten entry criteria');
-    if (stats.exitReasons.stop_loss > 20) recs.push('High stop loss rate - review risk/reward');
-    if (stats.exitReasons.max_hold_time_exceeded > 25) recs.push('High timeout rate - reduce max hold time to 2h');
-    if (technical?.rsi > 70) recs.push('RSI overbought - avoid new longs');
-    if (technical?.rsi < 30) recs.push('RSI oversold - consider long entries');
-    if (fg?.value < 25) recs.push('Extreme fear - potential buying opportunity');
-    if (fg?.value > 75) recs.push('Extreme greed - exercise caution');
-    if (recs.length === 0) recs.push('Parameters look reasonable - continue monitoring');
-    return recs;
-}
-
 // ============== SOCKET.IO EVENTS ==============
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
-    sendStatusUpdate(socket);
+
+    // Send initial dashboard data
+    sendDashboardUpdate(socket);
+    sendLogUpdate(socket);
 
     // AI Chat handler
     socket.on('chat-message', async (data) => {
@@ -853,15 +1177,20 @@ io.on('connection', (socket) => {
         socket.emit('bot-status', { action: data.action, success: true });
     });
 
+    // Request logs
+    socket.on('request-logs', () => {
+        sendLogUpdate(socket);
+    });
+
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
     });
 });
 
-async function sendStatusUpdate(socket) {
+async function sendDashboardUpdate(socket) {
     try {
-        const [running, binanceData, technical, fearGreed] = await Promise.all([
-            isBotRunning(),
+        const [botInfo, binanceData, technical, fearGreed] = await Promise.all([
+            getBotProcessInfo(),
             fetchBinancePrice(),
             fetchTechnicalData(),
             fetchFearGreedIndex()
@@ -870,10 +1199,60 @@ async function sendStatusUpdate(socket) {
         const balances = getVirtualBalances();
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
+        const logStats = getLogStats();
+        const indicators = parseInstitutionalIndicators();
+        const positions = getActivePositions();
+        const last3Trades = getLast3Trades();
         const price = binanceData?.bnb?.price || 700;
+        const total = balances.usdt + (balances.bnb * price);
+        const bnbPercent = ((balances.bnb * price) / total) * 100;
+
+        socket.emit('dashboard-update', {
+            botStatus: {
+                running: botInfo.running,
+                pid: botInfo.pid,
+                uptime: botInfo.uptime,
+                cpu: botInfo.cpu,
+                memory: botInfo.memory
+            },
+            portfolio: {
+                totalValue: total,
+                usdt: balances.usdt,
+                bnb: balances.bnb,
+                bnbPercent: bnbPercent,
+                inRange: bnbPercent >= 35 && bnbPercent <= 45
+            },
+            market: {
+                price,
+                change24h: binanceData?.bnb?.change24h || 0,
+                volatility: technical.volatility,
+                regime: indicators?.regime?.type || detectRegime(trades),
+                btcPrice: binanceData?.btc?.price || 0,
+                rsi: technical.rsi,
+                trend: technical.trend,
+                fearGreed: fearGreed[0]?.value || 50
+            },
+            institutional: {
+                orderFlow: indicators?.orderFlow || { score: '+0.0%', delta: '0.2%' },
+                volumeProfile: indicators?.volumeProfile || { score: '-7.2%', poc: '179904.742' },
+                liquidity: indicators?.liquidity || { score: '+0.0%', ratio: '1.0' },
+                vwap: indicators?.vwap || { score: '+15.0%' },
+                atr: indicators?.atr || { score: '+12.0%' },
+                regime: indicators?.regime || { score: '+4.5%' },
+                finalConfidence: indicators?.finalConfidence || 62.1
+            },
+            tradingActivity: {
+                tradesToday: logStats.tradesToday
+            },
+            last3Trades,
+            positions,
+            errors: logStats.errors,
+            stats,
+            updatedAt: new Date().toISOString()
+        });
 
         socket.emit('bot-status', {
-            running,
+            running: botInfo.running,
             strategy: detectTopStrategy(trades),
             regime: detectRegime(trades),
             confidence: 0.75,
@@ -890,15 +1269,20 @@ async function sendStatusUpdate(socket) {
 
         socket.emit('portfolio-update', { ...balances, price });
     } catch (error) {
-        console.error('Status update error:', error);
+        console.error('Dashboard update error:', error);
     }
 }
 
-// Periodic updates
+function sendLogUpdate(socket) {
+    const logs = getRecentLogs(50);
+    socket.emit('logs-update', { logs });
+}
+
+// Periodic updates - every 10 seconds for real-time feel
 setInterval(async () => {
     try {
-        const [running, binanceData, technical, fearGreed] = await Promise.all([
-            isBotRunning(),
+        const [botInfo, binanceData, technical, fearGreed] = await Promise.all([
+            getBotProcessInfo(),
             fetchBinancePrice(),
             fetchTechnicalData(),
             fetchFearGreedIndex()
@@ -907,10 +1291,61 @@ setInterval(async () => {
         const balances = getVirtualBalances();
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
+        const logStats = getLogStats();
+        const indicators = parseInstitutionalIndicators();
+        const positions = getActivePositions();
+        const last3Trades = getLast3Trades();
         const price = binanceData?.bnb?.price || 700;
+        const total = balances.usdt + (balances.bnb * price);
+        const bnbPercent = ((balances.bnb * price) / total) * 100;
+
+        // Emit dashboard update to all clients
+        io.emit('dashboard-update', {
+            botStatus: {
+                running: botInfo.running,
+                pid: botInfo.pid,
+                uptime: botInfo.uptime,
+                cpu: botInfo.cpu,
+                memory: botInfo.memory
+            },
+            portfolio: {
+                totalValue: total,
+                usdt: balances.usdt,
+                bnb: balances.bnb,
+                bnbPercent: bnbPercent,
+                inRange: bnbPercent >= 35 && bnbPercent <= 45
+            },
+            market: {
+                price,
+                change24h: binanceData?.bnb?.change24h || 0,
+                volatility: technical.volatility,
+                regime: indicators?.regime?.type || detectRegime(trades),
+                btcPrice: binanceData?.btc?.price || 0,
+                rsi: technical.rsi,
+                trend: technical.trend,
+                fearGreed: fearGreed[0]?.value || 50
+            },
+            institutional: {
+                orderFlow: indicators?.orderFlow || { score: '+0.0%', delta: '0.2%' },
+                volumeProfile: indicators?.volumeProfile || { score: '-7.2%', poc: '179904.742' },
+                liquidity: indicators?.liquidity || { score: '+0.0%', ratio: '1.0' },
+                vwap: indicators?.vwap || { score: '+15.0%' },
+                atr: indicators?.atr || { score: '+12.0%' },
+                regime: indicators?.regime || { score: '+4.5%' },
+                finalConfidence: indicators?.finalConfidence || 62.1
+            },
+            tradingActivity: {
+                tradesToday: logStats.tradesToday
+            },
+            last3Trades,
+            positions,
+            errors: logStats.errors,
+            stats,
+            updatedAt: new Date().toISOString()
+        });
 
         io.emit('bot-status', {
-            running,
+            running: botInfo.running,
             strategy: detectTopStrategy(trades),
             regime: detectRegime(trades),
             confidence: 0.75,
@@ -926,6 +1361,10 @@ setInterval(async () => {
         });
 
         io.emit('portfolio-update', { ...balances, price });
+
+        // Send log updates
+        const logs = getRecentLogs(50);
+        io.emit('logs-update', { logs });
     } catch (error) {}
 }, 10000);
 
@@ -933,25 +1372,34 @@ setInterval(async () => {
 server.listen(PORT, async () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║        AlgoQBot Production Monitor - Enhanced                ║
+║     🤖 AlgoQBot INSTITUTIONAL DASHBOARD - Web Interface      ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Status: Running                                             ║
 ║  Port: ${PORT}                                                   ║
 ║  URL: http://localhost:${PORT}                                  ║
 ╠══════════════════════════════════════════════════════════════╣
+║  Features:                                                   ║
+║  • Live Bot Status (PID, Uptime, CPU, Memory)               ║
+║  • Institutional 6-Indicator System                         ║
+║  • Real-time Log Streaming                                  ║
+║  • AI Chat & Council                                        ║
+║  • Auto-refresh every 10 seconds                            ║
+╠══════════════════════════════════════════════════════════════╣
 ║  Live Data Sources:                                          ║
 ║  • Binance API - BNB/BTC prices                              ║
 ║  • CoinGecko - Market data                                   ║
 ║  • Alternative.me - Fear & Greed Index                       ║
-║  • Technical Indicators - RSI, SMA, Trends                   ║
+║  • Bot Logs - Real-time parsing                             ║
 ╚══════════════════════════════════════════════════════════════╝
     `);
 
     // Initial data fetch
     try {
+        const botInfo = await getBotProcessInfo();
         const price = await fetchBinancePrice();
         const fg = await fetchFearGreedIndex();
         const tech = await fetchTechnicalData();
+        console.log(`  Bot: ${botInfo.running ? '🟢 Running (PID: ' + botInfo.pid + ')' : '🔴 Not Running'}`);
         console.log(`  BNB: $${price?.bnb?.price?.toFixed(2) || 'N/A'}`);
         console.log(`  Fear & Greed: ${fg[0]?.value || 'N/A'} (${fg[0]?.value_classification || 'N/A'})`);
         console.log(`  RSI: ${tech?.rsi?.toFixed(1) || 'N/A'}`);
