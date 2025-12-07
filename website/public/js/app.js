@@ -76,7 +76,12 @@ function initSocket() {
     });
 
     socket.on('chat-response', (data) => {
-        addChatMessage(data.message, 'assistant');
+        // Pass agent info for enhanced display
+        addChatMessage(data.message, 'assistant', {
+            agent: data.agent,
+            mode: data.mode,
+            isMultiAgent: data.isMultiAgent
+        });
     });
 
     socket.on('council-response', (data) => {
@@ -89,6 +94,9 @@ function initSocket() {
         councilState.active = true;
         updateCouncilControls('running');
         addCouncilEntry({ type: 'system', content: `Session started: ${data.topic || 'Market Analysis'}` });
+        // Initialize and start progression tracking
+        initRoundProgression();
+        startSessionTimer();
     });
 
     socket.on('council-round-started', (data) => {
@@ -96,6 +104,8 @@ function initSocket() {
         const roundInfo = document.getElementById('council-round-info');
         if (roundInfo) roundInfo.textContent = `Round ${data.round}/${data.maxRounds}`;
         addCouncilEntry({ type: 'round', round: data.round, maxRounds: data.maxRounds });
+        // Update progression panel
+        updateRoundProgression(data.round, data.maxRounds);
     });
 
     socket.on('council-agent-spoke', (data) => {
@@ -103,6 +113,8 @@ function initSocket() {
             agent: data.agent,
             content: data.discussion?.content || data.discussion?.summary || 'Analyzing...'
         });
+        // Mark agent as having spoken in progression
+        markAgentSpoke(data.agent, councilState.currentRound);
     });
 
     socket.on('council-voting-started', (data) => {
@@ -111,6 +123,8 @@ function initSocket() {
 
     socket.on('council-agent-voted', (data) => {
         updateAgentVote(data.agent, data.vote, data.confidence);
+        // Track vote in progression
+        markVoteCast();
     });
 
     socket.on('council-voting-complete', (data) => {
@@ -129,6 +143,9 @@ function initSocket() {
             content: `Consensus reached! Decision: ${data.consensus.decision} (${data.consensus.strength?.toFixed(0)}% agreement)`,
             consensus: data.consensus
         });
+        // Complete progression
+        completeRound(councilState.currentRound);
+        stopSessionTimer();
     });
 
     socket.on('council-consensus-forced', (data) => {
@@ -139,6 +156,9 @@ function initSocket() {
             content: `Max rounds reached. Final decision: ${data.consensus.decision} (${data.consensus.strength?.toFixed(0)}% support)`,
             consensus: data.consensus
         });
+        // Complete all rounds and stop
+        for (let i = 1; i <= 5; i++) completeRound(i);
+        stopSessionTimer();
     });
 
     socket.on('council-no-consensus', (data) => {
@@ -161,6 +181,8 @@ function initSocket() {
     socket.on('council-session-stopped', (data) => {
         updateCouncilControls('stopped');
         addCouncilEntry({ type: 'system', content: 'Session stopped by user.' });
+        // Stop progression timer
+        stopSessionTimer();
     });
 
     socket.on('council-user-intervention', (data) => {
@@ -195,6 +217,18 @@ function initSocket() {
     // Logs update handler
     socket.on('logs-update', (data) => {
         updateLiveLogs(data.logs);
+    });
+
+    // Bot logs update handler
+    socket.on('bot-logs-update', (data) => {
+        updateBotLogs(data.logs);
+    });
+
+    // Request initial bot logs on connect
+    socket.on('connect', () => {
+        setTimeout(() => {
+            socket.emit('request-bot-logs');
+        }, 1000);
     });
 }
 
@@ -404,7 +438,7 @@ function clearActivityLog() {
     `;
 }
 
-// Chat Functions
+// Chat Functions - Enhanced with agent selection
 function sendChatMessage() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
@@ -414,7 +448,23 @@ function sendChatMessage() {
     addChatMessage(message, 'user');
     input.value = '';
 
-    socket.emit('chat-message', { message });
+    // Determine which agents to use based on chat mode
+    let agents = [];
+    if (chatState.mode === 'single') {
+        agents = [chatState.selectedAgent];
+    } else if (chatState.mode === 'group') {
+        agents = chatState.selectedAgents;
+    } else if (chatState.mode === 'all') {
+        agents = Object.keys(AGENT_INFO);
+    }
+
+    // Send enhanced message with agent selection and discussion mode
+    socket.emit('chat-message', {
+        message,
+        agents: agents,
+        discussionMode: chatState.discussionMode,
+        chatMode: chatState.mode
+    });
 }
 
 function sendQuickMessage(message) {
@@ -422,16 +472,28 @@ function sendQuickMessage(message) {
     sendChatMessage();
 }
 
-function addChatMessage(content, role) {
+function addChatMessage(content, role, agentInfo = null) {
     const container = document.getElementById('chat-messages');
     const msg = document.createElement('div');
     msg.className = `message ${role}`;
+
     // Support markdown-style formatting
     const formatted = content
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>')
         .replace(/• /g, '&bull; ');
-    msg.innerHTML = `<div class="message-content">${formatted}</div>`;
+
+    // Add agent badge for assistant messages
+    let agentBadge = '';
+    if (role === 'assistant' && agentInfo) {
+        const agent = AGENT_INFO[agentInfo.agent] || {};
+        agentBadge = `<div class="message-agent-badge">
+            <span class="agent-emoji">${agent.emoji || '🤖'}</span>
+            <span class="agent-label">${agent.name || agentInfo.agent}</span>
+        </div>`;
+    }
+
+    msg.innerHTML = `${agentBadge}<div class="message-content">${formatted}</div>`;
     container.appendChild(msg);
     container.scrollTop = container.scrollHeight;
 }
@@ -1614,3 +1676,767 @@ function startAutoRefresh() {
         }
     }, 10000); // Every 10 seconds
 }
+
+// ============== BOT LOGS VIEWER ==============
+const botLogsState = {
+    logs: [],
+    filter: 'all',
+    stats: {
+        total: 0,
+        trades: 0,
+        signals: 0,
+        errors: 0
+    }
+};
+
+// Update bot logs from server
+function updateBotLogs(logs) {
+    if (!logs || !Array.isArray(logs)) return;
+
+    const container = document.getElementById('bot-logs-container');
+    if (!container) return;
+
+    // Store logs and update stats
+    botLogsState.logs = logs;
+    updateLogStats(logs);
+
+    // Clear and repopulate
+    container.innerHTML = '';
+
+    const filteredLogs = filterLogsByType(logs, botLogsState.filter);
+
+    filteredLogs.forEach(log => {
+        const entry = createBotLogEntry(log);
+        container.appendChild(entry);
+    });
+
+    // Auto-scroll if enabled
+    const autoScroll = document.getElementById('auto-scroll-logs');
+    if (autoScroll && autoScroll.checked) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+// Create a log entry element
+function createBotLogEntry(log) {
+    const entry = document.createElement('div');
+    const type = classifyLogType(log);
+    entry.className = `bot-log-entry ${type}`;
+    entry.dataset.type = type;
+
+    // Format timestamp
+    let timeStr = '--:--:--';
+    if (log.timestamp) {
+        try {
+            const date = new Date(log.timestamp);
+            timeStr = date.toLocaleTimeString();
+        } catch (e) {
+            timeStr = log.timestamp.substring(11, 19) || '--:--:--';
+        }
+    }
+
+    // Determine level and source
+    const level = log.level ? log.level.toUpperCase() : type.toUpperCase();
+    const source = log.source || extractSource(log.message) || 'BOT';
+    const message = log.message || JSON.stringify(log);
+
+    entry.innerHTML = `
+        <span class="log-timestamp">${timeStr}</span>
+        <span class="log-level">${level}</span>
+        <span class="log-source">${source}</span>
+        <span class="log-text">${message}</span>
+    `;
+
+    return entry;
+}
+
+// Classify log type based on content
+function classifyLogType(log) {
+    const message = (log.message || '').toLowerCase();
+    const level = (log.level || '').toLowerCase();
+
+    if (level === 'error' || message.includes('error') || message.includes('failed')) {
+        return 'error';
+    }
+    if (level === 'warn' || message.includes('warning') || message.includes('warn')) {
+        return 'warning';
+    }
+    if (message.includes('trade') || message.includes('buy') || message.includes('sell') || message.includes('order')) {
+        return 'trade';
+    }
+    if (message.includes('signal') || message.includes('indicator') || message.includes('rsi') || message.includes('macd')) {
+        return 'signal';
+    }
+    if (message.includes('decision') || message.includes('confidence') || message.includes('action')) {
+        return 'decision';
+    }
+    if (message.includes('api') || message.includes('binance') || message.includes('fetch') || message.includes('request')) {
+        return 'api';
+    }
+    return 'info';
+}
+
+// Extract source from message
+function extractSource(message) {
+    if (!message) return 'BOT';
+    const lowerMsg = message.toLowerCase();
+
+    if (lowerMsg.includes('binance')) return 'BINANCE';
+    if (lowerMsg.includes('indicator') || lowerMsg.includes('rsi') || lowerMsg.includes('macd')) return 'INDICATOR';
+    if (lowerMsg.includes('strategy')) return 'STRATEGY';
+    if (lowerMsg.includes('portfolio')) return 'PORTFOLIO';
+    if (lowerMsg.includes('trade') || lowerMsg.includes('order')) return 'TRADING';
+    if (lowerMsg.includes('risk')) return 'RISK';
+    if (lowerMsg.includes('decision')) return 'DECISION';
+    return 'BOT';
+}
+
+// Filter logs by type
+function filterLogsByType(logs, filterType) {
+    if (filterType === 'all') return logs;
+    return logs.filter(log => classifyLogType(log) === filterType);
+}
+
+// Update log statistics
+function updateLogStats(logs) {
+    botLogsState.stats = {
+        total: logs.length,
+        trades: logs.filter(l => classifyLogType(l) === 'trade').length,
+        signals: logs.filter(l => classifyLogType(l) === 'signal').length,
+        errors: logs.filter(l => classifyLogType(l) === 'error').length
+    };
+
+    document.getElementById('log-count-total').textContent = botLogsState.stats.total;
+    document.getElementById('log-count-trades').textContent = botLogsState.stats.trades;
+    document.getElementById('log-count-signals').textContent = botLogsState.stats.signals;
+    document.getElementById('log-count-errors').textContent = botLogsState.stats.errors;
+}
+
+// Filter button handler
+function filterLogs(filterType) {
+    botLogsState.filter = filterType;
+
+    // Update active button
+    document.querySelectorAll('.log-filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filterType);
+    });
+
+    // Re-render logs
+    updateBotLogs(botLogsState.logs);
+}
+
+// Clear bot logs display
+function clearBotLogs() {
+    const container = document.getElementById('bot-logs-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="bot-log-entry info">
+                <span class="log-timestamp">--:--:--</span>
+                <span class="log-level">INFO</span>
+                <span class="log-source">SYSTEM</span>
+                <span class="log-text">Logs cleared</span>
+            </div>
+        `;
+    }
+    botLogsState.logs = [];
+    updateLogStats([]);
+}
+
+// Download logs as file
+function downloadLogs() {
+    if (botLogsState.logs.length === 0) {
+        alert('No logs to download');
+        return;
+    }
+
+    const logText = botLogsState.logs.map(log => {
+        const time = log.timestamp || new Date().toISOString();
+        const level = log.level || 'info';
+        const msg = log.message || JSON.stringify(log);
+        return `[${time}] [${level.toUpperCase()}] ${msg}`;
+    }).join('\n');
+
+    const blob = new Blob([logText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `algoqbot-logs-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Request bot logs from server
+function requestBotLogs() {
+    if (socket && state.connected) {
+        socket.emit('request-bot-logs');
+    }
+}
+
+// ============== ENHANCED AI CHAT - AGENT SELECTION ==============
+const chatState = {
+    mode: 'single',           // single, group, all
+    selectedAgent: 'AlgoQ',
+    selectedAgents: [],       // for group mode
+    discussionMode: 'analyse', // analyse, brainstorm, debate
+    customGroups: JSON.parse(localStorage.getItem('algoq-chat-groups') || '[]')
+};
+
+const AGENT_INFO = {
+    'AlgoQ': { emoji: '🤖', name: 'AlgoQ', specialty: 'Lead AI & Executor' },
+    'Strategist': { emoji: '🎯', name: 'Strategist', specialty: 'Strategy & Direction' },
+    'Analyst': { emoji: '📊', name: 'Dr. Sarah Data', specialty: 'Quantitative Analysis' },
+    'RiskManager': { emoji: '🛡️', name: 'Victor Shield', specialty: 'Risk Management' },
+    'Sentiment': { emoji: '📡', name: 'Echo Pulse', specialty: 'Sentiment Analysis' }
+};
+
+// Set chat mode (single, group, all)
+function setChatMode(mode) {
+    chatState.mode = mode;
+
+    // Update mode buttons
+    document.querySelectorAll('.chat-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    // Show/hide group creator
+    const groupCreator = document.getElementById('group-creator');
+    if (groupCreator) {
+        groupCreator.style.display = mode === 'group' ? 'block' : 'none';
+    }
+
+    // Reset agent cards based on mode
+    if (mode === 'single') {
+        document.querySelectorAll('.agent-card').forEach(card => {
+            card.classList.remove('selected');
+            if (card.dataset.agent === chatState.selectedAgent) {
+                card.classList.add('active');
+            }
+        });
+        chatState.selectedAgents = [];
+    } else if (mode === 'all') {
+        chatState.selectedAgents = Object.keys(AGENT_INFO);
+        document.querySelectorAll('.agent-card').forEach(card => {
+            card.classList.add('selected');
+            card.classList.remove('active');
+        });
+    }
+
+    updateChatDisplay();
+}
+
+// Select agent (for single mode or group building)
+function selectAgent(agentId) {
+    if (chatState.mode === 'single') {
+        // Single mode - select one agent
+        chatState.selectedAgent = agentId;
+        document.querySelectorAll('.agent-card').forEach(card => {
+            card.classList.toggle('active', card.dataset.agent === agentId);
+            card.classList.remove('selected');
+        });
+    } else if (chatState.mode === 'group') {
+        // Group mode - toggle selection
+        const card = document.querySelector(`.agent-card[data-agent="${agentId}"]`);
+        if (chatState.selectedAgents.includes(agentId)) {
+            chatState.selectedAgents = chatState.selectedAgents.filter(a => a !== agentId);
+            card.classList.remove('selected');
+        } else {
+            chatState.selectedAgents.push(agentId);
+            card.classList.add('selected');
+        }
+        updateGroupSelectedDisplay();
+    }
+
+    updateChatDisplay();
+}
+
+// Update chat display header
+function updateChatDisplay() {
+    const agentDisplay = document.getElementById('chat-agent-display');
+    const modeDisplay = document.getElementById('chat-mode-display');
+
+    if (!agentDisplay) return;
+
+    if (chatState.mode === 'single') {
+        const agent = AGENT_INFO[chatState.selectedAgent];
+        agentDisplay.textContent = `${agent.emoji} ${agent.name}`;
+    } else if (chatState.mode === 'group') {
+        if (chatState.selectedAgents.length === 0) {
+            agentDisplay.textContent = '👥 Select agents...';
+        } else {
+            const emojis = chatState.selectedAgents.map(a => AGENT_INFO[a].emoji).join('');
+            agentDisplay.textContent = `👥 ${emojis} (${chatState.selectedAgents.length} agents)`;
+        }
+    } else if (chatState.mode === 'all') {
+        agentDisplay.textContent = '🌐 All Agents (5)';
+    }
+
+    if (modeDisplay) {
+        const modeLabels = {
+            'analyse': '🔍 Analyse',
+            'brainstorm': '💡 Brainstorm',
+            'debate': '⚔️ Debate'
+        };
+        modeDisplay.textContent = `Mode: ${modeLabels[chatState.discussionMode]}`;
+    }
+}
+
+// Set chat discussion mode
+function setChatDiscussionMode(mode) {
+    chatState.discussionMode = mode;
+
+    document.querySelectorAll('.chat-disc-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    updateChatDisplay();
+}
+
+// Update group selected display
+function updateGroupSelectedDisplay() {
+    const container = document.getElementById('group-selected');
+    if (!container) return;
+
+    if (chatState.selectedAgents.length === 0) {
+        container.innerHTML = '<span class="placeholder-text">Select agents above</span>';
+    } else {
+        container.innerHTML = chatState.selectedAgents.map(agentId => {
+            const agent = AGENT_INFO[agentId];
+            return `<span class="group-member-tag">${agent.emoji} ${agent.name}</span>`;
+        }).join('');
+    }
+}
+
+// Save custom group
+function saveCustomGroup() {
+    const nameInput = document.getElementById('group-name');
+    const name = nameInput.value.trim();
+
+    if (!name) {
+        alert('Please enter a group name');
+        return;
+    }
+
+    if (chatState.selectedAgents.length < 2) {
+        alert('Please select at least 2 agents for a group');
+        return;
+    }
+
+    const group = {
+        id: Date.now(),
+        name: name,
+        agents: [...chatState.selectedAgents]
+    };
+
+    chatState.customGroups.push(group);
+    localStorage.setItem('algoq-chat-groups', JSON.stringify(chatState.customGroups));
+
+    nameInput.value = '';
+    renderSavedGroups();
+    alert(`Group "${name}" saved!`);
+}
+
+// Render saved groups
+function renderSavedGroups() {
+    const container = document.getElementById('groups-list');
+    if (!container) return;
+
+    if (chatState.customGroups.length === 0) {
+        container.innerHTML = '<div class="no-groups">No saved groups</div>';
+        return;
+    }
+
+    container.innerHTML = chatState.customGroups.map(group => `
+        <div class="saved-group-item" onclick="loadGroup(${group.id})">
+            <span class="group-item-name">${group.name}</span>
+            <span class="group-item-count">${group.agents.length} agents</span>
+        </div>
+    `).join('');
+}
+
+// Load a saved group
+function loadGroup(groupId) {
+    const group = chatState.customGroups.find(g => g.id === groupId);
+    if (!group) return;
+
+    setChatMode('group');
+    chatState.selectedAgents = [...group.agents];
+
+    // Update agent cards
+    document.querySelectorAll('.agent-card').forEach(card => {
+        card.classList.remove('active', 'selected');
+        if (chatState.selectedAgents.includes(card.dataset.agent)) {
+            card.classList.add('selected');
+        }
+    });
+
+    updateGroupSelectedDisplay();
+    updateChatDisplay();
+}
+
+// Initialize chat on page load
+function initEnhancedChat() {
+    renderSavedGroups();
+    updateChatDisplay();
+}
+
+// Call on DOM ready
+document.addEventListener('DOMContentLoaded', initEnhancedChat);
+
+// ============== ROUND PROGRESSION TRACKING ==============
+const progressionState = {
+    currentRound: 0,
+    maxRounds: 5,
+    agentsSpokeThisRound: [],
+    totalAgentsSpoke: 0,
+    totalVotesCast: 0,
+    sessionStartTime: null,
+    timerInterval: null
+};
+
+// Initialize round progression display
+function initRoundProgression() {
+    // Reset all steps to waiting
+    for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById(`round-step-${i}`);
+        if (step) {
+            step.classList.remove('active', 'completed');
+            step.classList.add('waiting');
+        }
+        // Initialize agent badges for each step
+        const agentsContainer = document.getElementById(`step-agents-${i}`);
+        if (agentsContainer) {
+            agentsContainer.innerHTML = Object.values(AGENT_INFO).map(agent =>
+                `<span class="step-agent-badge" data-agent="${agent.name}">${agent.emoji}</span>`
+            ).join('');
+        }
+    }
+
+    // Reset counters
+    progressionState.currentRound = 0;
+    progressionState.agentsSpokeThisRound = [];
+    progressionState.totalAgentsSpoke = 0;
+    progressionState.totalVotesCast = 0;
+
+    updateProgressionSummary();
+}
+
+// Start session timer
+function startSessionTimer() {
+    progressionState.sessionStartTime = Date.now();
+
+    if (progressionState.timerInterval) {
+        clearInterval(progressionState.timerInterval);
+    }
+
+    progressionState.timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - progressionState.sessionStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const seconds = (elapsed % 60).toString().padStart(2, '0');
+        const timerEl = document.getElementById('session-timer');
+        if (timerEl) {
+            timerEl.textContent = `${minutes}:${seconds}`;
+        }
+    }, 1000);
+}
+
+// Stop session timer
+function stopSessionTimer() {
+    if (progressionState.timerInterval) {
+        clearInterval(progressionState.timerInterval);
+        progressionState.timerInterval = null;
+    }
+}
+
+// Update round progression when a new round starts
+function updateRoundProgression(round, maxRounds) {
+    progressionState.currentRound = round;
+    progressionState.maxRounds = maxRounds;
+    progressionState.agentsSpokeThisRound = [];
+
+    // Update step states
+    for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById(`round-step-${i}`);
+        if (!step) continue;
+
+        step.classList.remove('waiting', 'active', 'completed');
+
+        if (i < round) {
+            step.classList.add('completed');
+        } else if (i === round) {
+            step.classList.add('active');
+        } else {
+            step.classList.add('waiting');
+        }
+    }
+
+    updateProgressionSummary();
+}
+
+// Mark agent as having spoken in current round
+function markAgentSpoke(agentName, round) {
+    if (!progressionState.agentsSpokeThisRound.includes(agentName)) {
+        progressionState.agentsSpokeThisRound.push(agentName);
+        progressionState.totalAgentsSpoke++;
+    }
+
+    // Update agent badge
+    const agentsContainer = document.getElementById(`step-agents-${round}`);
+    if (agentsContainer) {
+        const badge = agentsContainer.querySelector(`[data-agent="${agentName}"]`);
+        if (badge) {
+            badge.classList.add('spoke');
+        }
+    }
+
+    updateProgressionSummary();
+}
+
+// Mark vote cast
+function markVoteCast() {
+    progressionState.totalVotesCast++;
+    updateProgressionSummary();
+}
+
+// Update progression summary
+function updateProgressionSummary() {
+    const spokeCount = document.getElementById('agents-spoke-count');
+    const votesCount = document.getElementById('votes-cast-count');
+    const progressFill = document.getElementById('overall-progress-fill');
+
+    if (spokeCount) {
+        spokeCount.textContent = progressionState.totalAgentsSpoke;
+    }
+
+    if (votesCount) {
+        votesCount.textContent = progressionState.totalVotesCast;
+    }
+
+    if (progressFill) {
+        const progress = (progressionState.currentRound / progressionState.maxRounds) * 100;
+        progressFill.style.width = `${progress}%`;
+    }
+}
+
+// Complete current round
+function completeRound(round) {
+    const step = document.getElementById(`round-step-${round}`);
+    if (step) {
+        step.classList.remove('active', 'waiting');
+        step.classList.add('completed');
+    }
+}
+
+// Reset progression for new session
+function resetProgression() {
+    initRoundProgression();
+    stopSessionTimer();
+    const timerEl = document.getElementById('session-timer');
+    if (timerEl) {
+        timerEl.textContent = '00:00';
+    }
+}
+
+// ============== AGENT PROFILES ==============
+let currentAgentProfile = null;
+
+// Load agent profiles on page load
+async function loadAgentProfiles() {
+    try {
+        const response = await fetch('/api/agents');
+        const data = await response.json();
+
+        if (data.agents) {
+            renderAgentProfiles(data.agents);
+        }
+    } catch (error) {
+        console.error('Failed to load agent profiles:', error);
+    }
+}
+
+// Render agent profile cards
+function renderAgentProfiles(agents) {
+    const container = document.getElementById('agent-profiles-grid');
+    if (!container) return;
+
+    container.innerHTML = agents.map(agent => `
+        <div class="agent-profile-card" onclick="showAgentDetail('${agent.id}')">
+            <div class="agent-profile-header">
+                <span class="agent-profile-avatar">${agent.avatar}</span>
+                <div class="agent-profile-info">
+                    <h4>${agent.name}</h4>
+                    <span>${agent.role}</span>
+                </div>
+            </div>
+            <div class="agent-profile-stats">
+                <div class="agent-stat">
+                    <span class="agent-stat-value">${agent.totalSessions}</span>
+                    <span class="agent-stat-label">Sessions</span>
+                </div>
+                <div class="agent-stat">
+                    <span class="agent-stat-value">${agent.memorySize}</span>
+                    <span class="agent-stat-label">Memories</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Show agent detail modal
+async function showAgentDetail(agentId) {
+    try {
+        const response = await fetch(`/api/agents/${agentId}`);
+        const data = await response.json();
+
+        if (data.agent) {
+            currentAgentProfile = data.agent;
+            populateAgentModal(data.agent);
+            document.getElementById('agent-detail-modal').classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Failed to load agent detail:', error);
+    }
+}
+
+// Hide agent detail modal
+function hideAgentDetail() {
+    document.getElementById('agent-detail-modal').classList.add('hidden');
+    currentAgentProfile = null;
+}
+
+// Populate agent modal with data
+function populateAgentModal(agent) {
+    // Header
+    document.querySelector('.agent-modal-avatar').textContent = agent.avatar;
+    document.getElementById('agent-modal-name').textContent = agent.fullName || agent.name;
+    document.getElementById('agent-modal-role').textContent = agent.role;
+
+    // Profile Tab
+    const traitsContainer = document.getElementById('agent-personality-traits');
+    traitsContainer.innerHTML = agent.personality.traits.map(trait =>
+        `<span class="trait-badge">${trait}</span>`
+    ).join('');
+
+    document.getElementById('agent-comm-style').textContent = agent.personality.communicationStyle;
+    document.getElementById('agent-decision-style').textContent = agent.personality.decisionMaking;
+    document.getElementById('agent-risk-tolerance').textContent = agent.personality.riskTolerance;
+
+    const expertiseContainer = document.getElementById('agent-expertise');
+    expertiseContainer.innerHTML = agent.expertise.map(exp =>
+        `<span class="expertise-badge">${exp}</span>`
+    ).join('');
+
+    document.getElementById('agent-api').textContent = agent.api;
+    document.getElementById('agent-voting-weight').textContent = agent.votingWeight;
+
+    // Objectives Tab
+    document.getElementById('agent-primary-objective').textContent = agent.objectives.primary;
+
+    const missionsContainer = document.getElementById('agent-missions');
+    missionsContainer.innerHTML = agent.objectives.missions.map(m =>
+        `<li>${m}</li>`
+    ).join('');
+
+    const kpisContainer = document.getElementById('agent-kpis');
+    kpisContainer.innerHTML = agent.objectives.kpis.map(kpi =>
+        `<li>${kpi}</li>`
+    ).join('');
+
+    // Memory Tab
+    populateMemoryTab(agent.memory);
+
+    // History Tab
+    populateHistoryTab(agent.history, agent.performance);
+}
+
+// Populate memory tab
+function populateMemoryTab(memory) {
+    const shortTermContainer = document.getElementById('agent-short-term-memory');
+    if (memory.shortTerm && memory.shortTerm.length > 0) {
+        shortTermContainer.innerHTML = memory.shortTerm.map(item => `
+            <div class="memory-item">
+                <span class="timestamp">${new Date(item.timestamp).toLocaleString()}</span>
+                <p>${item.content || JSON.stringify(item)}</p>
+            </div>
+        `).join('');
+    } else {
+        shortTermContainer.innerHTML = '<p class="empty">No recent context</p>';
+    }
+
+    const longTermContainer = document.getElementById('agent-long-term-memory');
+    if (memory.longTerm && memory.longTerm.length > 0) {
+        longTermContainer.innerHTML = memory.longTerm.map(item => `
+            <div class="memory-item">
+                <span class="timestamp">${new Date(item.timestamp).toLocaleString()}</span>
+                <p>${item.insight || JSON.stringify(item)}</p>
+            </div>
+        `).join('');
+    } else {
+        longTermContainer.innerHTML = '<p class="empty">No long-term memories</p>';
+    }
+
+    const learningsContainer = document.getElementById('agent-learnings');
+    if (memory.learnings && memory.learnings.length > 0) {
+        learningsContainer.innerHTML = memory.learnings.map(item => `
+            <div class="memory-item">
+                <span class="timestamp">${new Date(item.timestamp).toLocaleString()}</span>
+                <p>${item.lesson || JSON.stringify(item)}</p>
+            </div>
+        `).join('');
+    } else {
+        learningsContainer.innerHTML = '<p class="empty">No learnings recorded</p>';
+    }
+}
+
+// Populate history tab
+function populateHistoryTab(history, performance) {
+    document.getElementById('agent-total-sessions').textContent = history.totalSessions;
+    document.getElementById('agent-total-discussions').textContent = history.totalDiscussions;
+    document.getElementById('agent-total-votes').textContent = history.totalVotes;
+    document.getElementById('agent-prediction-accuracy').textContent = performance.predictionAccuracy;
+
+    const contributionsContainer = document.getElementById('agent-contributions');
+    if (history.contributions && history.contributions.length > 0) {
+        contributionsContainer.innerHTML = history.contributions.slice(-10).reverse().map(c => `
+            <div class="memory-item">
+                <span class="timestamp">${new Date(c.timestamp).toLocaleString()}</span>
+                <p><strong>${c.type}:</strong> ${c.summary}</p>
+            </div>
+        `).join('');
+    } else {
+        contributionsContainer.innerHTML = '<p class="empty">No contributions yet</p>';
+    }
+
+    const milestonesContainer = document.getElementById('agent-milestones');
+    if (history.milestones && history.milestones.length > 0) {
+        milestonesContainer.innerHTML = history.milestones.map(m => `
+            <div class="memory-item">
+                <span class="timestamp">${new Date(m.timestamp).toLocaleString()}</span>
+                <p>${m.description || m.title}</p>
+            </div>
+        `).join('');
+    } else {
+        milestonesContainer.innerHTML = '<p class="empty">No milestones yet</p>';
+    }
+}
+
+// Show agent tab
+function showAgentTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.agent-tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+
+    // Show selected tab
+    document.getElementById(`agent-tab-${tabName}`).classList.remove('hidden');
+
+    // Update tab buttons
+    document.querySelectorAll('.detail-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+// Initialize agent profiles on DOM ready
+document.addEventListener('DOMContentLoaded', loadAgentProfiles);

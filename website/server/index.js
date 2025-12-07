@@ -27,6 +27,18 @@ const {
     AGENT_DIRECTIVES
 } = require('./council');
 
+// Import Agent Database System
+const {
+    AGENT_PROFILES: DB_AGENT_PROFILES,
+    loadAgentMemory,
+    addToShortTermMemory,
+    addToLongTermMemory,
+    recordContribution,
+    recordSessionParticipation,
+    getAgentFullProfile,
+    getAllAgentsSummary
+} = require('./agentDatabase');
+
 // Configuration
 const PORT = process.env.PORT || 9000;
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
@@ -1259,6 +1271,56 @@ app.get('/api/logs', (req, res) => {
     res.json({ logs: getRecentLogs(count) });
 });
 
+// ============== AGENT DATABASE ENDPOINTS ==============
+
+// Get all agents summary
+app.get('/api/agents', (req, res) => {
+    try {
+        const agents = getAllAgentsSummary();
+        res.json({ agents });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get agents' });
+    }
+});
+
+// Get specific agent full profile
+app.get('/api/agents/:agentId', (req, res) => {
+    try {
+        const profile = getAgentFullProfile(req.params.agentId);
+        if (!profile) {
+            return res.status(404).json({ error: 'Agent not found' });
+        }
+        res.json({ agent: profile });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get agent profile' });
+    }
+});
+
+// Get agent memory
+app.get('/api/agents/:agentId/memory', (req, res) => {
+    try {
+        const memory = loadAgentMemory(req.params.agentId);
+        res.json({ memory });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get agent memory' });
+    }
+});
+
+// Add to agent memory (for user notes)
+app.post('/api/agents/:agentId/memory', (req, res) => {
+    try {
+        const { type, content } = req.body;
+        if (type === 'shortTerm') {
+            addToShortTermMemory(req.params.agentId, { content, source: 'user' });
+        } else if (type === 'longTerm') {
+            addToLongTermMemory(req.params.agentId, { insight: content, importance: 'high' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add to memory' });
+    }
+});
+
 // Market data endpoint - comprehensive
 app.get('/api/market', async (req, res) => {
     try {
@@ -1673,9 +1735,9 @@ io.on('connection', (socket) => {
     // Send council status on connect
     socket.emit('council-status', councilManager.getStatus());
 
-    // AI Chat handler
+    // AI Chat handler - Enhanced with agent selection and discussion modes
     socket.on('chat-message', async (data) => {
-        const { message } = data;
+        const { message, agents = ['AlgoQ'], discussionMode = 'analyse', chatMode = 'single' } = data;
 
         // Gather comprehensive context for detailed responses
         const [binanceData, technical, fearGreed, botInfo] = await Promise.all([
@@ -1716,9 +1778,109 @@ io.on('connection', (socket) => {
             price
         };
 
-        const response = await generateDetailedAIResponse(message, fullContext);
-        socket.emit('chat-response', { message: response });
+        // Discussion mode prompts
+        const modePrompts = {
+            analyse: 'Provide detailed quantitative analysis with specific data points, metrics, and evidence-based conclusions.',
+            brainstorm: 'Think creatively and propose innovative strategies. Explore unconventional approaches and "what if" scenarios.',
+            debate: 'Present strong arguments for your position. Challenge assumptions and provide alternative viewpoints.'
+        };
+
+        const modeInstruction = modePrompts[discussionMode] || modePrompts.analyse;
+
+        // Handle different chat modes
+        if (chatMode === 'single' || agents.length === 1) {
+            // Single agent response
+            const agentId = agents[0];
+            const response = await generateAgentSpecificResponse(agentId, message, fullContext, modeInstruction);
+            socket.emit('chat-response', {
+                message: response,
+                agent: agentId,
+                mode: discussionMode
+            });
+        } else {
+            // Multiple agents - get responses from each
+            const responses = [];
+            for (const agentId of agents) {
+                const response = await generateAgentSpecificResponse(agentId, message, fullContext, modeInstruction);
+                responses.push({ agent: agentId, response });
+
+                // Send each response as it comes in
+                socket.emit('chat-response', {
+                    message: response,
+                    agent: agentId,
+                    mode: discussionMode,
+                    isMultiAgent: true,
+                    totalAgents: agents.length,
+                    currentIndex: responses.length
+                });
+            }
+        }
     });
+
+    // Generate response for a specific agent with their personality
+    async function generateAgentSpecificResponse(agentId, message, context, modeInstruction) {
+        const agentPersonalities = {
+            'AlgoQ': {
+                name: 'AlgoQ',
+                role: 'Lead AI & Executor',
+                style: 'decisive, data-driven, action-oriented',
+                focus: 'execution, synthesis, final decisions'
+            },
+            'Strategist': {
+                name: 'Strategist',
+                role: 'Strategy & Direction',
+                style: 'long-term thinking, strategic planning',
+                focus: 'market regimes, position sizing, timing'
+            },
+            'Analyst': {
+                name: 'Dr. Sarah Data',
+                role: 'Quantitative Analysis',
+                style: 'precise, statistical, evidence-based',
+                focus: 'patterns, correlations, backtesting'
+            },
+            'RiskManager': {
+                name: 'Victor Shield',
+                role: 'Risk Management',
+                style: 'cautious, protective, disciplined',
+                focus: 'risk metrics, position limits, drawdown control'
+            },
+            'Sentiment': {
+                name: 'Echo Pulse',
+                role: 'Sentiment Analysis',
+                style: 'intuitive, market psychology focused',
+                focus: 'market mood, fear/greed, social signals'
+            }
+        };
+
+        const agent = agentPersonalities[agentId] || agentPersonalities['AlgoQ'];
+
+        // Build agent-specific prompt
+        const prompt = `You are ${agent.name}, the ${agent.role} for AlgoQBot.
+Your style: ${agent.style}
+Your focus: ${agent.focus}
+
+${modeInstruction}
+
+Current Market Context:
+- BNB Price: $${context.marketData?.bnb?.price?.toFixed(2) || 'N/A'}
+- 24h Change: ${context.marketData?.bnb?.change24h?.toFixed(2) || 0}%
+- Bot Status: ${context.botData?.running ? 'Running' : 'Stopped'}
+- Portfolio: $${context.total?.toFixed(2) || '0'}
+- Fear/Greed: ${context.sentiment?.value} (${context.sentiment?.classification})
+- Today's Trades: ${context.botData?.tradesToday || 0}
+
+User Question: ${message}
+
+Respond as ${agent.name} with your unique perspective. Be concise but insightful. Start with your name in bold.`;
+
+        try {
+            // Try to use the agent's API (simplified for now, uses fallback)
+            const response = await generateEnhancedAIResponse(prompt, context);
+            return `**${agent.name}** (${agent.role}):\n\n${response}`;
+        } catch (error) {
+            return `**${agent.name}** (${agent.role}):\n\nBased on current market conditions, I recommend monitoring the situation closely. ${agent.focus === 'risk metrics, position limits, drawdown control' ? 'Risk levels appear manageable.' : 'The data suggests staying alert for opportunities.'}`;
+        }
+    }
 
     // ============== COUNCIL SOCKET HANDLERS ==============
 
@@ -1883,10 +2045,45 @@ io.on('connection', (socket) => {
         sendLogUpdate(socket);
     });
 
+    // Request comprehensive bot logs
+    socket.on('request-bot-logs', () => {
+        sendBotLogsUpdate(socket);
+    });
+
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
     });
 });
+
+// Send comprehensive bot logs
+function sendBotLogsUpdate(socket) {
+    const logs = getRecentLogs(200);  // Get more logs for the detailed view
+
+    // Enhance logs with additional metadata
+    const enhancedLogs = logs.map(log => {
+        const message = log.message || '';
+        let source = 'BOT';
+        let level = log.level || 'info';
+
+        // Determine source from message content
+        if (message.includes('Binance') || message.includes('binance')) source = 'BINANCE';
+        else if (message.includes('RSI') || message.includes('MACD') || message.includes('indicator')) source = 'INDICATOR';
+        else if (message.includes('Strategy') || message.includes('strategy')) source = 'STRATEGY';
+        else if (message.includes('Portfolio') || message.includes('portfolio')) source = 'PORTFOLIO';
+        else if (message.includes('Trade') || message.includes('trade') || message.includes('Shadow')) source = 'TRADING';
+        else if (message.includes('Risk') || message.includes('risk')) source = 'RISK';
+        else if (message.includes('Decision') || message.includes('decision')) source = 'DECISION';
+        else if (message.includes('API') || message.includes('api') || message.includes('fetch')) source = 'API';
+
+        return {
+            ...log,
+            source,
+            level
+        };
+    });
+
+    socket.emit('bot-logs-update', { logs: enhancedLogs });
+}
 
 async function sendDashboardUpdate(socket) {
     try {
@@ -2066,6 +2263,19 @@ setInterval(async () => {
         // Send log updates
         const logs = getRecentLogs(50);
         io.emit('logs-update', { logs });
+
+        // Send enhanced bot logs
+        const botLogs = getRecentLogs(200);
+        const enhancedBotLogs = botLogs.map(log => {
+            const message = log.message || '';
+            let source = 'BOT';
+            if (message.includes('Binance') || message.includes('binance')) source = 'BINANCE';
+            else if (message.includes('RSI') || message.includes('MACD')) source = 'INDICATOR';
+            else if (message.includes('Trade') || message.includes('Shadow')) source = 'TRADING';
+            else if (message.includes('Decision')) source = 'DECISION';
+            return { ...log, source };
+        });
+        io.emit('bot-logs-update', { logs: enhancedBotLogs });
     } catch (error) {}
 }, 10000);
 

@@ -260,6 +260,42 @@
                 </div>
             </div>
 
+            <!-- [9] LIVE BOT LOGS -->
+            <div class="institutional-section bot-logs-section">
+                <div class="section-title">[9] LIVE BOT LOGS</div>
+                <div class="logs-controls">
+                    <div class="log-filters">
+                        <button class="log-filter-btn active" data-filter="all" onclick="filterLogs('all')">All</button>
+                        <button class="log-filter-btn" data-filter="trade" onclick="filterLogs('trade')">Trades</button>
+                        <button class="log-filter-btn" data-filter="signal" onclick="filterLogs('signal')">Signals</button>
+                        <button class="log-filter-btn" data-filter="decision" onclick="filterLogs('decision')">Decisions</button>
+                        <button class="log-filter-btn" data-filter="error" onclick="filterLogs('error')">Errors</button>
+                        <button class="log-filter-btn" data-filter="api" onclick="filterLogs('api')">API</button>
+                    </div>
+                    <div class="log-actions">
+                        <label class="auto-scroll-toggle">
+                            <input type="checkbox" id="auto-scroll-logs" checked> Auto-scroll
+                        </label>
+                        <button class="btn-small" onclick="clearBotLogs()">Clear</button>
+                        <button class="btn-small" onclick="downloadLogs()">Download</button>
+                    </div>
+                </div>
+                <div class="bot-logs-container" id="bot-logs-container">
+                    <div class="bot-log-entry info">
+                        <span class="log-timestamp">--:--:--</span>
+                        <span class="log-level">INFO</span>
+                        <span class="log-source">SYSTEM</span>
+                        <span class="log-text">Waiting for bot logs...</span>
+                    </div>
+                </div>
+                <div class="logs-stats">
+                    <span class="log-stat">Total: <span id="log-count-total">0</span></span>
+                    <span class="log-stat">Trades: <span id="log-count-trades">0</span></span>
+                    <span class="log-stat">Signals: <span id="log-count-signals">0</span></span>
+                    <span class="log-stat">Errors: <span id="log-count-errors">0</span></span>
+                </div>
+            </div>
+
             <!-- Activity Log -->
             <div class="card activity-card">
                 <div class="card-header">
@@ -277,47 +313,165 @@
             </div>
         </section>
 
-        <!-- AI Chat Section -->
+        <!-- AI Chat Section - Enhanced with Agent Selection -->
         <section id="chat" class="section">
             <div class="section-header">
-                <h2>AI Chat</h2>
+                <h2>AI Command Center</h2>
                 <div class="chat-status">
                     <span class="dot connected"></span>
                     <span>AI Ready</span>
                 </div>
             </div>
 
-            <div class="chat-container">
-                <div class="chat-messages" id="chat-messages">
-                    <div class="message system">
-                        <div class="message-content">
-                            <p>Welcome to AlgoQBot AI Assistant. I can help you:</p>
-                            <ul>
-                                <li>Analyze trading performance</li>
-                                <li>Generate reports and insights</li>
-                                <li>Adjust bot parameters</li>
-                                <li>Explain strategies and decisions</li>
-                            </ul>
-                            <p>Type your question or use the quick actions below.</p>
+            <div class="chat-layout">
+                <!-- Agent Selection Panel -->
+                <div class="agent-panel">
+                    <div class="panel-header">
+                        <h3>Select Agent</h3>
+                        <span class="panel-desc">Chat directly with experts</span>
+                    </div>
+
+                    <!-- Chat Mode Selection -->
+                    <div class="chat-mode-selector">
+                        <button class="chat-mode-btn active" data-mode="single" onclick="setChatMode('single')">
+                            <span class="mode-icon">👤</span>
+                            <span>Single</span>
+                        </button>
+                        <button class="chat-mode-btn" data-mode="group" onclick="setChatMode('group')">
+                            <span class="mode-icon">👥</span>
+                            <span>Group</span>
+                        </button>
+                        <button class="chat-mode-btn" data-mode="all" onclick="setChatMode('all')">
+                            <span class="mode-icon">🌐</span>
+                            <span>All</span>
+                        </button>
+                    </div>
+
+                    <!-- Agent Cards -->
+                    <div class="agent-cards">
+                        <div class="agent-card active" data-agent="AlgoQ" onclick="selectAgent('AlgoQ')">
+                            <div class="agent-avatar">🤖</div>
+                            <div class="agent-details">
+                                <span class="agent-name">AlgoQ</span>
+                                <span class="agent-specialty">Lead AI & Executor</span>
+                                <span class="agent-api-badge claude">Claude</span>
+                            </div>
+                            <div class="agent-select-indicator">✓</div>
+                        </div>
+                        <div class="agent-card" data-agent="Strategist" onclick="selectAgent('Strategist')">
+                            <div class="agent-avatar">🎯</div>
+                            <div class="agent-details">
+                                <span class="agent-name">Strategist</span>
+                                <span class="agent-specialty">Strategy & Direction</span>
+                                <span class="agent-api-badge deepseek">DeepSeek</span>
+                            </div>
+                            <div class="agent-select-indicator">✓</div>
+                        </div>
+                        <div class="agent-card" data-agent="Analyst" onclick="selectAgent('Analyst')">
+                            <div class="agent-avatar">📊</div>
+                            <div class="agent-details">
+                                <span class="agent-name">Dr. Sarah Data</span>
+                                <span class="agent-specialty">Quantitative Analysis</span>
+                                <span class="agent-api-badge qween">Qween</span>
+                            </div>
+                            <div class="agent-select-indicator">✓</div>
+                        </div>
+                        <div class="agent-card" data-agent="RiskManager" onclick="selectAgent('RiskManager')">
+                            <div class="agent-avatar">🛡️</div>
+                            <div class="agent-details">
+                                <span class="agent-name">Victor Shield</span>
+                                <span class="agent-specialty">Risk Management</span>
+                                <span class="agent-api-badge hf">HuggingFace</span>
+                            </div>
+                            <div class="agent-select-indicator">✓</div>
+                        </div>
+                        <div class="agent-card" data-agent="Sentiment" onclick="selectAgent('Sentiment')">
+                            <div class="agent-avatar">📡</div>
+                            <div class="agent-details">
+                                <span class="agent-name">Echo Pulse</span>
+                                <span class="agent-specialty">Sentiment Analysis</span>
+                                <span class="agent-api-badge hf">HuggingFace</span>
+                            </div>
+                            <div class="agent-select-indicator">✓</div>
+                        </div>
+                    </div>
+
+                    <!-- Discussion Mode in Chat -->
+                    <div class="chat-discussion-mode">
+                        <h4>Discussion Mode</h4>
+                        <div class="chat-mode-buttons">
+                            <button class="chat-disc-btn active" data-mode="analyse" onclick="setChatDiscussionMode('analyse')">
+                                🔍 Analyse
+                            </button>
+                            <button class="chat-disc-btn" data-mode="brainstorm" onclick="setChatDiscussionMode('brainstorm')">
+                                💡 Brainstorm
+                            </button>
+                            <button class="chat-disc-btn" data-mode="debate" onclick="setChatDiscussionMode('debate')">
+                                ⚔️ Debate
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Group Creation -->
+                    <div class="group-creator" id="group-creator" style="display: none;">
+                        <h4>Create Custom Group</h4>
+                        <input type="text" id="group-name" placeholder="Group name..." class="group-input">
+                        <div class="group-selected" id="group-selected">
+                            <span class="placeholder-text">Select agents above</span>
+                        </div>
+                        <button class="save-group-btn" onclick="saveCustomGroup()">💾 Save Group</button>
+                    </div>
+
+                    <!-- Saved Groups -->
+                    <div class="saved-groups" id="saved-groups">
+                        <h4>Saved Groups</h4>
+                        <div class="groups-list" id="groups-list">
+                            <div class="no-groups">No saved groups</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="quick-actions">
-                    <button class="quick-btn trading-ideas-btn" onclick="getTradingIdeas()">💡 Trading Ideas</button>
-                    <button class="quick-btn" onclick="sendQuickMessage('Give me a full market analysis')">📊 Market Analysis</button>
-                    <button class="quick-btn" onclick="sendQuickMessage('What is the current risk assessment?')">🛡️ Risk Check</button>
-                    <button class="quick-btn" onclick="sendQuickMessage('Analyze my trading performance')">📈 Performance</button>
-                    <button class="quick-btn" onclick="sendQuickMessage('What is the market sentiment?')">📡 Sentiment</button>
-                    <button class="quick-btn" onclick="sendQuickMessage('Recommend optimal strategy')">🎯 Strategy</button>
-                </div>
+                <!-- Chat Area -->
+                <div class="chat-main">
+                    <div class="chat-header-bar">
+                        <div class="current-chat-info">
+                            <span class="chat-with">Chatting with:</span>
+                            <span class="chat-agent-name" id="chat-agent-display">🤖 AlgoQ</span>
+                            <span class="chat-mode-display" id="chat-mode-display">Mode: Analyse</span>
+                        </div>
+                    </div>
 
-                <div class="chat-input-container">
-                    <input type="text" id="chat-input" placeholder="Ask anything about your trading bot..." onkeypress="handleChatKeypress(event)">
-                    <button class="send-btn" onclick="sendChatMessage()">
-                        <span>Send</span>
-                        <span class="send-icon">➤</span>
-                    </button>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message system">
+                            <div class="message-content">
+                                <p><strong>Welcome to the AI Command Center!</strong></p>
+                                <p>Select an agent from the panel to chat directly with them. Features:</p>
+                                <ul>
+                                    <li><strong>Single:</strong> Chat 1-on-1 with an expert</li>
+                                    <li><strong>Group:</strong> Create a custom group discussion</li>
+                                    <li><strong>All:</strong> Get perspectives from all agents</li>
+                                </ul>
+                                <p>Use discussion modes to guide the conversation style.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-actions">
+                        <button class="quick-btn trading-ideas-btn" onclick="getTradingIdeas()">💡 Trading Ideas</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('Give me a full market analysis')">📊 Market Analysis</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('What is the current risk assessment?')">🛡️ Risk Check</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('Analyze my trading performance')">📈 Performance</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('What is the market sentiment?')">📡 Sentiment</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('Recommend optimal strategy')">🎯 Strategy</button>
+                    </div>
+
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="Ask anything about your trading bot..." onkeypress="handleChatKeypress(event)">
+                        <button class="send-btn" onclick="sendChatMessage()">
+                            <span>Send</span>
+                            <span class="send-icon">➤</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -404,6 +558,72 @@
                     <button class="control-btn stop" onclick="stopCouncil()" id="btn-council-stop" disabled>⏹ Stop</button>
                     <button class="control-btn restart" onclick="restartCouncil()" id="btn-council-restart" disabled>🔄 Restart</button>
                     <button class="control-btn history" onclick="showCouncilHistory()">📜 History</button>
+                </div>
+            </div>
+
+            <!-- Round Progression Panel -->
+            <div class="round-progression-panel" id="round-progression-panel">
+                <div class="progression-header">
+                    <h4>Session Progress</h4>
+                    <span class="session-timer" id="session-timer">00:00</span>
+                </div>
+                <div class="round-steps">
+                    <div class="round-step" id="round-step-1" data-round="1">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <span class="step-title">Round 1</span>
+                            <span class="step-status">Research & Initial Analysis</span>
+                        </div>
+                        <div class="step-agents" id="step-agents-1"></div>
+                    </div>
+                    <div class="round-step" id="round-step-2" data-round="2">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <span class="step-title">Round 2</span>
+                            <span class="step-status">Discussion & Refinement</span>
+                        </div>
+                        <div class="step-agents" id="step-agents-2"></div>
+                    </div>
+                    <div class="round-step" id="round-step-3" data-round="3">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <span class="step-title">Round 3</span>
+                            <span class="step-status">Voting & Consensus</span>
+                        </div>
+                        <div class="step-agents" id="step-agents-3"></div>
+                    </div>
+                    <div class="round-step" id="round-step-4" data-round="4">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <span class="step-title">Round 4</span>
+                            <span class="step-status">Final Deliberation</span>
+                        </div>
+                        <div class="step-agents" id="step-agents-4"></div>
+                    </div>
+                    <div class="round-step" id="round-step-5" data-round="5">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <span class="step-title">Round 5</span>
+                            <span class="step-status">Force Consensus</span>
+                        </div>
+                        <div class="step-agents" id="step-agents-5"></div>
+                    </div>
+                </div>
+                <div class="progression-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">Agents Spoke:</span>
+                        <span class="summary-value" id="agents-spoke-count">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Votes Cast:</span>
+                        <span class="summary-value" id="votes-cast-count">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Progress:</span>
+                        <div class="mini-progress-bar">
+                            <div class="mini-progress-fill" id="overall-progress-fill"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -674,6 +894,144 @@
                     <button class="action-btn" onclick="pauseBot()">⏸️ Pause Bot</button>
                     <button class="action-btn" onclick="resumeBot()">▶️ Resume Bot</button>
                     <button class="action-btn danger" onclick="emergencyStop()">🛑 Emergency Stop</button>
+                </div>
+            </div>
+
+            <!-- Agent Profiles Section -->
+            <div class="agent-profiles-section">
+                <div class="profiles-header">
+                    <h3>AI Agent Profiles</h3>
+                    <span class="profiles-desc">View agent objectives, personality, memory & work history</span>
+                </div>
+                <div class="agent-profiles-grid" id="agent-profiles-grid">
+                    <!-- Agent profiles loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Agent Detail Modal -->
+            <div class="agent-detail-modal hidden" id="agent-detail-modal">
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <div class="agent-modal-title" id="agent-modal-title">
+                            <span class="agent-modal-avatar">🤖</span>
+                            <div>
+                                <h3 id="agent-modal-name">Agent Name</h3>
+                                <span id="agent-modal-role">Role</span>
+                            </div>
+                        </div>
+                        <button class="modal-close" onclick="hideAgentDetail()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="agent-detail-tabs">
+                            <button class="detail-tab active" onclick="showAgentTab('profile')">Profile</button>
+                            <button class="detail-tab" onclick="showAgentTab('objectives')">Objectives</button>
+                            <button class="detail-tab" onclick="showAgentTab('memory')">Memory</button>
+                            <button class="detail-tab" onclick="showAgentTab('history')">History</button>
+                        </div>
+
+                        <div class="agent-tab-content" id="agent-tab-profile">
+                            <div class="profile-section">
+                                <h4>Personality</h4>
+                                <div class="personality-traits" id="agent-personality-traits"></div>
+                                <div class="profile-row">
+                                    <span class="profile-label">Communication Style:</span>
+                                    <span class="profile-value" id="agent-comm-style">--</span>
+                                </div>
+                                <div class="profile-row">
+                                    <span class="profile-label">Decision Making:</span>
+                                    <span class="profile-value" id="agent-decision-style">--</span>
+                                </div>
+                                <div class="profile-row">
+                                    <span class="profile-label">Risk Tolerance:</span>
+                                    <span class="profile-value" id="agent-risk-tolerance">--</span>
+                                </div>
+                            </div>
+                            <div class="profile-section">
+                                <h4>Expertise</h4>
+                                <div class="expertise-list" id="agent-expertise"></div>
+                            </div>
+                            <div class="profile-section">
+                                <h4>API & Authority</h4>
+                                <div class="profile-row">
+                                    <span class="profile-label">API:</span>
+                                    <span class="profile-value" id="agent-api">--</span>
+                                </div>
+                                <div class="profile-row">
+                                    <span class="profile-label">Voting Weight:</span>
+                                    <span class="profile-value" id="agent-voting-weight">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="agent-tab-content hidden" id="agent-tab-objectives">
+                            <div class="objective-primary">
+                                <h4>Primary Objective</h4>
+                                <p id="agent-primary-objective">--</p>
+                            </div>
+                            <div class="missions-list">
+                                <h4>Missions</h4>
+                                <ul id="agent-missions"></ul>
+                            </div>
+                            <div class="kpis-list">
+                                <h4>Key Performance Indicators</h4>
+                                <ul id="agent-kpis"></ul>
+                            </div>
+                        </div>
+
+                        <div class="agent-tab-content hidden" id="agent-tab-memory">
+                            <div class="memory-section">
+                                <h4>Recent Context (Short-term)</h4>
+                                <div class="memory-list" id="agent-short-term-memory">
+                                    <p class="empty">No recent context</p>
+                                </div>
+                            </div>
+                            <div class="memory-section">
+                                <h4>Learned Insights (Long-term)</h4>
+                                <div class="memory-list" id="agent-long-term-memory">
+                                    <p class="empty">No long-term memories</p>
+                                </div>
+                            </div>
+                            <div class="memory-section">
+                                <h4>Trading Learnings</h4>
+                                <div class="memory-list" id="agent-learnings">
+                                    <p class="empty">No learnings recorded</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="agent-tab-content hidden" id="agent-tab-history">
+                            <div class="history-stats-grid">
+                                <div class="history-stat">
+                                    <span class="stat-value" id="agent-total-sessions">0</span>
+                                    <span class="stat-label">Sessions</span>
+                                </div>
+                                <div class="history-stat">
+                                    <span class="stat-value" id="agent-total-discussions">0</span>
+                                    <span class="stat-label">Discussions</span>
+                                </div>
+                                <div class="history-stat">
+                                    <span class="stat-value" id="agent-total-votes">0</span>
+                                    <span class="stat-label">Votes</span>
+                                </div>
+                                <div class="history-stat">
+                                    <span class="stat-value" id="agent-prediction-accuracy">N/A</span>
+                                    <span class="stat-label">Accuracy</span>
+                                </div>
+                            </div>
+                            <div class="history-section">
+                                <h4>Recent Contributions</h4>
+                                <div class="contributions-list" id="agent-contributions">
+                                    <p class="empty">No contributions yet</p>
+                                </div>
+                            </div>
+                            <div class="history-section">
+                                <h4>Milestones</h4>
+                                <div class="milestones-list" id="agent-milestones">
+                                    <p class="empty">No milestones yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
