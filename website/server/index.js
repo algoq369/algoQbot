@@ -15,9 +15,17 @@ const { exec, spawn } = require('child_process');
 // Import AI Agents System
 const {
     AGENT_PROFILES,
+    MAIN_AGENTS,
+    SPECIALIST_AGENTS,
     getAgentMemory,
     generateTradingIdea,
-    generateEnhancedAIResponse
+    generateEnhancedAIResponse,
+    consultSpecialist,
+    consultMultipleSpecialists,
+    generateLocalSpecialistResponse,
+    getMainAgents,
+    getSpecialistAgents,
+    getAllAgents
 } = require('./agents');
 
 // Import AI Council System
@@ -1451,6 +1459,187 @@ app.get('/api/council/knowledge', (req, res) => {
 // Agent directives
 app.get('/api/council/directives', (req, res) => {
     res.json(AGENT_DIRECTIVES);
+});
+
+// ============== AGENT FLEET ENDPOINTS ==============
+
+// Get all agents organized by tier
+app.get('/api/agents/fleet', (req, res) => {
+    res.json({
+        main: {
+            agents: MAIN_AGENTS,
+            description: 'Premium API agents - Primary decision makers',
+            count: Object.keys(MAIN_AGENTS).length
+        },
+        specialists: {
+            agents: SPECIALIST_AGENTS,
+            description: 'HuggingFace specialists - Consulted by main agents',
+            count: Object.keys(SPECIALIST_AGENTS).length
+        },
+        total: Object.keys(AGENT_PROFILES).length
+    });
+});
+
+// Get main agents only
+app.get('/api/agents/main', (req, res) => {
+    res.json({
+        agents: MAIN_AGENTS,
+        ids: getMainAgents()
+    });
+});
+
+// Get specialist agents only
+app.get('/api/agents/specialists', (req, res) => {
+    res.json({
+        agents: SPECIALIST_AGENTS,
+        ids: getSpecialistAgents()
+    });
+});
+
+// ============== SPECIALIST CONSULTATION ENDPOINTS ==============
+
+// Consult a single specialist
+app.post('/api/specialist/consult', async (req, res) => {
+    try {
+        const { specialistId, query } = req.body;
+
+        if (!specialistId || !query) {
+            return res.status(400).json({ error: 'specialistId and query required' });
+        }
+
+        // Build current context
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const context = {
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
+
+        const result = await consultSpecialist(specialistId, query, context);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Consult multiple specialists at once
+app.post('/api/specialist/consult-multiple', async (req, res) => {
+    try {
+        const { specialistIds, query } = req.body;
+
+        if (!specialistIds || !Array.isArray(specialistIds) || !query) {
+            return res.status(400).json({ error: 'specialistIds (array) and query required' });
+        }
+
+        // Build current context
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const context = {
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
+
+        const result = await consultMultipleSpecialists(specialistIds, query, context);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get specialist insight without API call (local fallback)
+app.post('/api/specialist/local-insight', async (req, res) => {
+    try {
+        const { specialistId } = req.body;
+
+        if (!specialistId) {
+            return res.status(400).json({ error: 'specialistId required' });
+        }
+
+        // Build current context
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const context = {
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
+
+        const response = generateLocalSpecialistResponse(specialistId, context);
+        res.json({
+            specialistId,
+            response,
+            timestamp: new Date().toISOString(),
+            source: 'local'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Full council consultation - AlgoQ consults all specialists
+app.get('/api/specialist/full-analysis', async (req, res) => {
+    try {
+        // Build current context
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const context = {
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
+
+        // Get insights from all specialists
+        const specialistIds = ['PriceMovement', 'Microstructure', 'Fundamentals', 'Macro', 'RiskManager', 'Sentiment'];
+        const insights = {};
+
+        for (const id of specialistIds) {
+            insights[id] = generateLocalSpecialistResponse(id, context);
+        }
+
+        res.json({
+            timestamp: new Date().toISOString(),
+            context: {
+                price: binanceData?.bnb?.price,
+                rsi: technical?.rsi,
+                trend: technical?.trend,
+                fearGreed: fearGreed[0]?.value
+            },
+            insights,
+            specialistCount: specialistIds.length
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Start council session (POST)

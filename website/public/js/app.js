@@ -2240,23 +2240,116 @@ function resetProgression() {
 
 // ============== AGENT PROFILES ==============
 let currentAgentProfile = null;
+let agentFleet = null;
 
 // Load agent profiles on page load
 async function loadAgentProfiles() {
     try {
-        const response = await fetch('/api/agents');
-        const data = await response.json();
+        // Load the full agent fleet
+        const fleetResponse = await fetch('/api/agents/fleet');
+        const fleetData = await fleetResponse.json();
 
-        if (data.agents) {
-            renderAgentProfiles(data.agents);
+        if (fleetData) {
+            agentFleet = fleetData;
+            renderAgentFleet(fleetData);
         }
     } catch (error) {
         console.error('Failed to load agent profiles:', error);
+        // Fallback to old endpoint
+        try {
+            const response = await fetch('/api/agents');
+            const data = await response.json();
+            if (data.agents) {
+                renderAgentProfilesLegacy(data.agents);
+            }
+        } catch (e) {
+            console.error('Fallback also failed:', e);
+        }
     }
 }
 
-// Render agent profile cards
-function renderAgentProfiles(agents) {
+// Render the full agent fleet with tier organization
+function renderAgentFleet(fleetData) {
+    const container = document.getElementById('agent-profiles-grid');
+    if (!container) return;
+
+    const mainAgents = Object.entries(fleetData.main.agents);
+    const specialistAgents = Object.entries(fleetData.specialists.agents);
+
+    container.innerHTML = `
+        <!-- Main Agents Section -->
+        <div class="agent-tier-section">
+            <div class="tier-header main-tier">
+                <h3>🎯 Main Agents</h3>
+                <span class="tier-badge tier-main">Premium APIs</span>
+                <p>Primary decision makers - AlgoQ orchestrates, DeepSeek strategizes, Qween analyzes</p>
+            </div>
+            <div class="agent-cards-row">
+                ${mainAgents.map(([id, agent]) => renderAgentCard(id, agent, 'main')).join('')}
+            </div>
+        </div>
+
+        <!-- Specialist Agents Section -->
+        <div class="agent-tier-section">
+            <div class="tier-header specialist-tier">
+                <h3>🔬 Specialist Agents</h3>
+                <span class="tier-badge tier-specialist">HuggingFace</span>
+                <p>Consulted by AlgoQ for specialized insights</p>
+            </div>
+            <div class="agent-cards-row">
+                ${specialistAgents.map(([id, agent]) => renderAgentCard(id, agent, 'specialist')).join('')}
+            </div>
+        </div>
+
+        <!-- Fleet Summary -->
+        <div class="fleet-summary">
+            <div class="summary-stat">
+                <span class="summary-value">${fleetData.total}</span>
+                <span class="summary-label">Total Agents</span>
+            </div>
+            <div class="summary-stat">
+                <span class="summary-value">${mainAgents.length}</span>
+                <span class="summary-label">Main (Premium)</span>
+            </div>
+            <div class="summary-stat">
+                <span class="summary-value">${specialistAgents.length}</span>
+                <span class="summary-label">Specialists (HF)</span>
+            </div>
+        </div>
+    `;
+}
+
+// Render individual agent card
+function renderAgentCard(id, agent, tier) {
+    const tierClass = tier === 'main' ? 'main-agent-card' : 'specialist-agent-card';
+    const apiLabel = tier === 'main' ? agent.apiProvider?.toUpperCase() : 'HuggingFace';
+
+    return `
+        <div class="agent-profile-card ${tierClass}" onclick="showAgentDetail('${id}')" data-agent-id="${id}">
+            <div class="agent-tier-indicator ${tier}"></div>
+            <div class="agent-profile-header">
+                <span class="agent-profile-avatar">${agent.avatar}</span>
+                <div class="agent-profile-info">
+                    <h4>${agent.name}</h4>
+                    <span class="agent-role">${agent.role}</span>
+                </div>
+            </div>
+            <div class="agent-api-badge">${apiLabel}</div>
+            ${agent.specialization ? `<div class="agent-specialization">${agent.specialization.replace(/_/g, ' ')}</div>` : ''}
+            <div class="agent-expertise-preview">
+                ${(agent.expertise || []).slice(0, 3).map(e => `<span class="expertise-mini">${e}</span>`).join('')}
+            </div>
+            <div class="agent-card-actions">
+                <button class="btn-consult" onclick="event.stopPropagation(); consultAgent('${id}')">
+                    💬 Consult
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Legacy render for backwards compatibility
+function renderAgentProfilesLegacy(agents) {
     const container = document.getElementById('agent-profiles-grid');
     if (!container) return;
 
@@ -2281,6 +2374,65 @@ function renderAgentProfiles(agents) {
             </div>
         </div>
     `).join('');
+}
+
+// ============== SPECIALIST CONSULTATION ==============
+
+// Consult an agent directly
+async function consultAgent(agentId) {
+    const query = prompt(`Ask ${agentId} a question:`, 'What is your current market analysis?');
+    if (!query) return;
+
+    try {
+        addChatMessage(`Consulting ${agentId}...`, 'system');
+
+        const response = await fetch('/api/specialist/local-insight', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ specialistId: agentId })
+        });
+
+        const data = await response.json();
+
+        if (data.response) {
+            addChatMessage(data.response, 'assistant', {
+                agent: agentId,
+                source: data.source
+            });
+        } else {
+            addChatMessage(`Could not get response from ${agentId}`, 'error');
+        }
+    } catch (error) {
+        console.error('Consultation error:', error);
+        addChatMessage(`Error consulting ${agentId}: ${error.message}`, 'error');
+    }
+}
+
+// Get full analysis from all specialists
+async function getFullSpecialistAnalysis() {
+    try {
+        addChatMessage('🔄 Requesting full analysis from all specialists...', 'system');
+
+        const response = await fetch('/api/specialist/full-analysis');
+        const data = await response.json();
+
+        if (data.insights) {
+            let fullReport = `**📊 FULL SPECIALIST ANALYSIS**\n`;
+            fullReport += `*Price: $${data.context.price?.toFixed(2)} | RSI: ${data.context.rsi?.toFixed(1)} | F&G: ${data.context.fearGreed}*\n\n`;
+
+            for (const [id, insight] of Object.entries(data.insights)) {
+                fullReport += `---\n${insight}\n\n`;
+            }
+
+            addChatMessage(fullReport, 'assistant', {
+                agent: 'AlgoQ',
+                source: 'specialist-synthesis'
+            });
+        }
+    } catch (error) {
+        console.error('Full analysis error:', error);
+        addChatMessage(`Error getting full analysis: ${error.message}`, 'error');
+    }
 }
 
 // Show agent detail modal

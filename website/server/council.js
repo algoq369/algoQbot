@@ -62,63 +62,142 @@ const MODE_PROMPTS = {
 };
 
 // ============== AGENT DIRECTIVES & MISSIONS ==============
-const AGENT_DIRECTIVES = {
+// TIER 1: MAIN AGENTS (Premium APIs - Decision Makers)
+const MAIN_AGENT_DIRECTIVES = {
     'AlgoQ': {
-        directive: 'Lead the council to profitable trading decisions through data-driven analysis and precise execution.',
+        directive: 'Lead the council as chief orchestrator. Synthesize all inputs, consult specialists when needed, and make final trading decisions.',
         missions: [
+            'Orchestrate council discussions and synthesize agent insights',
+            'Consult specialist agents for detailed analysis when confidence is low',
             'Analyze market conditions and identify optimal entry/exit points',
-            'Review bot performance and suggest strategy adjustments',
             'Execute trades with minimal slippage and optimal timing',
-            'Synthesize council input into actionable trading decisions'
+            'Make final decisions after weighing all agent inputs'
         ],
-        votingWeight: 2.0,  // Lead AI has higher weight
-        decisionAuthority: ['execute', 'modify_strategy', 'final_call']
+        votingWeight: 2.5,  // Lead AI has highest weight
+        decisionAuthority: ['execute', 'modify_strategy', 'final_call', 'consult_specialists'],
+        tier: 'main',
+        apiProvider: 'claude'
     },
     'Strategist': {
-        directive: 'Guide long-term strategy evolution and market regime adaptation.',
+        directive: 'Guide long-term strategy and market direction. Define the strategic compass for all trading decisions.',
         missions: [
             'Detect market regime changes (trending/ranging/volatile)',
-            'Recommend strategy adjustments based on macro conditions',
+            'Define strategic direction and bias',
+            'Recommend strategy adjustments based on conditions',
             'Identify optimal position sizing for current regime',
             'Plan entry/exit timing based on strategic outlook'
         ],
-        votingWeight: 1.5,
-        decisionAuthority: ['strategy', 'regime', 'timing']
+        votingWeight: 2.0,
+        decisionAuthority: ['strategy', 'regime', 'direction', 'timing'],
+        tier: 'main',
+        apiProvider: 'deepseek'
     },
     'Analyst': {
-        directive: 'Provide deep quantitative analysis and pattern recognition.',
+        directive: 'Provide rigorous quantitative analysis. Every number verified, every pattern validated with statistical confidence.',
         missions: [
             'Analyze historical patterns and backtesting results',
             'Calculate statistical significance of trading signals',
             'Identify correlations and leading indicators',
-            'Validate strategy performance with data'
+            'Validate strategy performance with hard data',
+            'Provide probability assessments for setups'
+        ],
+        votingWeight: 1.8,
+        decisionAuthority: ['analysis', 'validation', 'metrics', 'statistics'],
+        tier: 'main',
+        apiProvider: 'qween'
+    }
+};
+
+// TIER 2: SPECIALIST AGENTS (Hugging Face - Consulted by Main Agents)
+const SPECIALIST_AGENT_DIRECTIVES = {
+    'PriceMovement': {
+        directive: 'Master of price action. Read every candle, map every level, detect every momentum shift.',
+        missions: [
+            'Analyze candlestick patterns and price structure',
+            'Map key support and resistance levels with exact prices',
+            'Detect breakout/breakdown setups and probability',
+            'Assess momentum strength and direction',
+            'Provide specific price targets for trades'
+        ],
+        votingWeight: 1.2,
+        decisionAuthority: ['price_levels', 'patterns', 'targets'],
+        tier: 'specialist',
+        apiProvider: 'huggingface'
+    },
+    'Microstructure': {
+        directive: 'See beneath the surface. Analyze order flow, liquidity, and execution quality.',
+        missions: [
+            'Analyze order book depth and imbalances',
+            'Map liquidity concentration zones',
+            'Detect whale activity and large orders',
+            'Assess slippage risk for different sizes',
+            'Recommend optimal execution strategy'
+        ],
+        votingWeight: 1.0,
+        decisionAuthority: ['execution', 'liquidity', 'order_flow'],
+        tier: 'specialist',
+        apiProvider: 'huggingface'
+    },
+    'Fundamentals': {
+        directive: 'Understand the why behind the what. Fundamentals drive long-term value.',
+        missions: [
+            'Analyze project tokenomics and supply dynamics',
+            'Track news, announcements, and catalysts',
+            'Assess development activity and roadmap progress',
+            'Evaluate competitive positioning',
+            'Identify upcoming events that could move price'
+        ],
+        votingWeight: 1.0,
+        decisionAuthority: ['fundamentals', 'catalysts', 'news'],
+        tier: 'specialist',
+        apiProvider: 'huggingface'
+    },
+    'Macro': {
+        directive: 'See the forest, not just the trees. Global macro forces shape all markets.',
+        missions: [
+            'Analyze Fed policy and rate expectations',
+            'Track global liquidity conditions',
+            'Monitor DXY and crypto correlation',
+            'Assess risk-on vs risk-off environment',
+            'Identify key macro events on calendar'
         ],
         votingWeight: 1.3,
-        decisionAuthority: ['analysis', 'validation', 'metrics']
+        decisionAuthority: ['macro', 'liquidity', 'correlation'],
+        tier: 'specialist',
+        apiProvider: 'huggingface'
     },
     'RiskManager': {
-        directive: 'Protect capital through disciplined risk control and position management.',
+        directive: 'Protect capital through disciplined risk control. Survival first, profits second.',
         missions: [
             'Monitor portfolio risk and drawdown levels',
             'Set appropriate stop-loss and take-profit levels',
             'Recommend position sizing based on risk parameters',
-            'Veto trades that exceed risk thresholds'
+            'Veto trades that exceed risk thresholds',
+            'Assess overall portfolio heat'
         ],
-        votingWeight: 1.5,  // Risk has veto power
-        decisionAuthority: ['risk', 'position_size', 'veto']
+        votingWeight: 1.8,  // Risk has veto power
+        decisionAuthority: ['risk', 'position_size', 'veto', 'stops'],
+        tier: 'specialist',
+        apiProvider: 'huggingface'
     },
     'Sentiment': {
-        directive: 'Interpret market psychology and crowd behavior for contrarian opportunities.',
+        directive: 'Read the crowd. Fade extremes. Follow the smart money.',
         missions: [
             'Track Fear & Greed Index and sentiment indicators',
             'Identify crowd positioning extremes',
             'Signal contrarian entry/exit opportunities',
-            'Monitor social sentiment and news flow'
+            'Monitor funding rates and leverage',
+            'Detect smart money vs retail divergence'
         ],
-        votingWeight: 1.0,
-        decisionAuthority: ['sentiment', 'timing', 'contrarian']
+        votingWeight: 1.2,
+        decisionAuthority: ['sentiment', 'contrarian', 'crowd'],
+        tier: 'specialist',
+        apiProvider: 'huggingface'
     }
 };
+
+// Combined agent directives
+const AGENT_DIRECTIVES = { ...MAIN_AGENT_DIRECTIVES, ...SPECIALIST_AGENT_DIRECTIVES };
 
 // ============== COUNCIL SESSION CLASS ==============
 class CouncilSession extends EventEmitter {

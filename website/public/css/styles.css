@@ -2713,6 +2713,203 @@ body {
     color: var(--text-muted);
 }
 
+/* ============== AGENT FLEET STYLES ============== */
+
+/* Tier Sections */
+.agent-tier-section {
+    margin-bottom: 2rem;
+}
+
+.tier-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tier-header.main-tier {
+    border-bottom-color: var(--accent-cyan);
+}
+
+.tier-header.specialist-tier {
+    border-bottom-color: var(--accent-purple);
+}
+
+.tier-header h3 {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.tier-header p {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.tier-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.tier-badge.tier-main {
+    background: rgba(0, 212, 255, 0.2);
+    color: var(--accent-cyan);
+}
+
+.tier-badge.tier-specialist {
+    background: rgba(179, 136, 255, 0.2);
+    color: var(--accent-purple);
+}
+
+/* Agent Cards Row */
+.agent-cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+/* Enhanced Agent Profile Card */
+.agent-profile-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.agent-tier-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.agent-tier-indicator.main {
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+}
+
+.agent-tier-indicator.specialist {
+    background: linear-gradient(90deg, var(--accent-purple), #9c27b0);
+}
+
+/* Main Agent Card */
+.main-agent-card {
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.main-agent-card:hover {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 4px 20px rgba(0, 212, 255, 0.25);
+}
+
+/* Specialist Agent Card */
+.specialist-agent-card {
+    border-color: rgba(179, 136, 255, 0.3);
+}
+
+.specialist-agent-card:hover {
+    border-color: var(--accent-purple);
+    box-shadow: 0 4px 20px rgba(179, 136, 255, 0.25);
+}
+
+/* Agent Role & API Badge */
+.agent-role {
+    display: block;
+    font-size: 0.65rem !important;
+    color: var(--text-muted) !important;
+}
+
+.agent-api-badge {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    font-size: 0.55rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.agent-specialization {
+    font-size: 0.6rem;
+    color: var(--accent-purple);
+    text-transform: uppercase;
+    margin-top: 0.3rem;
+}
+
+/* Expertise Preview */
+.agent-expertise-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.expertise-mini {
+    font-size: 0.55rem;
+    padding: 0.1rem 0.3rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    color: var(--text-muted);
+}
+
+/* Consult Button */
+.agent-card-actions {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-consult {
+    width: 100%;
+    padding: 0.4rem;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-consult:hover {
+    transform: scale(1.02);
+    box-shadow: 0 2px 10px rgba(0, 212, 255, 0.3);
+}
+
+/* Fleet Summary */
+.fleet-summary {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.summary-stat {
+    text-align: center;
+}
+
+.summary-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+}
+
+.summary-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
 /* Agent Detail Modal */
 .agent-detail-modal {
     position: fixed;
