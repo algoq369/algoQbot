@@ -1605,20 +1605,24 @@ function getSentimentAction(fg) {
 async function testApiConnections() {
     const results = {
         timestamp: new Date().toISOString(),
-        claude: { configured: false, connected: false, status: 'not configured' },
-        deepseek: { configured: false, connected: false, status: 'not configured' },
-        qween: { configured: false, connected: false, status: 'not configured' }
+        claude: { configured: false, connected: false, status: 'not configured', details: null },
+        deepseek: { configured: false, connected: false, status: 'not configured', details: null },
+        qween: { configured: false, connected: false, status: 'not configured', details: null },
+        huggingface: { configured: false, connected: false, status: 'not configured', details: null }
     };
+
+    console.log('🔍 Testing API connections...');
 
     // Test Claude API
     if (API_KEYS.claude) {
         results.claude.configured = true;
+        console.log('  Testing Claude API...');
         try {
             const testResult = await new Promise((resolve) => {
                 const data = JSON.stringify({
                     model: 'claude-3-haiku-20240307',
                     max_tokens: 10,
-                    messages: [{ role: 'user', content: 'test' }]
+                    messages: [{ role: 'user', content: 'Say "connected" if you receive this.' }]
                 });
 
                 const options = {
@@ -1636,35 +1640,49 @@ async function testApiConnections() {
                     let body = '';
                     res.on('data', chunk => body += chunk);
                     res.on('end', () => {
-                        if (res.statusCode === 200) {
-                            resolve({ connected: true, status: 'connected' });
-                        } else if (res.statusCode === 401) {
-                            resolve({ connected: false, status: 'invalid API key' });
-                        } else {
-                            resolve({ connected: false, status: `error: ${res.statusCode}` });
+                        try {
+                            const parsed = JSON.parse(body);
+                            if (res.statusCode === 200) {
+                                const response = parsed.content?.[0]?.text || '';
+                                console.log('  ✅ Claude: Connected - Response:', response.substring(0, 50));
+                                resolve({ connected: true, status: 'connected', details: { response: response.substring(0, 100) } });
+                            } else if (res.statusCode === 401) {
+                                console.log('  ❌ Claude: Invalid API key');
+                                resolve({ connected: false, status: 'invalid API key', details: parsed });
+                            } else {
+                                console.log(`  ❌ Claude: Error ${res.statusCode}:`, parsed.error?.message || body.substring(0, 100));
+                                resolve({ connected: false, status: `error: ${res.statusCode}`, details: parsed.error || parsed });
+                            }
+                        } catch (e) {
+                            resolve({ connected: false, status: `parse error: ${res.statusCode}`, details: body.substring(0, 200) });
                         }
                     });
                 });
 
-                req.on('error', () => resolve({ connected: false, status: 'connection error' }));
-                req.setTimeout(5000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.on('error', (e) => {
+                    console.log('  ❌ Claude: Connection error -', e.message);
+                    resolve({ connected: false, status: 'connection error', details: e.message });
+                });
+                req.setTimeout(10000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
                 req.write(data);
                 req.end();
             });
             results.claude = { ...results.claude, ...testResult };
         } catch (e) {
             results.claude.status = 'test failed';
+            results.claude.details = e.message;
         }
     }
 
     // Test DeepSeek API
     if (API_KEYS.deepseek) {
         results.deepseek.configured = true;
+        console.log('  Testing DeepSeek API...');
         try {
             const testResult = await new Promise((resolve) => {
                 const data = JSON.stringify({
                     model: 'deepseek-chat',
-                    messages: [{ role: 'user', content: 'test' }],
+                    messages: [{ role: 'user', content: 'Say "connected" if you receive this.' }],
                     max_tokens: 10
                 });
 
@@ -1682,35 +1700,49 @@ async function testApiConnections() {
                     let body = '';
                     res.on('data', chunk => body += chunk);
                     res.on('end', () => {
-                        if (res.statusCode === 200) {
-                            resolve({ connected: true, status: 'connected' });
-                        } else if (res.statusCode === 401) {
-                            resolve({ connected: false, status: 'invalid API key' });
-                        } else {
-                            resolve({ connected: false, status: `error: ${res.statusCode}` });
+                        try {
+                            const parsed = JSON.parse(body);
+                            if (res.statusCode === 200) {
+                                const response = parsed.choices?.[0]?.message?.content || '';
+                                console.log('  ✅ DeepSeek: Connected - Response:', response.substring(0, 50));
+                                resolve({ connected: true, status: 'connected', details: { response: response.substring(0, 100) } });
+                            } else if (res.statusCode === 401) {
+                                console.log('  ❌ DeepSeek: Invalid API key');
+                                resolve({ connected: false, status: 'invalid API key', details: parsed });
+                            } else {
+                                console.log(`  ❌ DeepSeek: Error ${res.statusCode}:`, parsed.error?.message || body.substring(0, 100));
+                                resolve({ connected: false, status: `error: ${res.statusCode}`, details: parsed.error || parsed });
+                            }
+                        } catch (e) {
+                            resolve({ connected: false, status: `parse error: ${res.statusCode}`, details: body.substring(0, 200) });
                         }
                     });
                 });
 
-                req.on('error', () => resolve({ connected: false, status: 'connection error' }));
-                req.setTimeout(5000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.on('error', (e) => {
+                    console.log('  ❌ DeepSeek: Connection error -', e.message);
+                    resolve({ connected: false, status: 'connection error', details: e.message });
+                });
+                req.setTimeout(10000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
                 req.write(data);
                 req.end();
             });
             results.deepseek = { ...results.deepseek, ...testResult };
         } catch (e) {
             results.deepseek.status = 'test failed';
+            results.deepseek.details = e.message;
         }
     }
 
     // Test Qween/Mistral API
     if (API_KEYS.qween) {
         results.qween.configured = true;
+        console.log('  Testing Qween (Mistral) API...');
         try {
             const testResult = await new Promise((resolve) => {
                 const data = JSON.stringify({
-                    model: 'mistral-large-latest',
-                    messages: [{ role: 'user', content: 'test' }],
+                    model: 'mistral-small-latest',
+                    messages: [{ role: 'user', content: 'Say "connected" if you receive this.' }],
                     max_tokens: 10
                 });
 
@@ -1728,27 +1760,106 @@ async function testApiConnections() {
                     let body = '';
                     res.on('data', chunk => body += chunk);
                     res.on('end', () => {
-                        if (res.statusCode === 200) {
-                            resolve({ connected: true, status: 'connected' });
-                        } else if (res.statusCode === 401) {
-                            resolve({ connected: false, status: 'invalid API key' });
-                        } else {
-                            resolve({ connected: false, status: `error: ${res.statusCode}` });
+                        try {
+                            const parsed = JSON.parse(body);
+                            if (res.statusCode === 200) {
+                                const response = parsed.choices?.[0]?.message?.content || '';
+                                console.log('  ✅ Qween: Connected - Response:', response.substring(0, 50));
+                                resolve({ connected: true, status: 'connected', details: { response: response.substring(0, 100) } });
+                            } else if (res.statusCode === 401) {
+                                console.log('  ❌ Qween: Invalid API key');
+                                resolve({ connected: false, status: 'invalid API key', details: parsed });
+                            } else {
+                                console.log(`  ❌ Qween: Error ${res.statusCode}:`, parsed.error?.message || body.substring(0, 100));
+                                resolve({ connected: false, status: `error: ${res.statusCode}`, details: parsed.error || parsed });
+                            }
+                        } catch (e) {
+                            resolve({ connected: false, status: `parse error: ${res.statusCode}`, details: body.substring(0, 200) });
                         }
                     });
                 });
 
-                req.on('error', () => resolve({ connected: false, status: 'connection error' }));
-                req.setTimeout(5000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.on('error', (e) => {
+                    console.log('  ❌ Qween: Connection error -', e.message);
+                    resolve({ connected: false, status: 'connection error', details: e.message });
+                });
+                req.setTimeout(10000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
                 req.write(data);
                 req.end();
             });
             results.qween = { ...results.qween, ...testResult };
         } catch (e) {
             results.qween.status = 'test failed';
+            results.qween.details = e.message;
         }
     }
 
+    // Test HuggingFace API
+    if (API_KEYS.huggingface && API_KEYS.huggingface !== 'YOUR_HUGGINGFACE_API_KEY_HERE') {
+        results.huggingface.configured = true;
+        console.log('  Testing HuggingFace API...');
+        try {
+            const testResult = await new Promise((resolve) => {
+                const data = JSON.stringify({
+                    inputs: '<s>[INST] Say "connected" if you receive this. [/INST]',
+                    parameters: { max_new_tokens: 10, temperature: 0.1 }
+                });
+
+                const options = {
+                    hostname: 'api-inference.huggingface.co',
+                    path: '/models/mistralai/Mistral-7B-Instruct-v0.2',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEYS.huggingface}`
+                    }
+                };
+
+                const req = https.request(options, (res) => {
+                    let body = '';
+                    res.on('data', chunk => body += chunk);
+                    res.on('end', () => {
+                        try {
+                            const parsed = JSON.parse(body);
+                            if (res.statusCode === 200 && !parsed.error) {
+                                const response = parsed[0]?.generated_text || '';
+                                console.log('  ✅ HuggingFace: Connected - Response:', response.substring(0, 50));
+                                resolve({ connected: true, status: 'connected', details: { response: response.substring(0, 100) } });
+                            } else if (res.statusCode === 401 || parsed.error?.includes('Invalid')) {
+                                console.log('  ❌ HuggingFace: Invalid API key');
+                                resolve({ connected: false, status: 'invalid API key', details: parsed });
+                            } else if (parsed.error?.includes('loading')) {
+                                console.log('  ⏳ HuggingFace: Model loading...');
+                                resolve({ connected: true, status: 'model loading (retry in 30s)', details: parsed });
+                            } else {
+                                console.log(`  ❌ HuggingFace: Error ${res.statusCode}:`, parsed.error || body.substring(0, 100));
+                                resolve({ connected: false, status: `error: ${res.statusCode}`, details: parsed.error || parsed });
+                            }
+                        } catch (e) {
+                            resolve({ connected: false, status: `parse error: ${res.statusCode}`, details: body.substring(0, 200) });
+                        }
+                    });
+                });
+
+                req.on('error', (e) => {
+                    console.log('  ❌ HuggingFace: Connection error -', e.message);
+                    resolve({ connected: false, status: 'connection error', details: e.message });
+                });
+                req.setTimeout(30000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.write(data);
+                req.end();
+            });
+            results.huggingface = { ...results.huggingface, ...testResult };
+        } catch (e) {
+            results.huggingface.status = 'test failed';
+            results.huggingface.details = e.message;
+        }
+    } else if (API_KEYS.huggingface === 'YOUR_HUGGINGFACE_API_KEY_HERE') {
+        results.huggingface.status = 'placeholder key - needs real key';
+        console.log('  ⚠️ HuggingFace: Placeholder key detected - add your real API key');
+    }
+
+    console.log('🔍 API test complete');
     return results;
 }
 
