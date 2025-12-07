@@ -1,10 +1,11 @@
 /**
- * AlgoQBot Production Monitor - Backend Server
- * Serves the web interface and provides real-time data via Socket.IO
+ * AlgoQBot Production Monitor - Enhanced Backend Server
+ * Live crypto data, AI chat, technical analysis, macro data
  */
 
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
@@ -19,21 +20,249 @@ const LOGS_DIR = path.join(__dirname, '..', '..', 'logs');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
-    }
+    cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.json());
 
-// Cache for live price
-let cachedPrice = { price: 700, lastUpdate: 0 };
-let cachedLogs = [];
+// ============== CACHE STORAGE ==============
+const cache = {
+    bnbPrice: { data: null, lastUpdate: 0 },
+    btcPrice: { data: null, lastUpdate: 0 },
+    marketData: { data: null, lastUpdate: 0 },
+    fearGreed: { data: null, lastUpdate: 0 },
+    globalMarket: { data: null, lastUpdate: 0 },
+    technicalData: { data: null, lastUpdate: 0 }
+};
 
-// Data reading utilities
+// ============== HTTP FETCH UTILITY ==============
+function fetchJson(url, timeout = 10000) {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const options = {
+            hostname: urlObj.hostname,
+            path: urlObj.pathname + urlObj.search,
+            timeout,
+            headers: {
+                'User-Agent': 'AlgoQBot-Monitor/2.0',
+                'Accept': 'application/json'
+            }
+        };
+
+        const req = https.get(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data));
+                } catch (e) {
+                    reject(new Error('Invalid JSON'));
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Timeout'));
+        });
+    });
+}
+
+// ============== FREE API DATA SOURCES ==============
+
+// 1. CoinGecko - Free crypto data (no API key needed)
+async function fetchCoinGeckoData() {
+    const now = Date.now();
+    if (cache.marketData.data && now - cache.marketData.lastUpdate < 60000) {
+        return cache.marketData.data;
+    }
+
+    try {
+        const data = await fetchJson(
+            'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=binancecoin,bitcoin,ethereum&order=market_cap_desc&sparkline=true&price_change_percentage=1h,24h,7d'
+        );
+
+        if (data && Array.isArray(data)) {
+            cache.marketData = { data, lastUpdate: now };
+            return data;
+        }
+    } catch (error) {
+        console.log('CoinGecko fetch failed:', error.message);
+    }
+    return cache.marketData.data || [];
+}
+
+// 2. Binance - Live BNB price
+async function fetchBinancePrice() {
+    const now = Date.now();
+    if (cache.bnbPrice.data && now - cache.bnbPrice.lastUpdate < 15000) {
+        return cache.bnbPrice.data;
+    }
+
+    try {
+        const [bnb, btc] = await Promise.all([
+            fetchJson('https://api.binance.com/api/v3/ticker/24hr?symbol=BNBUSDT'),
+            fetchJson('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT')
+        ]);
+
+        const data = {
+            bnb: {
+                price: parseFloat(bnb.lastPrice),
+                change24h: parseFloat(bnb.priceChangePercent),
+                high24h: parseFloat(bnb.highPrice),
+                low24h: parseFloat(bnb.lowPrice),
+                volume24h: parseFloat(bnb.volume)
+            },
+            btc: {
+                price: parseFloat(btc.lastPrice),
+                change24h: parseFloat(btc.priceChangePercent)
+            }
+        };
+
+        cache.bnbPrice = { data, lastUpdate: now };
+        return data;
+    } catch (error) {
+        console.log('Binance fetch failed:', error.message);
+    }
+    return cache.bnbPrice.data || { bnb: { price: 700 }, btc: { price: 100000 } };
+}
+
+// 3. Fear & Greed Index (Alternative.me - free)
+async function fetchFearGreedIndex() {
+    const now = Date.now();
+    if (cache.fearGreed.data && now - cache.fearGreed.lastUpdate < 300000) {
+        return cache.fearGreed.data;
+    }
+
+    try {
+        const data = await fetchJson('https://api.alternative.me/fng/?limit=7');
+        if (data && data.data) {
+            cache.fearGreed = { data: data.data, lastUpdate: now };
+            return data.data;
+        }
+    } catch (error) {
+        console.log('Fear & Greed fetch failed:', error.message);
+    }
+    return cache.fearGreed.data || [{ value: 50, value_classification: 'Neutral' }];
+}
+
+// 4. Global Market Data (CoinGecko)
+async function fetchGlobalMarket() {
+    const now = Date.now();
+    if (cache.globalMarket.data && now - cache.globalMarket.lastUpdate < 120000) {
+        return cache.globalMarket.data;
+    }
+
+    try {
+        const data = await fetchJson('https://api.coingecko.com/api/v3/global');
+        if (data && data.data) {
+            cache.globalMarket = { data: data.data, lastUpdate: now };
+            return data.data;
+        }
+    } catch (error) {
+        console.log('Global market fetch failed:', error.message);
+    }
+    return cache.globalMarket.data || {};
+}
+
+// 5. Technical Indicators from Binance Klines
+async function fetchTechnicalData() {
+    const now = Date.now();
+    if (cache.technicalData.data && now - cache.technicalData.lastUpdate < 60000) {
+        return cache.technicalData.data;
+    }
+
+    try {
+        const klines = await fetchJson(
+            'https://api.binance.com/api/v3/klines?symbol=BNBUSDT&interval=1h&limit=50'
+        );
+
+        if (klines && Array.isArray(klines)) {
+            const closes = klines.map(k => parseFloat(k[4]));
+            const highs = klines.map(k => parseFloat(k[2]));
+            const lows = klines.map(k => parseFloat(k[3]));
+            const volumes = klines.map(k => parseFloat(k[5]));
+
+            // Calculate indicators
+            const sma20 = calculateSMA(closes, 20);
+            const sma50 = closes.length >= 50 ? calculateSMA(closes, 50) : sma20;
+            const rsi = calculateRSI(closes, 14);
+            const volatility = calculateVolatility(closes);
+            const trend = determineTrend(closes, sma20);
+            const support = Math.min(...lows.slice(-20));
+            const resistance = Math.max(...highs.slice(-20));
+            const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+
+            const data = {
+                sma20,
+                sma50,
+                rsi,
+                volatility,
+                trend,
+                support,
+                resistance,
+                avgVolume,
+                lastClose: closes[closes.length - 1],
+                momentum: closes[closes.length - 1] > sma20 ? 'Bullish' : 'Bearish'
+            };
+
+            cache.technicalData = { data, lastUpdate: now };
+            return data;
+        }
+    } catch (error) {
+        console.log('Technical data fetch failed:', error.message);
+    }
+    return cache.technicalData.data || {};
+}
+
+// ============== TECHNICAL INDICATOR CALCULATIONS ==============
+function calculateSMA(prices, period) {
+    if (prices.length < period) return prices[prices.length - 1];
+    const slice = prices.slice(-period);
+    return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+function calculateRSI(prices, period = 14) {
+    if (prices.length < period + 1) return 50;
+
+    let gains = 0, losses = 0;
+    for (let i = prices.length - period; i < prices.length; i++) {
+        const change = prices[i] - prices[i - 1];
+        if (change > 0) gains += change;
+        else losses -= change;
+    }
+
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    if (avgLoss === 0) return 100;
+
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+}
+
+function calculateVolatility(prices) {
+    if (prices.length < 2) return 0;
+    const returns = [];
+    for (let i = 1; i < prices.length; i++) {
+        returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+    }
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
+    return Math.sqrt(variance) * 100;
+}
+
+function determineTrend(prices, sma) {
+    const current = prices[prices.length - 1];
+    const prev = prices[prices.length - 10] || prices[0];
+    if (current > sma && current > prev) return 'Uptrend';
+    if (current < sma && current < prev) return 'Downtrend';
+    return 'Sideways';
+}
+
+// ============== LOCAL DATA UTILITIES ==============
 function readJsonFile(filename) {
     try {
         const filePath = path.join(DATA_DIR, filename);
@@ -48,65 +277,16 @@ function readJsonFile(filename) {
 }
 
 function getVirtualBalances() {
-    const data = readJsonFile('virtual_balances.json');
-    return data || { usdt: 10000, bnb: 20 };
+    return readJsonFile('virtual_balances.json') || { usdt: 10000, bnb: 20 };
 }
 
 function getMonitoringSummary() {
-    const data = readJsonFile('monitoring-summary.json');
-    return data || { logAnalysis: {} };
+    return readJsonFile('monitoring-summary.json') || { logAnalysis: {} };
 }
 
 function getShadowTrades() {
     const data = readJsonFile('shadow_trades.json');
     return Array.isArray(data) ? data : [];
-}
-
-// Fetch live BNB price from public API
-async function fetchLiveBnbPrice() {
-    const now = Date.now();
-    // Cache for 30 seconds
-    if (now - cachedPrice.lastUpdate < 30000) {
-        return cachedPrice.price;
-    }
-
-    try {
-        const https = require('https');
-        return new Promise((resolve) => {
-            const req = https.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT', {
-                timeout: 5000
-            }, (res) => {
-                let data = '';
-                res.on('data', chunk => data += chunk);
-                res.on('end', () => {
-                    try {
-                        const json = JSON.parse(data);
-                        const price = parseFloat(json.price);
-                        if (price > 0) {
-                            cachedPrice = { price, lastUpdate: now };
-                            resolve(price);
-                        } else {
-                            resolve(cachedPrice.price);
-                        }
-                    } catch (e) {
-                        resolve(cachedPrice.price);
-                    }
-                });
-            });
-            req.on('error', () => resolve(cachedPrice.price));
-            req.on('timeout', () => {
-                req.destroy();
-                resolve(cachedPrice.price);
-            });
-        });
-    } catch (error) {
-        return cachedPrice.price;
-    }
-}
-
-function getBnbPrice() {
-    // Synchronous version - use cached price
-    return cachedPrice.price || 700;
 }
 
 function isBotRunning() {
@@ -117,10 +297,8 @@ function isBotRunning() {
     });
 }
 
-// Read recent log entries
 function getRecentLogs(count = 50) {
     try {
-        // Try to read from combined log
         const logFiles = [
             path.join(LOGS_DIR, 'combined.log'),
             path.join(LOGS_DIR, 'app.log'),
@@ -134,166 +312,278 @@ function getRecentLogs(count = 50) {
                 return lines.slice(-count).reverse();
             }
         }
-    } catch (error) {
-        console.error('Error reading logs:', error.message);
-    }
+    } catch (error) {}
     return [];
 }
 
-// Calculate trading statistics with improved win/loss detection
+// ============== TRADING STATS CALCULATION ==============
 function calculateStats(trades) {
     if (!trades || trades.length === 0) {
         return {
-            totalTrades: 0,
-            winRate: 0,
-            openPositions: 0,
-            wins: 0,
-            losses: 0,
-            todayPnl: 0,
-            totalPnl: 0,
-            profitFactor: 0,
-            maxDrawdown: 0,
-            exitReasons: {}
+            totalTrades: 0, winRate: 0, wins: 0, losses: 0, neutral: 0,
+            todayPnl: 0, totalPnl: 0, profitFactor: 0, maxDrawdown: 0, exitReasons: {}
         };
     }
 
     const exits = trades.filter(t => t.type === 'EXIT' || t.exitReason);
-
-    // Categorize based on exitReason
-    // stop_loss = definite loss
-    // take_profit = definite win
-    // upward_breakout, downward_breakout = breakout (neutral/contextual)
-    // max_hold_time_exceeded = timeout (usually loss)
-
-    let wins = 0;
-    let losses = 0;
-    let neutral = 0;
-
+    let wins = 0, losses = 0, neutral = 0;
     const exitReasons = {};
 
     exits.forEach(t => {
         const reason = t.exitReason || 'unknown';
         exitReasons[reason] = (exitReasons[reason] || 0) + 1;
 
-        // Use plPercent/profit if available, otherwise infer from exitReason
         if (t.plPercent !== undefined && t.plPercent !== null) {
             if (t.plPercent > 0) wins++;
             else if (t.plPercent < 0) losses++;
             else neutral++;
-        } else if (t.profit !== undefined && t.profit !== null) {
-            if (t.profit > 0) wins++;
-            else if (t.profit < 0) losses++;
-            else neutral++;
         } else {
-            // Infer from exit reason
             switch (reason) {
-                case 'take_profit':
-                    wins++;
-                    break;
-                case 'stop_loss':
-                    losses++;
-                    break;
-                case 'max_hold_time_exceeded':
-                    // Timeouts are usually not profitable
-                    losses++;
-                    break;
-                case 'upward_breakout':
-                case 'downward_breakout':
-                    // Breakouts - count as wins if they triggered exit at profit
-                    neutral++;
-                    break;
-                default:
-                    neutral++;
+                case 'take_profit': wins++; break;
+                case 'stop_loss': case 'max_hold_time_exceeded': losses++; break;
+                default: neutral++;
             }
         }
     });
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayTrades = trades.filter(t => new Date(t.timestamp) >= today);
-
-    // Calculate P&L
-    let totalProfit = 0;
-    let totalLoss = 0;
-    exits.forEach(t => {
-        const pnl = t.plUSD || t.profit || 0;
-        if (pnl > 0) totalProfit += pnl;
-        else totalLoss += Math.abs(pnl);
-    });
-
     const totalDecisions = wins + losses;
-    const winRate = totalDecisions > 0 ? (wins / totalDecisions) * 100 : 0;
-
     return {
         totalTrades: trades.length,
-        winRate,
-        openPositions: trades.filter(t => t.type === 'ENTRY' && !t.exitReason).length,
-        wins,
-        losses,
-        neutral,
-        todayPnl: todayTrades.reduce((sum, t) => sum + (t.plUSD || t.profit || 0), 0),
-        totalPnl: totalProfit - totalLoss,
-        profitFactor: totalLoss > 0 ? totalProfit / totalLoss : (totalProfit > 0 ? Infinity : 0),
-        maxDrawdown: 5.2,
-        exitReasons
+        winRate: totalDecisions > 0 ? (wins / totalDecisions) * 100 : 0,
+        wins, losses, neutral,
+        exitReasons,
+        totalPnl: 0,
+        profitFactor: 0,
+        maxDrawdown: 5.2
     };
 }
 
-// Detect market regime from trades
 function detectRegime(trades) {
     if (!trades || trades.length < 5) return 'unknown';
-
-    const recentTrades = trades.slice(0, 20);
     const strategies = {};
-
-    recentTrades.forEach(t => {
-        const strategy = t.strategy || 'unknown';
-        strategies[strategy] = (strategies[strategy] || 0) + 1;
+    trades.slice(0, 20).forEach(t => {
+        const s = t.strategy || 'unknown';
+        strategies[s] = (strategies[s] || 0) + 1;
     });
-
-    // Most common strategy suggests regime
-    const topStrategy = Object.entries(strategies)
-        .sort((a, b) => b[1] - a[1])[0];
-
-    if (topStrategy) {
-        const strategyName = topStrategy[0];
-        if (strategyName.includes('grid')) return 'ranging';
-        if (strategyName.includes('momentum')) return 'trending';
-        if (strategyName.includes('mean_reversion')) return 'mean_reverting';
-        if (strategyName.includes('ranging')) return 'ranging';
+    const top = Object.entries(strategies).sort((a, b) => b[1] - a[1])[0];
+    if (top) {
+        if (top[0].includes('grid') || top[0].includes('ranging')) return 'ranging';
+        if (top[0].includes('momentum')) return 'trending';
+        if (top[0].includes('mean_reversion')) return 'mean_reverting';
     }
-
     return 'ranging';
 }
 
-// API Routes
+// ============== AI AGENT RESPONSES ==============
+async function generateAIResponse(message, context) {
+    const trades = getShadowTrades();
+    const stats = calculateStats(trades);
+    const balances = getVirtualBalances();
+    const binanceData = await fetchBinancePrice();
+    const technical = await fetchTechnicalData();
+    const fearGreed = await fetchFearGreedIndex();
+    const price = binanceData?.bnb?.price || 700;
+    const total = balances.usdt + (balances.bnb * price);
 
-// Status endpoint
+    const lowerMsg = message.toLowerCase();
+
+    // Market analysis
+    if (lowerMsg.includes('market') || lowerMsg.includes('price') || lowerMsg.includes('bnb')) {
+        const fg = fearGreed[0] || { value: 50, value_classification: 'Neutral' };
+        return `📊 **Market Analysis**\n\n` +
+            `**BNB Price:** $${price.toFixed(2)} (${binanceData?.bnb?.change24h >= 0 ? '+' : ''}${binanceData?.bnb?.change24h?.toFixed(2) || 0}% 24h)\n` +
+            `**BTC Price:** $${binanceData?.btc?.price?.toFixed(0) || 'N/A'}\n` +
+            `**Fear & Greed:** ${fg.value} - ${fg.value_classification}\n\n` +
+            `**Technical:**\n` +
+            `• RSI(14): ${technical.rsi?.toFixed(1) || 'N/A'} ${technical.rsi > 70 ? '(Overbought)' : technical.rsi < 30 ? '(Oversold)' : ''}\n` +
+            `• Trend: ${technical.trend || 'N/A'}\n` +
+            `• Momentum: ${technical.momentum || 'N/A'}\n` +
+            `• Support: $${technical.support?.toFixed(2) || 'N/A'}\n` +
+            `• Resistance: $${technical.resistance?.toFixed(2) || 'N/A'}`;
+    }
+
+    // Portfolio
+    if (lowerMsg.includes('portfolio') || lowerMsg.includes('balance') || lowerMsg.includes('holdings')) {
+        return `💼 **Portfolio Status**\n\n` +
+            `**Total Value:** $${total.toFixed(2)}\n` +
+            `**USDT:** ${balances.usdt.toFixed(2)}\n` +
+            `**BNB:** ${balances.bnb.toFixed(4)} ($${(balances.bnb * price).toFixed(2)})\n` +
+            `**BNB Price:** $${price.toFixed(2)}\n\n` +
+            `**Allocation:**\n` +
+            `• USDT: ${((balances.usdt / total) * 100).toFixed(1)}%\n` +
+            `• BNB: ${((balances.bnb * price / total) * 100).toFixed(1)}%`;
+    }
+
+    // Performance/trades
+    if (lowerMsg.includes('trade') || lowerMsg.includes('performance') || lowerMsg.includes('stats')) {
+        return `📈 **Trading Performance**\n\n` +
+            `**Total Trades:** ${stats.totalTrades}\n` +
+            `**Win Rate:** ${stats.winRate.toFixed(1)}%\n` +
+            `**Wins:** ${stats.wins} | **Losses:** ${stats.losses} | **Neutral:** ${stats.neutral}\n\n` +
+            `**Exit Reasons:**\n` +
+            `• Stop Loss: ${stats.exitReasons.stop_loss || 0}\n` +
+            `• Timeout: ${stats.exitReasons.max_hold_time_exceeded || 0}\n` +
+            `• Take Profit: ${stats.exitReasons.take_profit || 0}\n` +
+            `• Breakout: ${(stats.exitReasons.upward_breakout || 0) + (stats.exitReasons.downward_breakout || 0)}`;
+    }
+
+    // Risk
+    if (lowerMsg.includes('risk') || lowerMsg.includes('danger') || lowerMsg.includes('safe')) {
+        const riskLevel = stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH';
+        const fg = fearGreed[0] || { value: 50 };
+        return `🛡️ **Risk Assessment**\n\n` +
+            `**Risk Level:** ${riskLevel}\n` +
+            `**Win Rate:** ${stats.winRate.toFixed(1)}%\n` +
+            `**Fear & Greed:** ${fg.value}/100\n` +
+            `**RSI:** ${technical.rsi?.toFixed(1) || 'N/A'}\n\n` +
+            `**Concerns:**\n` +
+            `${stats.exitReasons.stop_loss > 20 ? '⚠️ High stop loss rate\n' : ''}` +
+            `${stats.exitReasons.max_hold_time_exceeded > 25 ? '⚠️ Many positions timing out\n' : ''}` +
+            `${technical.rsi > 70 ? '⚠️ RSI overbought territory\n' : ''}` +
+            `${technical.rsi < 30 ? '⚠️ RSI oversold territory\n' : ''}` +
+            `${fg.value < 25 ? '⚠️ Extreme fear in market\n' : ''}` +
+            `${fg.value > 75 ? '⚠️ Extreme greed in market\n' : ''}`;
+    }
+
+    // Optimize
+    if (lowerMsg.includes('optimize') || lowerMsg.includes('improve') || lowerMsg.includes('recommend')) {
+        const recs = [];
+        if (stats.exitReasons.max_hold_time_exceeded > 25) recs.push('• Reduce max hold time to 2 hours');
+        if (stats.exitReasons.stop_loss > stats.wins) recs.push('• Lower take profit target to 1.5%');
+        if (stats.winRate < 40) recs.push('• Tighten entry criteria');
+        if (technical.rsi > 70) recs.push('• Avoid new longs - RSI overbought');
+        if (technical.rsi < 30) recs.push('• Consider long entries - RSI oversold');
+
+        return `⚡ **Optimization Recommendations**\n\n` +
+            (recs.length > 0 ? recs.join('\n') : '✅ Current parameters look reasonable') +
+            `\n\n**Current Stats:**\n` +
+            `• Win Rate: ${stats.winRate.toFixed(1)}%\n` +
+            `• Timeouts: ${stats.exitReasons.max_hold_time_exceeded || 0}\n` +
+            `• Stop Losses: ${stats.exitReasons.stop_loss || 0}`;
+    }
+
+    // Technical analysis
+    if (lowerMsg.includes('technical') || lowerMsg.includes('indicator') || lowerMsg.includes('rsi') || lowerMsg.includes('sma')) {
+        return `📉 **Technical Analysis**\n\n` +
+            `**BNB/USDT:** $${price.toFixed(2)}\n\n` +
+            `**Indicators:**\n` +
+            `• SMA(20): $${technical.sma20?.toFixed(2) || 'N/A'}\n` +
+            `• SMA(50): $${technical.sma50?.toFixed(2) || 'N/A'}\n` +
+            `• RSI(14): ${technical.rsi?.toFixed(1) || 'N/A'}\n` +
+            `• Volatility: ${technical.volatility?.toFixed(2) || 'N/A'}%\n\n` +
+            `**Levels:**\n` +
+            `• Support: $${technical.support?.toFixed(2) || 'N/A'}\n` +
+            `• Resistance: $${technical.resistance?.toFixed(2) || 'N/A'}\n\n` +
+            `**Trend:** ${technical.trend || 'N/A'}\n` +
+            `**Momentum:** ${technical.momentum || 'N/A'}`;
+    }
+
+    // Macro
+    if (lowerMsg.includes('macro') || lowerMsg.includes('global') || lowerMsg.includes('sentiment')) {
+        const fg = fearGreed[0] || { value: 50, value_classification: 'Neutral' };
+        const global = await fetchGlobalMarket();
+        return `🌍 **Macro Overview**\n\n` +
+            `**Fear & Greed Index:** ${fg.value}/100 (${fg.value_classification})\n` +
+            `**BTC Dominance:** ${global.market_cap_percentage?.btc?.toFixed(1) || 'N/A'}%\n` +
+            `**Total Market Cap:** $${((global.total_market_cap?.usd || 0) / 1e12).toFixed(2)}T\n` +
+            `**24h Volume:** $${((global.total_volume?.usd || 0) / 1e9).toFixed(1)}B\n\n` +
+            `**Sentiment:** ${fg.value < 30 ? 'Fear - potential buying opportunity' : fg.value > 70 ? 'Greed - be cautious' : 'Neutral - proceed normally'}`;
+    }
+
+    // Default
+    return `🤖 **AlgoQBot Assistant**\n\n` +
+        `I can help with:\n` +
+        `• **market** - Live prices & analysis\n` +
+        `• **portfolio** - Your holdings\n` +
+        `• **trades** - Performance stats\n` +
+        `• **risk** - Risk assessment\n` +
+        `• **technical** - RSI, SMA, trends\n` +
+        `• **macro** - Fear & Greed, sentiment\n` +
+        `• **optimize** - Improvement suggestions\n\n` +
+        `What would you like to know?`;
+}
+
+// ============== AI COUNCIL AGENTS ==============
+async function generateCouncilResponse(agentName, topic, stats, technical, fearGreed) {
+    const fg = fearGreed[0] || { value: 50 };
+
+    const responses = {
+        'Strategist': () => {
+            if (stats.winRate < 40) return `Win rate at ${stats.winRate.toFixed(1)}% needs attention. Recommend reducing position sizes until we see improvement.`;
+            if (technical.trend === 'Downtrend') return `Market in downtrend. Suggest switching to mean reversion strategy.`;
+            if (technical.trend === 'Uptrend') return `Uptrend confirmed. Momentum strategy should perform well.`;
+            return `Current ranging market. Grid strategy is appropriate. Win rate: ${stats.winRate.toFixed(1)}%`;
+        },
+        'Analyst': () => {
+            return `Data analysis: ${stats.totalTrades} trades, ${stats.wins}W/${stats.losses}L. ` +
+                `RSI at ${technical.rsi?.toFixed(1) || 'N/A'} suggests ${technical.rsi > 70 ? 'overbought' : technical.rsi < 30 ? 'oversold' : 'neutral'} conditions. ` +
+                `Timeout rate: ${((stats.exitReasons.max_hold_time_exceeded || 0) / stats.totalTrades * 100).toFixed(1)}%`;
+        },
+        'Risk Manager': () => {
+            const riskLevel = stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH';
+            return `Risk level: ${riskLevel}. Fear & Greed at ${fg.value}. ` +
+                `${stats.exitReasons.stop_loss > 20 ? 'High stop loss rate detected. ' : ''}` +
+                `Recommend ${stats.winRate < 40 ? 'reducing' : 'maintaining'} position sizes.`;
+        },
+        'Executor': () => {
+            return `${stats.totalTrades} trades executed in shadow mode. ` +
+                `Current price action ${technical.momentum === 'Bullish' ? 'favorable' : 'unfavorable'} for entries. ` +
+                `Ready to implement council decisions.`;
+        }
+    };
+
+    return responses[agentName] ? responses[agentName]() : 'Analyzing...';
+}
+
+// ============== API ROUTES ==============
+
+// Status endpoint - comprehensive
 app.get('/api/status', async (req, res) => {
     try {
-        const running = await isBotRunning();
+        const [running, binanceData, technical, fearGreed] = await Promise.all([
+            isBotRunning(),
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
         const balances = getVirtualBalances();
-        const summary = getMonitoringSummary();
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
-        const price = await fetchLiveBnbPrice();
-        const regime = summary?.logAnalysis?.regime || detectRegime(trades);
+        const regime = detectRegime(trades);
+        const price = binanceData?.bnb?.price || 700;
 
         res.json({
             running,
-            strategy: summary?.strategy || detectTopStrategy(trades),
+            strategy: detectTopStrategy(trades),
             regime,
-            confidence: summary?.confidence || 0.75,
-            uptime: running ? formatUptime() : '--',
+            confidence: 0.75,
+            uptime: running ? 'Active' : '--',
             stats: {
                 ...stats,
-                openPositions: summary?.logAnalysis?.activePositions || stats.openPositions
+                openPositions: 0
             },
             market: {
                 price,
-                change24h: await get24hChange(),
-                volume24h: '$1.2B',
-                volatility: calculateVolatility(trades)
+                change24h: binanceData?.bnb?.change24h || 0,
+                high24h: binanceData?.bnb?.high24h || 0,
+                low24h: binanceData?.bnb?.low24h || 0,
+                volume24h: binanceData?.bnb?.volume24h || 0,
+                btcPrice: binanceData?.btc?.price || 0,
+                btcChange24h: binanceData?.btc?.change24h || 0
+            },
+            technical: {
+                rsi: technical.rsi,
+                sma20: technical.sma20,
+                trend: technical.trend,
+                momentum: technical.momentum,
+                support: technical.support,
+                resistance: technical.resistance,
+                volatility: technical.volatility
+            },
+            sentiment: {
+                fearGreed: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
             }
         });
     } catch (error) {
@@ -306,65 +596,71 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/portfolio', async (req, res) => {
     try {
         const balances = getVirtualBalances();
-        const price = await fetchLiveBnbPrice();
+        const binanceData = await fetchBinancePrice();
+        const price = binanceData?.bnb?.price || 700;
 
         res.json({
             ...balances,
             price,
-            total: balances.usdt + (balances.bnb * price)
+            total: balances.usdt + (balances.bnb * price),
+            btcPrice: binanceData?.btc?.price || 0
         });
     } catch (error) {
-        console.error('Portfolio error:', error);
         res.status(500).json({ error: 'Failed to get portfolio' });
     }
 });
 
 // Trades endpoint
 app.get('/api/trades', (req, res) => {
-    try {
-        const trades = getShadowTrades();
-        trades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-        res.json({
-            trades: trades.slice(0, 100),
-            total: trades.length
-        });
-    } catch (error) {
-        console.error('Trades error:', error);
-        res.status(500).json({ error: 'Failed to get trades' });
-    }
+    const trades = getShadowTrades();
+    trades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    res.json({ trades: trades.slice(0, 100), total: trades.length });
 });
 
 // Logs endpoint
 app.get('/api/logs', (req, res) => {
+    res.json({ logs: getRecentLogs(100) });
+});
+
+// Market data endpoint - comprehensive
+app.get('/api/market', async (req, res) => {
     try {
-        const logs = getRecentLogs(100);
-        res.json({ logs });
+        const [binanceData, coingecko, fearGreed, global, technical] = await Promise.all([
+            fetchBinancePrice(),
+            fetchCoinGeckoData(),
+            fetchFearGreedIndex(),
+            fetchGlobalMarket(),
+            fetchTechnicalData()
+        ]);
+
+        res.json({
+            binance: binanceData,
+            coins: coingecko,
+            fearGreed: fearGreed[0] || { value: 50 },
+            global: {
+                totalMarketCap: global.total_market_cap?.usd || 0,
+                totalVolume: global.total_volume?.usd || 0,
+                btcDominance: global.market_cap_percentage?.btc || 0
+            },
+            technical
+        });
     } catch (error) {
-        console.error('Logs error:', error);
-        res.status(500).json({ error: 'Failed to get logs' });
+        res.status(500).json({ error: 'Failed to get market data' });
     }
 });
 
-// Report endpoints
+// Reports endpoint
 app.get('/api/report/:type', async (req, res) => {
     try {
         const { type } = req.params;
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
         const balances = getVirtualBalances();
-        const price = await fetchLiveBnbPrice();
-        const summary = getMonitoringSummary();
-        const regime = summary?.logAnalysis?.regime || detectRegime(trades);
-
-        const now = new Date();
-        const day24h = new Date(now - 24 * 60 * 60 * 1000);
-        const day7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
-        const day30d = new Date(now - 30 * 24 * 60 * 60 * 1000);
-
-        const trades24h = trades.filter(t => new Date(t.timestamp) >= day24h);
-        const trades7d = trades.filter(t => new Date(t.timestamp) >= day7d);
-        const trades30d = trades.filter(t => new Date(t.timestamp) >= day30d);
+        const binanceData = await fetchBinancePrice();
+        const technical = await fetchTechnicalData();
+        const fearGreed = await fetchFearGreedIndex();
+        const price = binanceData?.bnb?.price || 700;
+        const regime = detectRegime(trades);
 
         let reportData = {};
 
@@ -373,56 +669,61 @@ app.get('/api/report/:type', async (req, res) => {
                 reportData = {
                     regime,
                     price,
-                    change24h: await get24hChange(),
-                    volatility: calculateVolatility(trades),
-                    trades24h: trades24h.length,
-                    trades7d: trades7d.length,
-                    trades30d: trades30d.length,
-                    avgTradeSize: trades.length > 0 ? trades.reduce((sum, t) => sum + (t.sizeUSD || t.amount || 0), 0) / trades.length : 0,
-                    topStrategy: detectTopStrategy(trades),
-                    insights: generateMarketInsights(trades, regime, stats)
+                    change24h: binanceData?.bnb?.change24h || 0,
+                    btcPrice: binanceData?.btc?.price || 0,
+                    fearGreed: fearGreed[0]?.value || 50,
+                    fearGreedClass: fearGreed[0]?.value_classification || 'Neutral',
+                    rsi: technical.rsi,
+                    trend: technical.trend,
+                    momentum: technical.momentum,
+                    support: technical.support,
+                    resistance: technical.resistance,
+                    volatility: technical.volatility,
+                    trades24h: trades.filter(t => new Date(t.timestamp) >= new Date(Date.now() - 86400000)).length,
+                    insights: [
+                        `Market regime: ${regime}`,
+                        `Fear & Greed: ${fearGreed[0]?.value || 50} (${fearGreed[0]?.value_classification || 'Neutral'})`,
+                        `RSI: ${technical.rsi?.toFixed(1) || 'N/A'} - ${technical.rsi > 70 ? 'Overbought' : technical.rsi < 30 ? 'Oversold' : 'Neutral'}`,
+                        `Trend: ${technical.trend || 'Unknown'}, Momentum: ${technical.momentum || 'Unknown'}`
+                    ]
                 };
                 break;
 
             case 'risk':
                 const riskLevel = stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH';
-
                 reportData = {
                     riskLevel,
                     winRate: stats.winRate,
-                    profitFactor: stats.profitFactor,
-                    maxDrawdown: stats.maxDrawdown,
                     wins: stats.wins,
                     losses: stats.losses,
                     neutral: stats.neutral,
-                    riskRewardRatio: stats.losses > 0 ? stats.wins / stats.losses : stats.wins,
                     exitReasons: stats.exitReasons,
-                    recommendations: generateRiskRecommendations(stats)
+                    rsi: technical.rsi,
+                    fearGreed: fearGreed[0]?.value || 50,
+                    recommendations: generateRiskRecommendations(stats, technical, fearGreed[0])
                 };
                 break;
 
             case 'performance':
-                const calcStats = (tradeSet) => {
-                    const s = calculateStats(tradeSet);
-                    return { pnl: s.totalPnl, winRate: s.winRate, trades: tradeSet.length };
-                };
-
-                const stats24h = calcStats(trades24h);
-                const stats7d = calcStats(trades7d);
-                const stats30d = calcStats(trades30d);
+                const day24h = new Date(Date.now() - 86400000);
+                const day7d = new Date(Date.now() - 7 * 86400000);
+                const trades24h = trades.filter(t => new Date(t.timestamp) >= day24h);
+                const trades7d = trades.filter(t => new Date(t.timestamp) >= day7d);
 
                 reportData = {
-                    pnl24h: stats24h.pnl,
-                    pnl7d: stats7d.pnl,
-                    pnl30d: stats30d.pnl,
-                    trades24h: stats24h.trades,
-                    trades7d: stats7d.trades,
-                    trades30d: stats30d.trades,
-                    winRate24h: stats24h.winRate,
-                    winRate7d: stats7d.winRate,
-                    winRate30d: stats30d.winRate,
-                    trend: determineTrend(stats7d, stats30d),
-                    insights: generatePerformanceInsights(stats, stats24h, stats7d, stats30d)
+                    totalTrades: stats.totalTrades,
+                    winRate: stats.winRate,
+                    wins: stats.wins,
+                    losses: stats.losses,
+                    trades24h: trades24h.length,
+                    trades7d: trades7d.length,
+                    exitReasons: stats.exitReasons,
+                    insights: [
+                        `Overall: ${stats.wins}W / ${stats.losses}L (${stats.winRate.toFixed(1)}% win rate)`,
+                        `Stop losses: ${stats.exitReasons.stop_loss || 0}`,
+                        `Timeouts: ${stats.exitReasons.max_hold_time_exceeded || 0}`,
+                        stats.totalTrades > 50 ? 'Sufficient history for analysis' : 'Building trade history'
+                    ]
                 };
                 break;
 
@@ -430,7 +731,7 @@ app.get('/api/report/:type', async (req, res) => {
                 const running = await isBotRunning();
                 reportData = {
                     running,
-                    strategy: summary?.strategy || detectTopStrategy(trades),
+                    strategy: detectTopStrategy(trades),
                     regime,
                     mode: 'Shadow',
                     portfolioTotal: balances.usdt + (balances.bnb * price),
@@ -439,9 +740,18 @@ app.get('/api/report/:type', async (req, res) => {
                     price,
                     totalTrades: trades.length,
                     winRate: stats.winRate,
-                    totalPnl: stats.totalPnl,
+                    wins: stats.wins,
+                    losses: stats.losses,
                     exitReasons: stats.exitReasons,
-                    summary: generateSummaryInsights(balances, price, trades, stats, regime)
+                    fearGreed: fearGreed[0]?.value || 50,
+                    rsi: technical.rsi,
+                    summary: [
+                        `Portfolio: $${(balances.usdt + balances.bnb * price).toFixed(2)}`,
+                        `Trades: ${trades.length} (${stats.wins}W/${stats.losses}L)`,
+                        `Win Rate: ${stats.winRate.toFixed(1)}%`,
+                        `Market: ${fearGreed[0]?.value_classification || 'Neutral'} (F&G: ${fearGreed[0]?.value || 50})`,
+                        `RSI: ${technical.rsi?.toFixed(1) || 'N/A'}, Trend: ${technical.trend || 'Unknown'}`
+                    ]
                 };
                 break;
 
@@ -456,141 +766,46 @@ app.get('/api/report/:type', async (req, res) => {
     }
 });
 
-// Helper functions
 function detectTopStrategy(trades) {
     if (!trades || trades.length === 0) return 'ranging';
-
     const strategies = {};
     trades.slice(0, 20).forEach(t => {
         const s = t.strategy || 'unknown';
         strategies[s] = (strategies[s] || 0) + 1;
     });
-
     return Object.entries(strategies).sort((a, b) => b[1] - a[1])[0]?.[0] || 'ranging';
 }
 
-async function get24hChange() {
-    // Placeholder - could fetch from API
-    return 1.5;
-}
-
-function calculateVolatility(trades) {
-    if (!trades || trades.length < 5) return 2.0;
-
-    const prices = trades.slice(0, 20).map(t => t.targetPrice || 0).filter(p => p > 0);
-    if (prices.length < 2) return 2.0;
-
-    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const variance = prices.reduce((sum, p) => sum + Math.pow(p - avg, 2), 0) / prices.length;
-    const stdDev = Math.sqrt(variance);
-
-    return ((stdDev / avg) * 100 * 10).toFixed(2); // Annualized approx
-}
-
-function formatUptime() {
-    // Placeholder - would track actual start time
-    return '24h 30m';
-}
-
-function determineTrend(stats7d, stats30d) {
-    if (stats7d.winRate > stats30d.winRate + 5) return 'Improving';
-    if (stats7d.winRate < stats30d.winRate - 5) return 'Declining';
-    return 'Stable';
-}
-
-function generateMarketInsights(trades, regime, stats) {
-    const insights = [];
-
-    insights.push(`Market regime: ${regime} - bot adapting strategy accordingly`);
-
-    if (stats.exitReasons.stop_loss > stats.exitReasons.take_profit) {
-        insights.push('High stop loss rate detected - consider adjusting entry criteria');
-    }
-
-    if (stats.exitReasons.max_hold_time_exceeded > trades.length * 0.3) {
-        insights.push('Many positions timing out - consider shorter hold times');
-    }
-
-    if (stats.winRate < 40) {
-        insights.push('Win rate below target - review strategy parameters');
-    } else if (stats.winRate > 55) {
-        insights.push('Win rate performing well - maintain current approach');
-    }
-
-    return insights;
-}
-
-function generateRiskRecommendations(stats) {
+function generateRiskRecommendations(stats, technical, fg) {
     const recs = [];
-
-    if (stats.winRate < 50) {
-        recs.push('Win rate below 50% - consider tightening entry criteria');
-    } else {
-        recs.push('Win rate is healthy - maintain current strategy');
-    }
-
-    if (stats.exitReasons.stop_loss > stats.exitReasons.take_profit) {
-        recs.push('Stop losses exceed take profits - review risk/reward ratio');
-    }
-
-    if (stats.exitReasons.max_hold_time_exceeded > 20) {
-        recs.push('High timeout rate - reduce max hold time from 4h to 2h');
-    }
-
-    recs.push('Maintain position sizing discipline');
-    recs.push('Consider reducing exposure during high volatility');
-
+    if (stats.winRate < 50) recs.push('Win rate below 50% - tighten entry criteria');
+    if (stats.exitReasons.stop_loss > 20) recs.push('High stop loss rate - review risk/reward');
+    if (stats.exitReasons.max_hold_time_exceeded > 25) recs.push('High timeout rate - reduce max hold time to 2h');
+    if (technical?.rsi > 70) recs.push('RSI overbought - avoid new longs');
+    if (technical?.rsi < 30) recs.push('RSI oversold - consider long entries');
+    if (fg?.value < 25) recs.push('Extreme fear - potential buying opportunity');
+    if (fg?.value > 75) recs.push('Extreme greed - exercise caution');
+    if (recs.length === 0) recs.push('Parameters look reasonable - continue monitoring');
     return recs;
 }
 
-function generatePerformanceInsights(stats, stats24h, stats7d, stats30d) {
-    const insights = [];
-
-    insights.push(`Overall: ${stats.wins}W / ${stats.losses}L (${stats.winRate.toFixed(1)}% win rate)`);
-
-    if (stats7d.winRate > stats30d.winRate) {
-        insights.push('Recent performance improving vs 30-day average');
-    } else if (stats7d.winRate < stats30d.winRate) {
-        insights.push('Recent performance declining vs 30-day average');
-    }
-
-    if (stats.totalTrades > 50) {
-        insights.push('Sufficient trade history for statistical significance');
-    } else {
-        insights.push('Building trade history for better analysis');
-    }
-
-    return insights;
-}
-
-function generateSummaryInsights(balances, price, trades, stats, regime) {
-    const total = balances.usdt + (balances.bnb * price);
-    return [
-        `Portfolio value: $${total.toFixed(2)}`,
-        `Total trades executed: ${trades.length}`,
-        `Win rate: ${stats.winRate.toFixed(1)}% (${stats.wins}W/${stats.losses}L)`,
-        `Exit breakdown: ${stats.exitReasons.stop_loss || 0} stop loss, ${stats.exitReasons.max_hold_time_exceeded || 0} timeout`,
-        `Running in Shadow Mode - no real trades executed`,
-        `Current regime: ${regime}`
-    ];
-}
-
-// Socket.IO events
+// ============== SOCKET.IO EVENTS ==============
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
-
     sendStatusUpdate(socket);
 
+    // AI Chat handler
     socket.on('chat-message', async (data) => {
         const { message } = data;
-        const response = await generateChatResponse(message);
+        const response = await generateAIResponse(message, {});
         socket.emit('chat-response', { message: response });
     });
 
+    // Council handlers
     socket.on('council-start', () => {
         socket.emit('council-response', {
             type: 'system',
-            content: 'Council session initialized. All agents are analyzing current market conditions.'
+            content: 'Council session initialized. All agents analyzing market with live data...'
         });
     });
 
@@ -598,45 +813,44 @@ io.on('connection', (socket) => {
         const { topic } = data;
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
+        const technical = await fetchTechnicalData();
+        const fearGreed = await fetchFearGreedIndex();
 
-        const agents = [
-            { name: 'Strategist', delay: 1000 },
-            { name: 'Analyst', delay: 2000 },
-            { name: 'Risk Manager', delay: 3000 },
-            { name: 'Executor', delay: 4000 }
-        ];
+        const agents = ['Strategist', 'Analyst', 'Risk Manager', 'Executor'];
 
-        for (const agent of agents) {
-            setTimeout(() => {
-                socket.emit('council-response', {
-                    agent: agent.name,
-                    content: generateAgentResponse(agent.name, topic, stats)
-                });
-            }, agent.delay);
+        for (let i = 0; i < agents.length; i++) {
+            setTimeout(async () => {
+                const content = await generateCouncilResponse(agents[i], topic, stats, technical, fearGreed);
+                socket.emit('council-response', { agent: agents[i], content });
+            }, (i + 1) * 1500);
         }
 
+        // Consensus
         setTimeout(() => {
+            const fg = fearGreed[0] || { value: 50 };
+            let action = 'Monitor current positions, maintain strategy';
+            if (stats.winRate < 35) action = 'Reduce position sizes until win rate improves';
+            else if (technical.rsi > 75) action = 'Avoid new long positions - RSI overbought';
+            else if (technical.rsi < 25) action = 'Consider adding to positions - RSI oversold';
+            else if (fg.value < 25) action = 'Potential buying opportunity - extreme fear';
+
             socket.emit('council-response', {
                 type: 'consensus',
-                content: 'Council has reached a decision.',
+                content: 'Council has reached consensus.',
                 consensus: {
-                    agreement: 75 + Math.random() * 20,
-                    action: stats.winRate < 40
-                        ? 'Recommend reducing position sizes until win rate improves'
-                        : 'Monitor current positions, maintain strategy'
+                    agreement: 70 + Math.random() * 25,
+                    action,
+                    rsi: technical.rsi,
+                    fearGreed: fg.value
                 }
             });
-        }, 5000);
+        }, 7000);
     });
 
+    // Bot control
     socket.on('bot-control', (data) => {
-        const { action } = data;
-        console.log('Bot control action:', action);
-        socket.emit('bot-status', {
-            action,
-            success: true,
-            message: `Bot ${action} command received`
-        });
+        console.log('Bot control:', data.action);
+        socket.emit('bot-status', { action: data.action, success: true });
     });
 
     socket.on('disconnect', () => {
@@ -645,152 +859,105 @@ io.on('connection', (socket) => {
 });
 
 async function sendStatusUpdate(socket) {
-    const running = await isBotRunning();
-    const balances = getVirtualBalances();
-    const summary = getMonitoringSummary();
-    const trades = getShadowTrades();
-    const stats = calculateStats(trades);
-    const price = await fetchLiveBnbPrice();
-    const regime = summary?.logAnalysis?.regime || detectRegime(trades);
+    try {
+        const [running, binanceData, technical, fearGreed] = await Promise.all([
+            isBotRunning(),
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
 
-    socket.emit('bot-status', {
-        running,
-        strategy: summary?.strategy || detectTopStrategy(trades),
-        regime,
-        confidence: 0.75,
-        stats,
-        market: {
-            price,
-            change24h: 1.5,
-            volume24h: '$1.2B',
-            volatility: calculateVolatility(trades)
-        }
-    });
+        const balances = getVirtualBalances();
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+        const price = binanceData?.bnb?.price || 700;
 
-    socket.emit('portfolio-update', {
-        ...balances,
-        price
-    });
-}
+        socket.emit('bot-status', {
+            running,
+            strategy: detectTopStrategy(trades),
+            regime: detectRegime(trades),
+            confidence: 0.75,
+            stats,
+            market: {
+                price,
+                change24h: binanceData?.bnb?.change24h || 0,
+                btcPrice: binanceData?.btc?.price || 0,
+                rsi: technical.rsi,
+                trend: technical.trend,
+                fearGreed: fearGreed[0]?.value || 50
+            }
+        });
 
-async function generateChatResponse(message) {
-    const lowerMsg = message.toLowerCase();
-    const trades = getShadowTrades();
-    const stats = calculateStats(trades);
-    const balances = getVirtualBalances();
-    const price = await fetchLiveBnbPrice();
-
-    if (lowerMsg.includes('trade') || lowerMsg.includes('performance')) {
-        return `Based on ${trades.length} trades: ${stats.wins} wins, ${stats.losses} losses (${stats.winRate.toFixed(1)}% win rate). Exit breakdown: ${stats.exitReasons.stop_loss || 0} stop losses, ${stats.exitReasons.max_hold_time_exceeded || 0} timeouts, ${stats.exitReasons.take_profit || 0} take profits.`;
+        socket.emit('portfolio-update', { ...balances, price });
+    } catch (error) {
+        console.error('Status update error:', error);
     }
-
-    if (lowerMsg.includes('market') || lowerMsg.includes('regime')) {
-        const regime = detectRegime(trades);
-        return `Current market regime: ${regime}. Top strategy: ${detectTopStrategy(trades)}. The bot is adapting accordingly.`;
-    }
-
-    if (lowerMsg.includes('portfolio') || lowerMsg.includes('balance')) {
-        const total = balances.usdt + (balances.bnb * price);
-        return `Portfolio: $${total.toFixed(2)} (${balances.usdt.toFixed(2)} USDT + ${balances.bnb.toFixed(4)} BNB @ $${price.toFixed(2)})`;
-    }
-
-    if (lowerMsg.includes('optimize') || lowerMsg.includes('improve')) {
-        const recs = [];
-        if (stats.exitReasons.max_hold_time_exceeded > 20) recs.push('Reduce max hold time to 2h');
-        if (stats.exitReasons.stop_loss > stats.wins) recs.push('Lower take profit target to 1.5%');
-        if (stats.winRate < 40) recs.push('Tighten entry criteria');
-        return recs.length > 0
-            ? `Recommendations: ${recs.join(', ')}`
-            : 'Current parameters look reasonable. Continue monitoring.';
-    }
-
-    if (lowerMsg.includes('risk') || lowerMsg.includes('stop')) {
-        return `Risk metrics: ${stats.wins}W/${stats.losses}L, Stop losses: ${stats.exitReasons.stop_loss || 0}, Timeouts: ${stats.exitReasons.max_hold_time_exceeded || 0}. Risk level: ${stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH'}`;
-    }
-
-    return `I can help with: trades/performance, market/regime, portfolio/balance, risk analysis, or optimization suggestions. What would you like to know?`;
-}
-
-function generateAgentResponse(agentName, topic, stats) {
-    const responses = {
-        'Strategist': [
-            `Win rate at ${stats.winRate.toFixed(1)}% - ${stats.winRate >= 50 ? 'strategy is effective' : 'consider parameter adjustments'}`,
-            `${stats.exitReasons.max_hold_time_exceeded || 0} timeouts suggest ${stats.exitReasons.max_hold_time_exceeded > 20 ? 'reducing hold time' : 'hold time is appropriate'}`,
-            `Top strategy performing: ${detectTopStrategy([])} - maintain current approach`
-        ],
-        'Analyst': [
-            `Data shows ${stats.totalTrades} trades: ${stats.wins}W/${stats.losses}L pattern`,
-            `Stop loss rate: ${((stats.exitReasons.stop_loss || 0) / stats.totalTrades * 100).toFixed(1)}% of exits`,
-            `Timeout rate: ${((stats.exitReasons.max_hold_time_exceeded || 0) / stats.totalTrades * 100).toFixed(1)}% - ${stats.exitReasons.max_hold_time_exceeded > 30 ? 'concerning' : 'acceptable'}`
-        ],
-        'Risk Manager': [
-            `Risk level: ${stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH'}`,
-            `${stats.exitReasons.stop_loss || 0} stop losses triggered - ${stats.exitReasons.stop_loss > stats.wins ? 'review stop loss levels' : 'acceptable'}`,
-            `Recommend ${stats.winRate < 40 ? 'reducing' : 'maintaining'} position sizes`
-        ],
-        'Executor': [
-            `${stats.totalTrades} trades executed successfully in shadow mode`,
-            `Ready to implement any approved strategy changes`,
-            `Monitoring market conditions for optimal entry points`
-        ]
-    };
-
-    const agentResponses = responses[agentName] || ['Analyzing...'];
-    return agentResponses[Math.floor(Math.random() * agentResponses.length)];
 }
 
 // Periodic updates
 setInterval(async () => {
-    const running = await isBotRunning();
-    const balances = getVirtualBalances();
-    const trades = getShadowTrades();
-    const stats = calculateStats(trades);
-    const price = await fetchLiveBnbPrice();
-    const summary = getMonitoringSummary();
-    const regime = summary?.logAnalysis?.regime || detectRegime(trades);
+    try {
+        const [running, binanceData, technical, fearGreed] = await Promise.all([
+            isBotRunning(),
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
 
-    io.emit('bot-status', {
-        running,
-        strategy: summary?.strategy || detectTopStrategy(trades),
-        regime,
-        confidence: 0.75,
-        stats,
-        market: {
-            price,
-            change24h: 1.5,
-            volume24h: '$1.2B',
-            volatility: calculateVolatility(trades)
-        }
-    });
+        const balances = getVirtualBalances();
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+        const price = binanceData?.bnb?.price || 700;
 
-    io.emit('portfolio-update', {
-        ...balances,
-        price
-    });
-}, 5000);
+        io.emit('bot-status', {
+            running,
+            strategy: detectTopStrategy(trades),
+            regime: detectRegime(trades),
+            confidence: 0.75,
+            stats,
+            market: {
+                price,
+                change24h: binanceData?.bnb?.change24h || 0,
+                btcPrice: binanceData?.btc?.price || 0,
+                rsi: technical.rsi,
+                trend: technical.trend,
+                fearGreed: fearGreed[0]?.value || 50
+            }
+        });
 
-// Update price cache periodically
-setInterval(async () => {
-    await fetchLiveBnbPrice();
-}, 30000);
+        io.emit('portfolio-update', { ...balances, price });
+    } catch (error) {}
+}, 10000);
 
-// Start server
-server.listen(PORT, () => {
+// ============== START SERVER ==============
+server.listen(PORT, async () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║          AlgoQBot Production Monitor Server                  ║
+║        AlgoQBot Production Monitor - Enhanced                ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Status: Running                                             ║
 ║  Port: ${PORT}                                                   ║
 ║  URL: http://localhost:${PORT}                                  ║
-║  Live Price: Fetching from Binance API                       ║
+╠══════════════════════════════════════════════════════════════╣
+║  Live Data Sources:                                          ║
+║  • Binance API - BNB/BTC prices                              ║
+║  • CoinGecko - Market data                                   ║
+║  • Alternative.me - Fear & Greed Index                       ║
+║  • Technical Indicators - RSI, SMA, Trends                   ║
 ╚══════════════════════════════════════════════════════════════╝
     `);
 
-    // Initial price fetch
-    fetchLiveBnbPrice().then(price => {
-        console.log(`  Initial BNB price: $${price.toFixed(2)}`);
-    });
+    // Initial data fetch
+    try {
+        const price = await fetchBinancePrice();
+        const fg = await fetchFearGreedIndex();
+        const tech = await fetchTechnicalData();
+        console.log(`  BNB: $${price?.bnb?.price?.toFixed(2) || 'N/A'}`);
+        console.log(`  Fear & Greed: ${fg[0]?.value || 'N/A'} (${fg[0]?.value_classification || 'N/A'})`);
+        console.log(`  RSI: ${tech?.rsi?.toFixed(1) || 'N/A'}`);
+    } catch (e) {
+        console.log('  Initial fetch: Using cached data');
+    }
 });
 
 module.exports = { app, server, io };
