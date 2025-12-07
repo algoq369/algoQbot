@@ -1,0 +1,6 @@
+{
+  "claude": "YOUR_CLAUDE_API_KEY",
+  "deepseek": "YOUR_DEEPSEEK_API_KEY",
+  "qween": "YOUR_QWEEN_API_KEY",
+  "huggingface": "YOUR_HUGGINGFACE_API_KEY_OPTIONAL"
+}

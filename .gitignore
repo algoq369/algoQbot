@@ -103,3 +103,4 @@ logs_backup_*
 
 # Nested project directories (duplicates)
 bsc-ranging-bot/
+config/ai-keys.json
