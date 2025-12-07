@@ -127,7 +127,7 @@ const AGENT_PROFILES = {
         fullName: 'Victor Shield',
         avatar: '🛡️',
         role: 'Risk Management',
-        api: 'HuggingFace',
+        api: 'OpenRouter',
         createdAt: '2024-01-01',
         createdFor: 'Protect capital through disciplined risk control',
 
@@ -160,7 +160,7 @@ const AGENT_PROFILES = {
         fullName: 'Echo Pulse',
         avatar: '📡',
         role: 'Sentiment Analysis',
-        api: 'HuggingFace',
+        api: 'OpenRouter',
         createdAt: '2024-01-01',
         createdFor: 'Monitor market sentiment and crowd psychology',
 

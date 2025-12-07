@@ -1302,7 +1302,7 @@ app.get('/api/agents/fleet', (req, res) => {
         },
         specialists: {
             agents: SPECIALIST_AGENTS,
-            description: 'HuggingFace specialists - Consulted by main agents',
+            description: 'OpenRouter FREE models - Consulted by main agents',
             count: Object.keys(SPECIALIST_AGENTS).length
         },
         total: Object.keys(AGENT_PROFILES).length

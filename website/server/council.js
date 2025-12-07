@@ -108,7 +108,7 @@ const MAIN_AGENT_DIRECTIVES = {
     }
 };
 
-// TIER 2: SPECIALIST AGENTS (Hugging Face - Consulted by Main Agents)
+// TIER 2: SPECIALIST AGENTS (OpenRouter FREE - Consulted by Main Agents)
 const SPECIALIST_AGENT_DIRECTIVES = {
     'PriceMovement': {
         directive: 'Master of price action. Read every candle, map every level, detect every momentum shift.',
@@ -122,7 +122,7 @@ const SPECIALIST_AGENT_DIRECTIVES = {
         votingWeight: 1.2,
         decisionAuthority: ['price_levels', 'patterns', 'targets'],
         tier: 'specialist',
-        apiProvider: 'huggingface'
+        apiProvider: 'openrouter'
     },
     'Microstructure': {
         directive: 'See beneath the surface. Analyze order flow, liquidity, and execution quality.',
@@ -136,7 +136,7 @@ const SPECIALIST_AGENT_DIRECTIVES = {
         votingWeight: 1.0,
         decisionAuthority: ['execution', 'liquidity', 'order_flow'],
         tier: 'specialist',
-        apiProvider: 'huggingface'
+        apiProvider: 'openrouter'
     },
     'Fundamentals': {
         directive: 'Understand the why behind the what. Fundamentals drive long-term value.',
@@ -150,7 +150,7 @@ const SPECIALIST_AGENT_DIRECTIVES = {
         votingWeight: 1.0,
         decisionAuthority: ['fundamentals', 'catalysts', 'news'],
         tier: 'specialist',
-        apiProvider: 'huggingface'
+        apiProvider: 'openrouter'
     },
     'Macro': {
         directive: 'See the forest, not just the trees. Global macro forces shape all markets.',
@@ -164,7 +164,7 @@ const SPECIALIST_AGENT_DIRECTIVES = {
         votingWeight: 1.3,
         decisionAuthority: ['macro', 'liquidity', 'correlation'],
         tier: 'specialist',
-        apiProvider: 'huggingface'
+        apiProvider: 'openrouter'
     },
     'RiskManager': {
         directive: 'Protect capital through disciplined risk control. Survival first, profits second.',
@@ -178,7 +178,7 @@ const SPECIALIST_AGENT_DIRECTIVES = {
         votingWeight: 1.8,  // Risk has veto power
         decisionAuthority: ['risk', 'position_size', 'veto', 'stops'],
         tier: 'specialist',
-        apiProvider: 'huggingface'
+        apiProvider: 'openrouter'
     },
     'Sentiment': {
         directive: 'Read the crowd. Fade extremes. Follow the smart money.',
@@ -192,7 +192,7 @@ const SPECIALIST_AGENT_DIRECTIVES = {
         votingWeight: 1.2,
         decisionAuthority: ['sentiment', 'contrarian', 'crowd'],
         tier: 'specialist',
-        apiProvider: 'huggingface'
+        apiProvider: 'openrouter'
     }
 };
 

@@ -2293,7 +2293,7 @@ function renderAgentFleet(fleetData) {
         <div class="agent-tier-section">
             <div class="tier-header specialist-tier">
                 <h3>🔬 Specialist Agents</h3>
-                <span class="tier-badge tier-specialist">HuggingFace</span>
+                <span class="tier-badge tier-specialist">OpenRouter FREE</span>
                 <p>Consulted by AlgoQ for specialized insights</p>
             </div>
             <div class="agent-cards-row">
@@ -2313,7 +2313,7 @@ function renderAgentFleet(fleetData) {
             </div>
             <div class="summary-stat">
                 <span class="summary-value">${specialistAgents.length}</span>
-                <span class="summary-label">Specialists (HF)</span>
+                <span class="summary-label">Specialists (OR)</span>
             </div>
         </div>
     `;
@@ -2322,7 +2322,7 @@ function renderAgentFleet(fleetData) {
 // Render individual agent card
 function renderAgentCard(id, agent, tier) {
     const tierClass = tier === 'main' ? 'main-agent-card' : 'specialist-agent-card';
-    const apiLabel = tier === 'main' ? agent.apiProvider?.toUpperCase() : 'HuggingFace';
+    const apiLabel = tier === 'main' ? agent.apiProvider?.toUpperCase() : 'OpenRouter';
 
     return `
         <div class="agent-profile-card ${tierClass}" onclick="showAgentDetail('${id}')" data-agent-id="${id}">

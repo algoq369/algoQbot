@@ -4,9 +4,18 @@
  * Each expert has personality, memory, and AI API connection
  *
  * API Integrations:
+ * TIER 1 - Main Agents (Premium APIs):
  * - AlgoQ (Lead AI): Claude API
- * - Strategist: DeepSeek API
- * - Analyst, RiskManager, Sentiment: Free APIs (Hugging Face)
+ * - Strategist (Marcus DeepSeek): DeepSeek API
+ * - Analyst (Dr. Qween): Mistral API
+ *
+ * TIER 2 - Specialist Agents (OpenRouter FREE models):
+ * - Price Movement (Apex Price): DeepSeek free
+ * - Microstructure (Atlas Flow): Llama 4 free
+ * - Fundamentals (Nova Fundament): DeepSeek R1 free
+ * - Macro (Titan Macro): Gemini free
+ * - Risk Manager (Victor Shield): Llama 4 free
+ * - Sentiment (Echo Pulse): DeepSeek free
  */
 
 const fs = require('fs');
@@ -27,7 +36,7 @@ let API_KEYS = {
     claude: process.env.CLAUDE_API_KEY || '',
     deepseek: process.env.DEEPSEEK_API_KEY || '',
     qween: process.env.QWEEN_API_KEY || '',
-    huggingface: process.env.HF_API_KEY || ''
+    openrouter: process.env.OPENROUTER_API_KEY || ''
 };
 
 // Load API keys from config file if exists
@@ -150,15 +159,15 @@ const MAIN_AGENTS = {
     }
 };
 
-// TIER 2: SPECIALIST AGENTS (Hugging Face - Consulted by Main Agents)
+// TIER 2: SPECIALIST AGENTS (OpenRouter FREE - Consulted by Main Agents)
 const SPECIALIST_AGENTS = {
     'PriceMovement': {
         name: 'Apex Price',
         role: 'Price Movement Specialist',
         avatar: '📈',
         tier: 'specialist',
-        apiProvider: 'huggingface',
-        hfModel: 'mistralai/Mistral-7B-Instruct-v0.2',
+        apiProvider: 'openrouter',
+        openRouterModel: 'deepseek/deepseek-chat-v3-0324:free',
         personality: {
             style: 'dynamic',
             tone: 'action-oriented',
@@ -207,8 +216,8 @@ Be specific. Use numbers. No vague statements.`,
         role: 'Microstructure Specialist',
         avatar: '🔬',
         tier: 'specialist',
-        apiProvider: 'huggingface',
-        hfModel: 'mistralai/Mistral-7B-Instruct-v0.2',
+        apiProvider: 'openrouter',
+        openRouterModel: 'meta-llama/llama-4-maverick:free',
         personality: {
             style: 'granular',
             tone: 'technical',
@@ -258,8 +267,8 @@ Focus on flow and depth. Be the eyes inside the order book.`,
         role: 'Fundamentals Specialist',
         avatar: '📋',
         tier: 'specialist',
-        apiProvider: 'huggingface',
-        hfModel: 'mistralai/Mistral-7B-Instruct-v0.2',
+        apiProvider: 'openrouter',
+        openRouterModel: 'deepseek/deepseek-r1:free',
         personality: {
             style: 'investigative',
             tone: 'research-driven',
@@ -309,8 +318,8 @@ Ground everything in facts. Link fundamentals to price impact.`,
         role: 'Macro Specialist',
         avatar: '🌍',
         tier: 'specialist',
-        apiProvider: 'huggingface',
-        hfModel: 'mistralai/Mistral-7B-Instruct-v0.2',
+        apiProvider: 'openrouter',
+        openRouterModel: 'google/gemini-2.0-flash-exp:free',
         personality: {
             style: 'big-picture',
             tone: 'authoritative',
@@ -360,8 +369,8 @@ Think like a macro hedge fund. Connect dots between global flows and crypto.`,
         role: 'Chief Risk Officer',
         avatar: '🛡️',
         tier: 'specialist',
-        apiProvider: 'huggingface',
-        hfModel: 'mistralai/Mistral-7B-Instruct-v0.2',
+        apiProvider: 'openrouter',
+        openRouterModel: 'meta-llama/llama-4-maverick:free',
         personality: {
             style: 'cautious',
             tone: 'serious',
@@ -402,8 +411,8 @@ You are the guardian. Survival is your mandate.`,
         role: 'Market Sentiment Analyst',
         avatar: '📡',
         tier: 'specialist',
-        apiProvider: 'huggingface',
-        hfModel: 'mistralai/Mistral-7B-Instruct-v0.2',
+        apiProvider: 'openrouter',
+        openRouterModel: 'deepseek/deepseek-chat-v3-0324:free',
         personality: {
             style: 'intuitive',
             tone: 'observant',
@@ -749,44 +758,56 @@ async function callQweenAPI(prompt, agentName, context) {
     });
 }
 
-// Hugging Face API call (for specialist agents)
-async function callHuggingFaceAPI(prompt, agentName, context) {
-    if (!API_KEYS.huggingface) {
+// OpenRouter API call (for specialist agents - FREE models)
+async function callOpenRouterAPI(prompt, agentName, context) {
+    if (!API_KEYS.openrouter) {
+        console.log(`⚠️ OpenRouter API key not configured for ${agentName}`);
         return null;
     }
 
     return new Promise((resolve) => {
         const agent = AGENT_PROFILES[agentName];
 
+        // Use the agent's specific model or default to DeepSeek free
+        const model = agent.openRouterModel || 'deepseek/deepseek-chat-v3-0324:free';
+
         // Use specialized system prompt if available, otherwise generate one
         const systemPrompt = agent.systemPrompt ||
-            `You are ${agent.name}, ${agent.role} for AlgoQBot. ${agent.vision}. ` +
+            `You are ${agent.name}, ${agent.role} for AlgoQBot trading system. ${agent.vision}. ` +
             `Your expertise: ${agent.expertise.join(', ')}. ` +
-            `Be specific, use numbers, provide actionable insights.`;
+            `Be specific, use exact numbers, provide actionable trading insights.`;
 
         // Format context for the specialist
         const formattedContext = formatContextForSpecialist(agentName, context);
 
         const data = JSON.stringify({
-            inputs: `<s>[INST] ${systemPrompt}\n\nCurrent Market Context:\n${formattedContext}\n\nQuery: ${prompt} [/INST]`,
-            parameters: {
-                max_new_tokens: 800,
-                temperature: 0.7,
-                do_sample: true,
-                top_p: 0.95,
-                return_full_text: false
-            }
+            model: model,
+            messages: [
+                {
+                    role: 'system',
+                    content: systemPrompt
+                },
+                {
+                    role: 'user',
+                    content: `Current Market Context:\n${formattedContext}\n\nQuery: ${prompt}\n\nProvide a detailed, specific analysis with exact numbers, levels, and actionable recommendations.`
+                }
+            ],
+            max_tokens: 1200,
+            temperature: 0.7,
+            top_p: 0.9
         });
 
-        const modelPath = agent.hfModel ? `/models/${agent.hfModel}` : '/models/mistralai/Mistral-7B-Instruct-v0.2';
+        console.log(`🤖 Calling OpenRouter [${model}] for ${agentName}...`);
 
         const options = {
-            hostname: 'api-inference.huggingface.co',
-            path: modelPath,
+            hostname: 'openrouter.ai',
+            path: '/api/v1/chat/completions',
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEYS.huggingface}`
+                'Authorization': `Bearer ${API_KEYS.openrouter}`,
+                'HTTP-Referer': 'https://algoqbot.com',
+                'X-Title': 'AlgoQBot Trading System'
             }
         };
 
@@ -797,24 +818,34 @@ async function callHuggingFaceAPI(prompt, agentName, context) {
                 try {
                     const response = JSON.parse(body);
                     if (response.error) {
-                        console.log(`HuggingFace API error for ${agentName}:`, response.error);
+                        console.log(`❌ OpenRouter error for ${agentName}:`, response.error.message || response.error);
                         resolve(null);
                     } else {
-                        const text = response[0]?.generated_text || '';
+                        const text = response.choices?.[0]?.message?.content || '';
+                        const usage = response.usage;
+                        if (usage) {
+                            console.log(`✅ ${agentName} response received (${usage.total_tokens} tokens used)`);
+                        } else {
+                            console.log(`✅ ${agentName} response received`);
+                        }
                         resolve(text.trim() || null);
                     }
                 } catch (e) {
-                    console.log(`HuggingFace parse error for ${agentName}:`, e.message);
+                    console.log(`❌ OpenRouter parse error for ${agentName}:`, e.message);
                     resolve(null);
                 }
             });
         });
 
         req.on('error', (e) => {
-            console.log(`HuggingFace connection error for ${agentName}:`, e.message);
+            console.log(`❌ OpenRouter connection error for ${agentName}:`, e.message);
             resolve(null);
         });
-        req.setTimeout(30000, () => { req.destroy(); resolve(null); });
+        req.setTimeout(45000, () => {
+            console.log(`⏱️ OpenRouter timeout for ${agentName}`);
+            req.destroy();
+            resolve(null);
+        });
         req.write(data);
         req.end();
     });
@@ -896,8 +927,8 @@ async function consultSpecialist(specialistId, query, context) {
 
     console.log(`🔄 AlgoQ consulting ${specialist.name} (${specialist.role})...`);
 
-    // Try HuggingFace API
-    let response = await callHuggingFaceAPI(query, specialistId, context);
+    // Try OpenRouter API (free models)
+    let response = await callOpenRouterAPI(query, specialistId, context);
 
     // If API fails, generate local specialist response
     if (!response) {
@@ -1319,8 +1350,8 @@ async function generateEnhancedAIResponse(agentId, message, context) {
         aiResponse = await callDeepSeekAPI(message, agentContext);
     } else if (agent.apiProvider === 'qween') {
         aiResponse = await callQweenAPI(message, agentId, agentContext);
-    } else if (agent.apiProvider === 'huggingface') {
-        aiResponse = await callHuggingFaceAPI(message, agentId, agentContext);
+    } else if (agent.apiProvider === 'openrouter') {
+        aiResponse = await callOpenRouterAPI(message, agentId, agentContext);
     }
 
     // If AI API returned a response, format and return it
@@ -1608,7 +1639,7 @@ async function testApiConnections() {
         claude: { configured: false, connected: false, status: 'not configured', details: null },
         deepseek: { configured: false, connected: false, status: 'not configured', details: null },
         qween: { configured: false, connected: false, status: 'not configured', details: null },
-        huggingface: { configured: false, connected: false, status: 'not configured', details: null }
+        openrouter: { configured: false, connected: false, status: 'not configured', details: null }
     };
 
     console.log('🔍 Testing API connections...');
@@ -1794,24 +1825,27 @@ async function testApiConnections() {
         }
     }
 
-    // Test HuggingFace API
-    if (API_KEYS.huggingface && API_KEYS.huggingface !== 'YOUR_HUGGINGFACE_API_KEY_HERE') {
-        results.huggingface.configured = true;
-        console.log('  Testing HuggingFace API...');
+    // Test OpenRouter API (for specialist agents)
+    if (API_KEYS.openrouter && API_KEYS.openrouter !== 'YOUR_OPENROUTER_API_KEY_HERE') {
+        results.openrouter.configured = true;
+        console.log('  Testing OpenRouter API...');
         try {
             const testResult = await new Promise((resolve) => {
                 const data = JSON.stringify({
-                    inputs: '<s>[INST] Say "connected" if you receive this. [/INST]',
-                    parameters: { max_new_tokens: 10, temperature: 0.1 }
+                    model: 'deepseek/deepseek-chat-v3-0324:free',
+                    messages: [{ role: 'user', content: 'Say "connected" if you receive this.' }],
+                    max_tokens: 15
                 });
 
                 const options = {
-                    hostname: 'api-inference.huggingface.co',
-                    path: '/models/mistralai/Mistral-7B-Instruct-v0.2',
+                    hostname: 'openrouter.ai',
+                    path: '/api/v1/chat/completions',
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${API_KEYS.huggingface}`
+                        'Authorization': `Bearer ${API_KEYS.openrouter}`,
+                        'HTTP-Referer': 'https://algoqbot.com',
+                        'X-Title': 'AlgoQBot'
                     }
                 };
 
@@ -1822,17 +1856,21 @@ async function testApiConnections() {
                         try {
                             const parsed = JSON.parse(body);
                             if (res.statusCode === 200 && !parsed.error) {
-                                const response = parsed[0]?.generated_text || '';
-                                console.log('  ✅ HuggingFace: Connected - Response:', response.substring(0, 50));
-                                resolve({ connected: true, status: 'connected', details: { response: response.substring(0, 100) } });
-                            } else if (res.statusCode === 401 || parsed.error?.includes('Invalid')) {
-                                console.log('  ❌ HuggingFace: Invalid API key');
+                                const response = parsed.choices?.[0]?.message?.content || '';
+                                const usage = parsed.usage;
+                                console.log('  ✅ OpenRouter: Connected - Response:', response.substring(0, 50));
+                                if (usage) {
+                                    console.log(`     Tokens used: ${usage.total_tokens}`);
+                                }
+                                resolve({ connected: true, status: 'connected', details: { response: response.substring(0, 100), tokens: usage?.total_tokens } });
+                            } else if (res.statusCode === 401) {
+                                console.log('  ❌ OpenRouter: Invalid API key');
                                 resolve({ connected: false, status: 'invalid API key', details: parsed });
-                            } else if (parsed.error?.includes('loading')) {
-                                console.log('  ⏳ HuggingFace: Model loading...');
-                                resolve({ connected: true, status: 'model loading (retry in 30s)', details: parsed });
+                            } else if (res.statusCode === 402) {
+                                console.log('  ❌ OpenRouter: Payment required - add credits');
+                                resolve({ connected: false, status: 'payment required', details: parsed });
                             } else {
-                                console.log(`  ❌ HuggingFace: Error ${res.statusCode}:`, parsed.error || body.substring(0, 100));
+                                console.log(`  ❌ OpenRouter: Error ${res.statusCode}:`, parsed.error?.message || body.substring(0, 100));
                                 resolve({ connected: false, status: `error: ${res.statusCode}`, details: parsed.error || parsed });
                             }
                         } catch (e) {
@@ -1842,21 +1880,21 @@ async function testApiConnections() {
                 });
 
                 req.on('error', (e) => {
-                    console.log('  ❌ HuggingFace: Connection error -', e.message);
+                    console.log('  ❌ OpenRouter: Connection error -', e.message);
                     resolve({ connected: false, status: 'connection error', details: e.message });
                 });
-                req.setTimeout(30000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.setTimeout(20000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
                 req.write(data);
                 req.end();
             });
-            results.huggingface = { ...results.huggingface, ...testResult };
+            results.openrouter = { ...results.openrouter, ...testResult };
         } catch (e) {
-            results.huggingface.status = 'test failed';
-            results.huggingface.details = e.message;
+            results.openrouter.status = 'test failed';
+            results.openrouter.details = e.message;
         }
-    } else if (API_KEYS.huggingface === 'YOUR_HUGGINGFACE_API_KEY_HERE') {
-        results.huggingface.status = 'placeholder key - needs real key';
-        console.log('  ⚠️ HuggingFace: Placeholder key detected - add your real API key');
+    } else if (API_KEYS.openrouter === 'YOUR_OPENROUTER_API_KEY_HERE') {
+        results.openrouter.status = 'placeholder key - needs real key';
+        console.log('  ⚠️ OpenRouter: Placeholder key detected - add your real API key');
     }
 
     console.log('🔍 API test complete');
