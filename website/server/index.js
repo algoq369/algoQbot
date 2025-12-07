@@ -77,7 +77,8 @@ function fetchJson(url, timeout = 10000) {
 // ============== BOT PROCESS STATUS ==============
 function getBotProcessInfo() {
     return new Promise((resolve) => {
-        exec('ps aux | grep -E "start-shadow-mode.js|start-with-web-interface.js|AdvancedTradingBot" | grep -v grep | head -1', (error, stdout) => {
+        // Match all possible bot startup scripts
+        exec('ps aux | grep -E "start-shadow-mode|start-with-web-interface|start-bot-auto|AdvancedTradingBot|algoQbot.*node" | grep -v grep | grep -v "website/server" | head -1', (error, stdout) => {
             if (stdout.trim()) {
                 const parts = stdout.trim().split(/\s+/);
                 const pid = parts[1];
