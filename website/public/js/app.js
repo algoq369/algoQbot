@@ -326,7 +326,12 @@ function addChatMessage(content, role) {
     const container = document.getElementById('chat-messages');
     const msg = document.createElement('div');
     msg.className = `message ${role}`;
-    msg.innerHTML = `<div class="message-content"><p>${content}</p></div>`;
+    // Support markdown-style formatting
+    const formatted = content
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>')
+        .replace(/• /g, '&bull; ');
+    msg.innerHTML = `<div class="message-content">${formatted}</div>`;
     container.appendChild(msg);
     container.scrollTop = container.scrollHeight;
 }
@@ -334,6 +339,45 @@ function addChatMessage(content, role) {
 function handleChatKeypress(event) {
     if (event.key === 'Enter') {
         sendChatMessage();
+    }
+}
+
+// Trading Ideas Function
+async function getTradingIdeas() {
+    addChatMessage('💡 Generating trading ideas based on current market conditions...', 'user');
+
+    try {
+        const response = await fetch('/api/trading-ideas');
+        const data = await response.json();
+
+        if (data.ideas && data.ideas.length > 0) {
+            let content = `🎯 **AI Trading Ideas** (Generated: ${new Date().toLocaleTimeString()})\n\n`;
+            content += `**Market Context:** BNB $${data.market.price.toFixed(2)} | RSI: ${data.market.rsi.toFixed(1)} | ${data.market.trend} | F&G: ${data.market.fearGreed}\n\n`;
+            content += `---\n\n`;
+
+            data.ideas.forEach((idea, i) => {
+                content += `**${i + 1}. ${idea.strategy}** [${idea.type}]\n`;
+                content += `• Confidence: ${idea.confidence}%\n`;
+                content += `• ${idea.reasoning}\n`;
+                if (idea.entry) content += `• Entry: $${idea.entry.toFixed(2)}\n`;
+                if (idea.target) content += `• Target: $${idea.target.toFixed(2)}\n`;
+                if (idea.stopLoss) content += `• Stop: $${idea.stopLoss.toFixed(2)}\n`;
+                if (idea.riskReward) content += `• Risk/Reward: ${idea.riskReward}\n`;
+                if (idea.timeframe) content += `• Timeframe: ${idea.timeframe}\n`;
+                if (idea.recommendations) {
+                    content += `• Recommendations:\n`;
+                    idea.recommendations.forEach(r => content += `  - ${r}\n`);
+                }
+                content += '\n';
+            });
+
+            addChatMessage(content, 'assistant');
+        } else {
+            addChatMessage('📊 **No Clear Opportunities**\n\nCurrent market conditions don\'t present strong trading signals. This is normal - patience is key to profitable trading. Continue monitoring and wait for better setups.', 'assistant');
+        }
+    } catch (error) {
+        console.error('Failed to get trading ideas:', error);
+        addChatMessage('❌ Failed to generate trading ideas. Please try again.', 'assistant');
     }
 }
 

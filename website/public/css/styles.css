@@ -564,6 +564,18 @@ body {
     color: var(--text-primary);
 }
 
+.quick-btn.trading-ideas-btn {
+    background: linear-gradient(135deg, var(--accent-orange), var(--accent-purple));
+    border: none;
+    color: white;
+    font-weight: 600;
+}
+
+.quick-btn.trading-ideas-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 167, 38, 0.4);
+}
+
 .chat-input-container {
     display: flex;
     gap: 0.75rem;

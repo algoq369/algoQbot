@@ -12,6 +12,14 @@ const path = require('path');
 const fs = require('fs');
 const { exec, spawn } = require('child_process');
 
+// Import AI Agents System
+const {
+    AGENT_PROFILES,
+    getAgentMemory,
+    generateTradingIdea,
+    generateEnhancedAIResponse
+} = require('./agents');
+
 // Configuration
 const PORT = process.env.PORT || 9000;
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
@@ -626,11 +634,41 @@ async function generateAIResponse(message, context) {
     const binanceData = await fetchBinancePrice();
     const technical = await fetchTechnicalData();
     const fearGreed = await fetchFearGreedIndex();
+    const logs = getRecentLogs(50);
     const price = binanceData?.bnb?.price || 700;
     const total = balances.usdt + (balances.bnb * price);
     const botInfo = await getBotProcessInfo();
 
+    // Build comprehensive context for AI agents
+    const fullContext = {
+        botData: {
+            running: botInfo.running,
+            pid: botInfo.pid,
+            uptime: botInfo.uptime,
+            cpu: botInfo.cpu,
+            memory: botInfo.memory,
+            stats,
+            regime: detectRegime(trades)
+        },
+        marketData: binanceData,
+        technical,
+        sentiment: {
+            value: fearGreed[0]?.value || 50,
+            classification: fearGreed[0]?.value_classification || 'Neutral'
+        },
+        logs,
+        trades,
+        balances,
+        total
+    };
+
+    // Use enhanced AI response with AlgoQ agent
     const lowerMsg = message.toLowerCase();
+
+    // Check for trading ideas specifically
+    if (lowerMsg.includes('idea') || lowerMsg.includes('opportunity') || lowerMsg.includes('trade idea')) {
+        return generateEnhancedAIResponse('AlgoQ', message, fullContext);
+    }
 
     // Bot status
     if (lowerMsg.includes('status') || lowerMsg.includes('running') || lowerMsg.includes('bot')) {
@@ -718,48 +756,32 @@ async function generateAIResponse(message, context) {
             `**Momentum:** ${technical.momentum || 'N/A'}`;
     }
 
-    // Default
-    return `🤖 **AlgoQBot Assistant**\n\n` +
-        `I can help with:\n` +
-        `• **status** - Bot running status\n` +
-        `• **market** - Live prices & analysis\n` +
-        `• **portfolio** - Your holdings\n` +
-        `• **trades** - Performance stats\n` +
-        `• **risk** - Risk assessment\n` +
-        `• **technical** - RSI, SMA, trends\n\n` +
-        `What would you like to know?`;
+    // Use AlgoQ for all other queries (enhanced with full context)
+    return generateEnhancedAIResponse('AlgoQ', message, fullContext);
 }
 
-// ============== AI COUNCIL AGENTS ==============
+// ============== AI COUNCIL AGENTS - ENHANCED ==============
 async function generateCouncilResponse(agentName, topic, stats, technical, fearGreed) {
     const fg = fearGreed[0] || { value: 50 };
+    const agent = AGENT_PROFILES[agentName] || AGENT_PROFILES['Strategist'];
+    const memory = getAgentMemory(agentName);
 
-    const responses = {
-        'Strategist': () => {
-            if (stats.winRate < 40) return `Win rate at ${stats.winRate.toFixed(1)}% needs attention. Recommend reducing position sizes until we see improvement.`;
-            if (technical.trend === 'Downtrend') return `Market in downtrend. Suggest switching to mean reversion strategy.`;
-            if (technical.trend === 'Uptrend') return `Uptrend confirmed. Momentum strategy should perform well.`;
-            return `Current ranging market. Grid strategy is appropriate. Win rate: ${stats.winRate.toFixed(1)}%`;
-        },
-        'Analyst': () => {
-            return `Data analysis: ${stats.totalTrades} trades, ${stats.wins}W/${stats.losses}L. ` +
-                `RSI at ${technical.rsi?.toFixed(1) || 'N/A'} suggests ${technical.rsi > 70 ? 'overbought' : technical.rsi < 30 ? 'oversold' : 'neutral'} conditions. ` +
-                `Timeout rate: ${((stats.exitReasons.max_hold_time_exceeded || 0) / stats.totalTrades * 100).toFixed(1)}%`;
-        },
-        'Risk Manager': () => {
-            const riskLevel = stats.winRate >= 50 ? 'LOW' : stats.winRate >= 35 ? 'MEDIUM' : 'HIGH';
-            return `Risk level: ${riskLevel}. Fear & Greed at ${fg.value}. ` +
-                `${stats.exitReasons.stop_loss > 20 ? 'High stop loss rate detected. ' : ''}` +
-                `Recommend ${stats.winRate < 40 ? 'reducing' : 'maintaining'} position sizes.`;
-        },
-        'Executor': () => {
-            return `${stats.totalTrades} trades executed in shadow mode. ` +
-                `Current price action ${technical.momentum === 'Bullish' ? 'favorable' : 'unfavorable'} for entries. ` +
-                `Ready to implement council decisions.`;
-        }
+    // Build context for enhanced response
+    const context = {
+        botData: { stats, regime: 'ranging' },
+        technical,
+        sentiment: { value: fg.value, classification: fg.value_classification || 'Neutral' },
+        trades: [],
+        logs: []
     };
 
-    return responses[agentName] ? responses[agentName]() : 'Analyzing...';
+    // Get sophisticated response from agent
+    const response = generateEnhancedAIResponse(agentName, topic, context);
+
+    // Record the council interaction
+    memory.addDecision(`Council discussion: ${topic}`, { stats: stats.winRate, fg: fg.value });
+
+    return response;
 }
 
 function generateRiskRecommendations(stats, technical, fg) {
@@ -992,6 +1014,67 @@ app.get('/api/market', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to get market data' });
     }
+});
+
+// Trading Ideas endpoint - AI-generated opportunities
+app.get('/api/trading-ideas', async (req, res) => {
+    try {
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+
+        const ideas = generateTradingIdea(
+            binanceData,
+            { stats },
+            technical,
+            { value: fearGreed[0]?.value || 50, classification: fearGreed[0]?.value_classification || 'Neutral' }
+        );
+
+        res.json({
+            ideas,
+            generated: new Date().toISOString(),
+            market: {
+                price: binanceData?.bnb?.price || 0,
+                rsi: technical?.rsi || 50,
+                trend: technical?.trend || 'Unknown',
+                fearGreed: fearGreed[0]?.value || 50
+            }
+        });
+    } catch (error) {
+        console.error('Trading ideas error:', error);
+        res.status(500).json({ error: 'Failed to generate trading ideas' });
+    }
+});
+
+// Agent profiles endpoint
+app.get('/api/agents', (req, res) => {
+    const profiles = Object.entries(AGENT_PROFILES).map(([id, profile]) => ({
+        id,
+        name: profile.name,
+        role: profile.role,
+        avatar: profile.avatar,
+        expertise: profile.expertise,
+        vision: profile.vision
+    }));
+    res.json({ agents: profiles });
+});
+
+// Agent memory endpoint
+app.get('/api/agent/:id/memory', (req, res) => {
+    const { id } = req.params;
+    const memory = getAgentMemory(id);
+    res.json({
+        agentId: id,
+        interactions: memory.memory.interactions,
+        recentInsights: memory.getRecentInsights(5),
+        recentDecisions: memory.getRecentDecisions(5),
+        tradingIdeas: memory.getTradingIdeas(5)
+    });
 });
 
 // Reports endpoint
