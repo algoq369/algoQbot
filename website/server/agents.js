@@ -424,7 +424,7 @@ async function callDeepSeekAPI(prompt, context) {
     });
 }
 
-// Qween AI API call (for Analyst)
+// Qween AI API call (Mistral-based - for Analyst)
 async function callQweenAPI(prompt, agentName, context) {
     if (!API_KEYS.qween) {
         return null;
@@ -433,19 +433,20 @@ async function callQweenAPI(prompt, agentName, context) {
     return new Promise((resolve) => {
         const agent = AGENT_PROFILES[agentName];
         const data = JSON.stringify({
-            model: 'qwen-max',
+            model: 'mistral-large-latest',
             messages: [
                 {
                     role: 'system',
-                    content: `You are ${agent.name}, ${agent.role} for AlgoQBot. ${agent.vision}. You are ${agent.personality.traits.join(', ')}. Provide detailed quantitative analysis.`
+                    content: `You are ${agent.name}, ${agent.role} for AlgoQBot. ${agent.vision}. You are ${agent.personality.traits.join(', ')}. Provide detailed quantitative analysis. Be concise but thorough.`
                 },
                 { role: 'user', content: `Context: ${JSON.stringify(context)}\n\nQuery: ${prompt}` }
             ],
-            max_tokens: 1024
+            max_tokens: 1024,
+            temperature: 0.7
         });
 
         const options = {
-            hostname: 'api.qwen.ai',
+            hostname: 'api.mistral.ai',
             path: '/v1/chat/completions',
             method: 'POST',
             headers: {
@@ -460,14 +461,22 @@ async function callQweenAPI(prompt, agentName, context) {
             res.on('end', () => {
                 try {
                     const response = JSON.parse(body);
-                    resolve(response.choices?.[0]?.message?.content || null);
+                    if (response.error) {
+                        console.log('Qween API error:', response.error);
+                        resolve(null);
+                    } else {
+                        resolve(response.choices?.[0]?.message?.content || null);
+                    }
                 } catch (e) {
                     resolve(null);
                 }
             });
         });
 
-        req.on('error', () => resolve(null));
+        req.on('error', (e) => {
+            console.log('Qween API connection error:', e.message);
+            resolve(null);
+        });
         req.setTimeout(15000, () => { req.destroy(); resolve(null); });
         req.write(data);
         req.end();

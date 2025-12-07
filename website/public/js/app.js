@@ -83,6 +83,106 @@ function initSocket() {
         addCouncilEntry(data);
     });
 
+    // Council real-time events
+    socket.on('council-session-started', (data) => {
+        councilState.sessionId = data.sessionId;
+        councilState.active = true;
+        updateCouncilControls('running');
+        addCouncilEntry({ type: 'system', content: `Session started: ${data.topic || 'Market Analysis'}` });
+    });
+
+    socket.on('council-round-started', (data) => {
+        councilState.currentRound = data.round;
+        const roundInfo = document.getElementById('council-round-info');
+        if (roundInfo) roundInfo.textContent = `Round ${data.round}/${data.maxRounds}`;
+        addCouncilEntry({ type: 'round', round: data.round, maxRounds: data.maxRounds });
+    });
+
+    socket.on('council-agent-spoke', (data) => {
+        addCouncilEntry({
+            agent: data.agent,
+            content: data.discussion?.content || data.discussion?.summary || 'Analyzing...'
+        });
+    });
+
+    socket.on('council-voting-started', (data) => {
+        addCouncilEntry({ type: 'voting', content: 'Voting round started...' });
+    });
+
+    socket.on('council-agent-voted', (data) => {
+        updateAgentVote(data.agent, data.vote, data.confidence);
+    });
+
+    socket.on('council-voting-complete', (data) => {
+        updateVotingTallies(data.tallies);
+        addCouncilEntry({
+            type: 'voting',
+            content: `Voting complete: ${data.leadingDecision} leads with ${data.consensusStrength}% strength`
+        });
+    });
+
+    socket.on('council-consensus-reached', (data) => {
+        updateCouncilControls('stopped');
+        updateConsensus(data.consensus);
+        addCouncilEntry({
+            type: 'consensus',
+            content: `Consensus reached! Decision: ${data.consensus.decision} (${data.consensus.strength?.toFixed(0)}% agreement)`,
+            consensus: data.consensus
+        });
+    });
+
+    socket.on('council-consensus-forced', (data) => {
+        updateCouncilControls('stopped');
+        updateConsensus(data.consensus);
+        addCouncilEntry({
+            type: 'consensus',
+            content: `Max rounds reached. Final decision: ${data.consensus.decision} (${data.consensus.strength?.toFixed(0)}% support)`,
+            consensus: data.consensus
+        });
+    });
+
+    socket.on('council-no-consensus', (data) => {
+        addCouncilEntry({
+            type: 'system',
+            content: `No consensus in round ${data.round}. Continuing discussion...`
+        });
+    });
+
+    socket.on('council-session-paused', (data) => {
+        updateCouncilControls('paused');
+        addCouncilEntry({ type: 'system', content: 'Session paused by user.' });
+    });
+
+    socket.on('council-session-resumed', (data) => {
+        updateCouncilControls('running');
+        addCouncilEntry({ type: 'system', content: 'Session resumed.' });
+    });
+
+    socket.on('council-session-stopped', (data) => {
+        updateCouncilControls('stopped');
+        addCouncilEntry({ type: 'system', content: 'Session stopped by user.' });
+    });
+
+    socket.on('council-user-intervention', (data) => {
+        addCouncilEntry({ type: 'system', content: `Guidance noted: "${data.intervention?.message}"` });
+    });
+
+    socket.on('council-addressing-intervention', (data) => {
+        addCouncilEntry({ type: 'system', content: 'Council addressing your guidance...' });
+    });
+
+    socket.on('council-status', (data) => {
+        if (data.hasActiveSession) {
+            updateCouncilControls('running');
+        } else {
+            updateCouncilControls('idle');
+        }
+    });
+
+    socket.on('council-history', (data) => {
+        // History data received - handled in showCouncilHistory
+    });
+
     socket.on('report-data', (data) => {
         displayReport(data);
     });
@@ -650,50 +750,206 @@ function generateSummaryReport(data) {
     `;
 }
 
-// Council Functions
+// ============== COUNCIL FUNCTIONS ==============
+
+// Council state
+let councilState = {
+    active: false,
+    paused: false,
+    currentRound: 0,
+    maxRounds: 5,
+    sessionId: null
+};
+
+// Start council session
 function startCouncilSession() {
+    const topicInput = document.getElementById('council-topic');
+    const topic = topicInput ? topicInput.value.trim() : '';
+
     const log = document.getElementById('council-log');
     log.innerHTML = `
         <div class="council-entry system">
-            <span class="entry-content">New council session started. All agents ready.</span>
+            <span class="entry-content">Initializing council session... Agents preparing for discussion.</span>
         </div>
     `;
-    socket.emit('council-start');
+
+    // Reset voting display
+    resetVotingDisplay();
+
+    socket.emit('council-start', { topic: topic || 'Market Analysis & Trading Strategy' });
+
+    // Update UI
+    updateCouncilControls('running');
 }
 
-function submitToCouncil() {
-    const input = document.getElementById('council-input');
-    const topic = input.value.trim();
+function startCouncilWithTopic() {
+    startCouncilSession();
+}
 
-    if (!topic) return;
+function pauseCouncil() {
+    socket.emit('council-pause');
+    updateCouncilControls('paused');
+}
+
+function resumeCouncil() {
+    socket.emit('council-resume');
+    updateCouncilControls('running');
+}
+
+function stopCouncil() {
+    socket.emit('council-stop');
+    updateCouncilControls('stopped');
+}
+
+function restartCouncil() {
+    const topicInput = document.getElementById('council-topic');
+    const topic = topicInput ? topicInput.value.trim() : '';
+
+    socket.emit('council-restart', { topic: topic || 'Market Analysis & Trading Strategy' });
+    updateCouncilControls('running');
+
+    const log = document.getElementById('council-log');
+    log.innerHTML = `
+        <div class="council-entry system">
+            <span class="entry-content">Council session restarted. Fresh analysis beginning...</span>
+        </div>
+    `;
+    resetVotingDisplay();
+}
+
+function sendCouncilGuidance() {
+    const input = document.getElementById('council-input');
+    const message = input.value.trim();
+
+    if (!message) return;
 
     addCouncilEntry({
-        type: 'user',
-        content: topic
+        type: 'user-guidance',
+        content: `📣 Your guidance: "${message}"`
     });
 
+    socket.emit('council-intervene', { message });
     input.value = '';
-    socket.emit('council-discuss', { topic });
+}
+
+function updateCouncilControls(state) {
+    const btnStart = document.getElementById('btn-council-start');
+    const btnPause = document.getElementById('btn-council-pause');
+    const btnResume = document.getElementById('btn-council-resume');
+    const btnStop = document.getElementById('btn-council-stop');
+    const btnRestart = document.getElementById('btn-council-restart');
+    const statusIndicator = document.getElementById('council-status-indicator');
+    const statusText = document.getElementById('council-status-text');
+
+    switch (state) {
+        case 'running':
+            councilState.active = true;
+            councilState.paused = false;
+            btnStart.disabled = true;
+            btnPause.disabled = false;
+            btnResume.disabled = true;
+            btnStop.disabled = false;
+            btnRestart.disabled = false;
+            statusIndicator.className = 'status-indicator active';
+            statusIndicator.style.color = '#4caf50';
+            statusText.textContent = 'In Session';
+            break;
+        case 'paused':
+            councilState.paused = true;
+            btnStart.disabled = true;
+            btnPause.disabled = true;
+            btnResume.disabled = false;
+            btnStop.disabled = false;
+            btnRestart.disabled = false;
+            statusIndicator.style.color = '#ff9800';
+            statusText.textContent = 'Paused';
+            break;
+        case 'stopped':
+        case 'idle':
+            councilState.active = false;
+            councilState.paused = false;
+            btnStart.disabled = false;
+            btnPause.disabled = true;
+            btnResume.disabled = true;
+            btnStop.disabled = true;
+            btnRestart.disabled = true;
+            statusIndicator.style.color = '#888';
+            statusText.textContent = 'Idle';
+            break;
+    }
+}
+
+function resetVotingDisplay() {
+    ['long', 'short', 'hold', 'reduce'].forEach(vote => {
+        const fill = document.getElementById(`tally-fill-${vote}`);
+        const score = document.getElementById(`tally-score-${vote}`);
+        if (fill) fill.style.width = '0%';
+        if (score) score.textContent = '0';
+    });
+
+    const consensusFill = document.getElementById('consensus-fill');
+    const consensusValue = document.getElementById('consensus-value');
+    const consensusDecision = document.getElementById('consensus-decision');
+    const actionPlan = document.getElementById('action-plan');
+
+    if (consensusFill) consensusFill.style.width = '0%';
+    if (consensusValue) consensusValue.textContent = '--';
+    if (consensusDecision) consensusDecision.textContent = 'Awaiting council';
+    if (actionPlan) actionPlan.style.display = 'none';
+
+    // Reset all member votes
+    ['AlgoQ', 'Strategist', 'Analyst', 'RiskManager', 'Sentiment'].forEach(agent => {
+        const voteEl = document.getElementById(`vote-${agent}`);
+        if (voteEl) voteEl.textContent = '';
+    });
 }
 
 function addCouncilEntry(data) {
     const log = document.getElementById('council-log');
     const entry = document.createElement('div');
+    const time = new Date().toLocaleTimeString();
 
-    if (data.type === 'user') {
+    if (data.type === 'user' || data.type === 'user-guidance') {
         entry.className = 'council-entry user';
-        entry.innerHTML = `<span class="entry-content"><strong>You:</strong> ${data.content}</span>`;
-    } else if (data.agent) {
-        entry.className = 'council-entry agent';
         entry.innerHTML = `
-            <span class="agent-name">${data.agent}:</span>
+            <span class="entry-time">${time}</span>
             <span class="entry-content">${data.content}</span>
         `;
-        updateMemberStatus(data.agent, 'thinking');
-        setTimeout(() => updateMemberStatus(data.agent, 'ready'), 2000);
+    } else if (data.agent) {
+        entry.className = 'council-entry agent';
+        const formatted = (data.content || '')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+        entry.innerHTML = `
+            <span class="entry-time">${time}</span>
+            <span class="agent-badge">${getAgentEmoji(data.agent)} ${data.agent}</span>
+            <span class="entry-content">${formatted}</span>
+        `;
+        updateMemberStatus(data.agent, 'speaking');
+        setTimeout(() => updateMemberStatus(data.agent, 'ready'), 3000);
+    } else if (data.type === 'round') {
+        entry.className = 'council-entry round-marker';
+        entry.innerHTML = `
+            <span class="round-badge">Round ${data.round} of ${data.maxRounds}</span>
+        `;
+    } else if (data.type === 'voting') {
+        entry.className = 'council-entry voting';
+        entry.innerHTML = `
+            <span class="entry-time">${time}</span>
+            <span class="entry-content">🗳️ ${data.content}</span>
+        `;
+    } else if (data.type === 'consensus') {
+        entry.className = 'council-entry consensus';
+        entry.innerHTML = `
+            <span class="entry-time">${time}</span>
+            <span class="entry-content">✅ ${data.content}</span>
+        `;
     } else {
         entry.className = 'council-entry system';
-        entry.innerHTML = `<span class="entry-content">${data.content}</span>`;
+        entry.innerHTML = `
+            <span class="entry-time">${time}</span>
+            <span class="entry-content">${data.content}</span>
+        `;
     }
 
     log.appendChild(entry);
@@ -705,28 +961,205 @@ function addCouncilEntry(data) {
     }
 }
 
+function getAgentEmoji(agent) {
+    const emojis = {
+        'AlgoQ': '🤖',
+        'Strategist': '🎯',
+        'Analyst': '📊',
+        'RiskManager': '🛡️',
+        'Sentiment': '📡'
+    };
+    return emojis[agent] || '💬';
+}
+
 function updateMemberStatus(agentName, status) {
-    const member = document.querySelector(`.member-card[data-agent="${agentName.toLowerCase()}"]`);
+    const member = document.getElementById(`member-${agentName}`);
     if (member) {
         const statusEl = member.querySelector('.member-status');
         statusEl.className = `member-status ${status}`;
-        statusEl.textContent = status === 'thinking' ? 'Thinking...' : 'Ready';
+
+        const statusTexts = {
+            'ready': 'Ready',
+            'speaking': 'Speaking...',
+            'thinking': 'Thinking...',
+            'voting': 'Voting...'
+        };
+        statusEl.textContent = statusTexts[status] || status;
     }
+}
+
+function updateVotingTallies(tallies) {
+    if (!tallies) return;
+
+    const total = Object.values(tallies).reduce((a, b) => a + b, 0) || 1;
+
+    Object.entries(tallies).forEach(([vote, score]) => {
+        const voteKey = vote.toLowerCase();
+        const fill = document.getElementById(`tally-fill-${voteKey}`);
+        const scoreEl = document.getElementById(`tally-score-${voteKey}`);
+
+        if (fill) {
+            const pct = (score / total) * 100;
+            fill.style.width = `${pct}%`;
+        }
+        if (scoreEl) {
+            scoreEl.textContent = score.toFixed(1);
+        }
+    });
+}
+
+function updateAgentVote(agent, vote, confidence) {
+    const voteEl = document.getElementById(`vote-${agent}`);
+    if (voteEl) {
+        const colors = {
+            'LONG': '#4caf50',
+            'SHORT': '#f44336',
+            'HOLD': '#ff9800',
+            'REDUCE': '#9c27b0'
+        };
+        voteEl.innerHTML = `<span style="color: ${colors[vote] || '#888'}">${vote} (${(confidence * 100).toFixed(0)}%)</span>`;
+    }
+    updateMemberStatus(agent, 'voting');
 }
 
 function updateConsensus(data) {
     const fill = document.getElementById('consensus-fill');
     const value = document.getElementById('consensus-value');
-    const action = document.querySelector('.consensus-action .action-value');
+    const decision = document.getElementById('consensus-decision');
+    const actionPlan = document.getElementById('action-plan');
+    const actionSteps = document.getElementById('action-plan-steps');
 
-    fill.style.width = `${data.agreement || 0}%`;
-    value.textContent = `${(data.agreement || 0).toFixed(0)}% Agreement`;
-    action.textContent = data.action || 'Awaiting discussion';
+    if (fill) fill.style.width = `${data.strength || data.agreement || 0}%`;
+    if (value) value.textContent = `${(data.strength || data.agreement || 0).toFixed(0)}% Agreement`;
+    if (decision) decision.textContent = data.decision || data.action || 'Awaiting council';
+
+    // Show action plan if available
+    if (data.actionPlan && actionPlan && actionSteps) {
+        actionPlan.style.display = 'block';
+        actionSteps.innerHTML = data.actionPlan.steps
+            ? data.actionPlan.steps.map(s => `<li>${s}</li>`).join('')
+            : '';
+    }
 }
 
 function handleCouncilKeypress(event) {
     if (event.key === 'Enter') {
-        submitToCouncil();
+        sendCouncilGuidance();
+    }
+}
+
+function handleTopicKeypress(event) {
+    if (event.key === 'Enter') {
+        startCouncilWithTopic();
+    }
+}
+
+// Council history functions
+async function showCouncilHistory() {
+    const modal = document.getElementById('council-history-modal');
+    modal.classList.remove('hidden');
+
+    try {
+        const response = await fetch('/api/council/history?limit=20');
+        const data = await response.json();
+
+        // Update stats
+        document.getElementById('history-total').textContent = data.totalSessions || 0;
+        document.getElementById('history-consensus').textContent = data.successfulConsensus || 0;
+        document.getElementById('history-rate').textContent = `${data.successRate || 0}%`;
+
+        // Populate list
+        const list = document.getElementById('history-list');
+        if (data.sessions && data.sessions.length > 0) {
+            list.innerHTML = data.sessions.map(session => `
+                <div class="history-item" onclick="viewSessionDetails('${session.sessionId}')">
+                    <div class="history-item-header">
+                        <span class="session-topic">${session.topic || 'Market Analysis'}</span>
+                        <span class="session-date">${new Date(session.startTime).toLocaleString()}</span>
+                    </div>
+                    <div class="history-item-body">
+                        <span class="session-rounds">Rounds: ${session.currentRound}/${session.maxRounds}</span>
+                        <span class="session-decision ${session.consensus ? 'has-consensus' : ''}">
+                            ${session.consensus ? `Decision: ${session.consensus.decision}` : 'No consensus'}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            list.innerHTML = '<p class="empty">No council sessions yet.</p>';
+        }
+    } catch (error) {
+        console.error('Failed to load history:', error);
+        document.getElementById('history-list').innerHTML = '<p class="error">Failed to load history</p>';
+    }
+}
+
+function hideCouncilHistory() {
+    const modal = document.getElementById('council-history-modal');
+    modal.classList.add('hidden');
+}
+
+async function viewSessionDetails(sessionId) {
+    try {
+        const response = await fetch(`/api/council/session/${sessionId}`);
+        const session = await response.json();
+
+        // Show session details in the history log
+        const historyLog = document.getElementById('council-history-log');
+        historyLog.innerHTML = '';
+
+        // Add discussions
+        if (session.discussions) {
+            session.discussions.forEach(round => {
+                const roundEntry = document.createElement('div');
+                roundEntry.className = 'council-entry round-marker';
+                roundEntry.innerHTML = `<span class="round-badge">Round ${round.round}</span>`;
+                historyLog.appendChild(roundEntry);
+
+                round.discussions.forEach(d => {
+                    const entry = document.createElement('div');
+                    entry.className = 'council-entry agent';
+                    entry.innerHTML = `
+                        <span class="agent-badge">${getAgentEmoji(d.agent)} ${d.agent}</span>
+                        <span class="entry-content">${d.summary || d.content}</span>
+                    `;
+                    historyLog.appendChild(entry);
+                });
+            });
+        }
+
+        // Add consensus
+        if (session.consensus) {
+            const consensusEntry = document.createElement('div');
+            consensusEntry.className = 'council-entry consensus';
+            consensusEntry.innerHTML = `
+                <span class="entry-content">✅ Consensus: ${session.consensus.decision} (${session.consensus.strength?.toFixed(0)}%)</span>
+            `;
+            historyLog.appendChild(consensusEntry);
+        }
+
+        // Switch to history tab
+        showDiscussionTab('history');
+    } catch (error) {
+        console.error('Failed to load session details:', error);
+    }
+}
+
+function showDiscussionTab(tab) {
+    const liveLog = document.getElementById('council-log');
+    const historyLog = document.getElementById('council-history-log');
+    const tabs = document.querySelectorAll('.discussion-tabs .tab-btn');
+
+    tabs.forEach(t => t.classList.remove('active'));
+
+    if (tab === 'live') {
+        liveLog.classList.remove('hidden');
+        historyLog.classList.add('hidden');
+        tabs[0].classList.add('active');
+    } else {
+        liveLog.classList.add('hidden');
+        historyLog.classList.remove('hidden');
+        tabs[1].classList.add('active');
     }
 }
 

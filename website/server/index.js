@@ -20,6 +20,13 @@ const {
     generateEnhancedAIResponse
 } = require('./agents');
 
+// Import AI Council System
+const {
+    councilManager,
+    CouncilState,
+    AGENT_DIRECTIVES
+} = require('./council');
+
 // Configuration
 const PORT = process.env.PORT || 9000;
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
@@ -1077,6 +1084,146 @@ app.get('/api/agent/:id/memory', (req, res) => {
     });
 });
 
+// ============== AI COUNCIL CONTROL ENDPOINTS ==============
+
+// Council status
+app.get('/api/council/status', (req, res) => {
+    res.json(councilManager.getStatus());
+});
+
+// Council history
+app.get('/api/council/history', (req, res) => {
+    const limit = parseInt(req.query.limit) || 20;
+    res.json(councilManager.getHistory(limit));
+});
+
+// Council session details
+app.get('/api/council/session/:id', (req, res) => {
+    const session = councilManager.getSessionDetails(req.params.id);
+    if (session) {
+        res.json(session);
+    } else {
+        res.status(404).json({ error: 'Session not found' });
+    }
+});
+
+// Council collective knowledge
+app.get('/api/council/knowledge', (req, res) => {
+    res.json(councilManager.getKnowledgeContext());
+});
+
+// Agent directives
+app.get('/api/council/directives', (req, res) => {
+    res.json(AGENT_DIRECTIVES);
+});
+
+// Start council session (POST)
+app.post('/api/council/start', async (req, res) => {
+    try {
+        const { topic } = req.body || {};
+
+        // Gather current context
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+
+        const context = {
+            botData: { stats, regime: detectRegime(trades) },
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
+
+        const result = councilManager.startSession(
+            topic || 'Market Analysis & Trading Strategy',
+            context,
+            generateEnhancedAIResponse
+        );
+
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Pause council session
+app.post('/api/council/pause', (req, res) => {
+    res.json(councilManager.pauseSession());
+});
+
+// Resume council session
+app.post('/api/council/resume', (req, res) => {
+    res.json(councilManager.resumeSession());
+});
+
+// Stop council session
+app.post('/api/council/stop', (req, res) => {
+    res.json(councilManager.stopSession());
+});
+
+// Restart council session
+app.post('/api/council/restart', async (req, res) => {
+    try {
+        const { topic } = req.body || {};
+
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+
+        const context = {
+            botData: { stats, regime: detectRegime(trades) },
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
+
+        const result = councilManager.restartSession(
+            topic || 'Market Analysis & Trading Strategy',
+            context,
+            generateEnhancedAIResponse
+        );
+
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// User intervention in council
+app.post('/api/council/intervene', (req, res) => {
+    const { message } = req.body || {};
+    if (!message) {
+        return res.status(400).json({ error: 'Message required' });
+    }
+    res.json(councilManager.userIntervene(message));
+});
+
+// Record outcome of council decision
+app.post('/api/council/outcome', (req, res) => {
+    const { sessionId, outcome, result } = req.body || {};
+    if (!sessionId || !outcome) {
+        return res.status(400).json({ error: 'sessionId and outcome required' });
+    }
+    councilManager.recordOutcome(sessionId, outcome, result);
+    res.json({ success: true });
+});
+
 // Reports endpoint
 app.get('/api/report/:type', async (req, res) => {
     try {
@@ -1195,12 +1342,73 @@ app.get('/api/report/:type', async (req, res) => {
 });
 
 // ============== SOCKET.IO EVENTS ==============
+
+// Setup council manager event forwarding to Socket.IO
+councilManager.on('session-started', (data) => {
+    io.emit('council-session-started', data);
+});
+
+councilManager.on('round-started', (data) => {
+    io.emit('council-round-started', data);
+});
+
+councilManager.on('agent-spoke', (data) => {
+    io.emit('council-agent-spoke', data);
+});
+
+councilManager.on('voting-started', (data) => {
+    io.emit('council-voting-started', data);
+});
+
+councilManager.on('agent-voted', (data) => {
+    io.emit('council-agent-voted', data);
+});
+
+councilManager.on('voting-complete', (data) => {
+    io.emit('council-voting-complete', data);
+});
+
+councilManager.on('consensus-reached', (data) => {
+    io.emit('council-consensus-reached', data);
+});
+
+councilManager.on('consensus-forced', (data) => {
+    io.emit('council-consensus-forced', data);
+});
+
+councilManager.on('no-consensus', (data) => {
+    io.emit('council-no-consensus', data);
+});
+
+councilManager.on('session-paused', (data) => {
+    io.emit('council-session-paused', data);
+});
+
+councilManager.on('session-resumed', (data) => {
+    io.emit('council-session-resumed', data);
+});
+
+councilManager.on('session-stopped', (data) => {
+    io.emit('council-session-stopped', data);
+});
+
+councilManager.on('user-intervention', (data) => {
+    io.emit('council-user-intervention', data);
+});
+
+councilManager.on('addressing-intervention', (data) => {
+    io.emit('council-addressing-intervention', data);
+});
+
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
     // Send initial dashboard data
     sendDashboardUpdate(socket);
     sendLogUpdate(socket);
+
+    // Send council status on connect
+    socket.emit('council-status', councilManager.getStatus());
 
     // AI Chat handler
     socket.on('chat-message', async (data) => {
@@ -1209,50 +1417,139 @@ io.on('connection', (socket) => {
         socket.emit('chat-response', { message: response });
     });
 
-    // Council handlers
-    socket.on('council-start', () => {
+    // ============== COUNCIL SOCKET HANDLERS ==============
+
+    // Start council session via socket
+    socket.on('council-start', async (data) => {
+        const { topic } = data || {};
+
+        // Gather context
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+
+        const context = {
+            botData: { stats, regime: detectRegime(trades) },
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
+
+        const result = councilManager.startSession(
+            topic || 'Market Analysis & Trading Strategy',
+            context,
+            generateEnhancedAIResponse
+        );
+
         socket.emit('council-response', {
             type: 'system',
-            content: 'Council session initialized. All agents analyzing market with live data...'
+            content: result.error || 'Council session started. Agents now researching and discussing...',
+            session: result.session
         });
     });
 
-    socket.on('council-discuss', async (data) => {
-        const { topic } = data;
+    // Pause council
+    socket.on('council-pause', () => {
+        const result = councilManager.pauseSession();
+        socket.emit('council-response', {
+            type: 'system',
+            content: result.error || 'Council session paused. Use resume to continue.',
+            state: result.state
+        });
+    });
+
+    // Resume council
+    socket.on('council-resume', () => {
+        const result = councilManager.resumeSession();
+        socket.emit('council-response', {
+            type: 'system',
+            content: result.error || 'Council session resumed.',
+            state: result.state
+        });
+    });
+
+    // Stop council
+    socket.on('council-stop', () => {
+        const result = councilManager.stopSession();
+        socket.emit('council-response', {
+            type: 'system',
+            content: result.error || 'Council session stopped.',
+            session: result.session
+        });
+    });
+
+    // Restart council
+    socket.on('council-restart', async (data) => {
+        const { topic } = data || {};
+
+        const [binanceData, technical, fearGreed] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex()
+        ]);
+
         const trades = getShadowTrades();
         const stats = calculateStats(trades);
-        const technical = await fetchTechnicalData();
-        const fearGreed = await fetchFearGreedIndex();
 
-        const agents = ['Strategist', 'Analyst', 'Risk Manager', 'Executor'];
+        const context = {
+            botData: { stats, regime: detectRegime(trades) },
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            }
+        };
 
-        for (let i = 0; i < agents.length; i++) {
-            setTimeout(async () => {
-                const content = await generateCouncilResponse(agents[i], topic, stats, technical, fearGreed);
-                socket.emit('council-response', { agent: agents[i], content });
-            }, (i + 1) * 1500);
-        }
+        const result = councilManager.restartSession(
+            topic || 'Market Analysis & Trading Strategy',
+            context,
+            generateEnhancedAIResponse
+        );
 
-        // Consensus
-        setTimeout(() => {
-            const fg = fearGreed[0] || { value: 50 };
-            let action = 'Monitor current positions, maintain strategy';
-            if (stats.winRate < 35) action = 'Reduce position sizes until win rate improves';
-            else if (technical.rsi > 75) action = 'Avoid new long positions - RSI overbought';
-            else if (technical.rsi < 25) action = 'Consider adding to positions - RSI oversold';
-            else if (fg.value < 25) action = 'Potential buying opportunity - extreme fear';
+        socket.emit('council-response', {
+            type: 'system',
+            content: 'Council session restarted with fresh context.',
+            session: result.session
+        });
+    });
 
+    // User intervention/guidance
+    socket.on('council-intervene', (data) => {
+        const { message } = data || {};
+        if (message) {
+            const result = councilManager.userIntervene(message);
             socket.emit('council-response', {
-                type: 'consensus',
-                content: 'Council has reached consensus.',
-                consensus: {
-                    agreement: 70 + Math.random() * 25,
-                    action,
-                    rsi: technical.rsi,
-                    fearGreed: fg.value
-                }
+                type: 'user-guidance',
+                content: `Your guidance received: "${message}"`,
+                intervention: result.intervention
             });
-        }, 7000);
+        }
+    });
+
+    // Get council history
+    socket.on('council-get-history', (data) => {
+        const limit = data?.limit || 20;
+        socket.emit('council-history', councilManager.getHistory(limit));
+    });
+
+    // Get council status
+    socket.on('council-get-status', () => {
+        socket.emit('council-status', councilManager.getStatus());
+    });
+
+    // Legacy council discuss handler (for backwards compatibility)
+    socket.on('council-discuss', async (data) => {
+        // Redirect to new council-start with topic
+        socket.emit('council-start', data);
     });
 
     // Bot control

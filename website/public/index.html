@@ -291,43 +291,78 @@
         <section id="council" class="section">
             <div class="section-header">
                 <h2>AI Council</h2>
-                <span class="section-desc">Multi-agent decision making</span>
+                <span class="section-desc">Autonomous multi-agent consensus system</span>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="council-control-panel">
+                <div class="control-status">
+                    <span class="status-indicator" id="council-status-indicator">●</span>
+                    <span id="council-status-text">Idle</span>
+                    <span class="round-info" id="council-round-info"></span>
+                </div>
+                <div class="control-buttons">
+                    <button class="control-btn start" onclick="startCouncilSession()" id="btn-council-start">▶ Start</button>
+                    <button class="control-btn pause" onclick="pauseCouncil()" id="btn-council-pause" disabled>⏸ Pause</button>
+                    <button class="control-btn resume" onclick="resumeCouncil()" id="btn-council-resume" disabled>▶ Resume</button>
+                    <button class="control-btn stop" onclick="stopCouncil()" id="btn-council-stop" disabled>⏹ Stop</button>
+                    <button class="control-btn restart" onclick="restartCouncil()" id="btn-council-restart" disabled>🔄 Restart</button>
+                    <button class="control-btn history" onclick="showCouncilHistory()">📜 History</button>
+                </div>
             </div>
 
             <div class="council-grid">
                 <!-- Council Members -->
                 <div class="council-members">
-                    <div class="member-card" data-agent="strategist">
+                    <div class="member-card" data-agent="AlgoQ" id="member-AlgoQ">
+                        <div class="member-avatar">🤖</div>
+                        <div class="member-info">
+                            <h4>AlgoQ</h4>
+                            <span class="member-role">Lead AI & Executor</span>
+                            <span class="member-api">Claude API</span>
+                        </div>
+                        <div class="member-status ready">Ready</div>
+                        <div class="member-vote" id="vote-AlgoQ"></div>
+                    </div>
+                    <div class="member-card" data-agent="Strategist" id="member-Strategist">
                         <div class="member-avatar">🎯</div>
                         <div class="member-info">
                             <h4>Strategist</h4>
                             <span class="member-role">Strategy & Direction</span>
+                            <span class="member-api">DeepSeek API</span>
                         </div>
                         <div class="member-status ready">Ready</div>
+                        <div class="member-vote" id="vote-Strategist"></div>
                     </div>
-                    <div class="member-card" data-agent="analyst">
+                    <div class="member-card" data-agent="Analyst" id="member-Analyst">
                         <div class="member-avatar">📊</div>
                         <div class="member-info">
-                            <h4>Analyst</h4>
-                            <span class="member-role">Data Analysis</span>
+                            <h4>Dr. Sarah Data</h4>
+                            <span class="member-role">Quantitative Analysis</span>
+                            <span class="member-api">Qween AI</span>
                         </div>
                         <div class="member-status ready">Ready</div>
+                        <div class="member-vote" id="vote-Analyst"></div>
                     </div>
-                    <div class="member-card" data-agent="risk">
+                    <div class="member-card" data-agent="RiskManager" id="member-RiskManager">
                         <div class="member-avatar">🛡️</div>
                         <div class="member-info">
-                            <h4>Risk Manager</h4>
-                            <span class="member-role">Risk Assessment</span>
+                            <h4>Victor Shield</h4>
+                            <span class="member-role">Risk Management</span>
+                            <span class="member-api">HuggingFace</span>
                         </div>
                         <div class="member-status ready">Ready</div>
+                        <div class="member-vote" id="vote-RiskManager"></div>
                     </div>
-                    <div class="member-card" data-agent="executor">
-                        <div class="member-avatar">⚡</div>
+                    <div class="member-card" data-agent="Sentiment" id="member-Sentiment">
+                        <div class="member-avatar">📡</div>
                         <div class="member-info">
-                            <h4>Executor</h4>
-                            <span class="member-role">Trade Execution</span>
+                            <h4>Echo Pulse</h4>
+                            <span class="member-role">Sentiment Analysis</span>
+                            <span class="member-api">HuggingFace</span>
                         </div>
                         <div class="member-status ready">Ready</div>
+                        <div class="member-vote" id="vote-Sentiment"></div>
                     </div>
                 </div>
 
@@ -335,30 +370,104 @@
                 <div class="council-discussion">
                     <div class="discussion-header">
                         <h3>Council Discussion</h3>
-                        <button class="btn-small" onclick="startCouncilSession()">New Session</button>
+                        <div class="discussion-tabs">
+                            <button class="tab-btn active" onclick="showDiscussionTab('live')">Live</button>
+                            <button class="tab-btn" onclick="showDiscussionTab('history')">History</button>
+                        </div>
                     </div>
                     <div class="discussion-log" id="council-log">
                         <div class="council-entry system">
-                            <span class="entry-content">AI Council is ready. Start a new session to discuss trading decisions.</span>
+                            <span class="entry-content">AI Council is ready. Click "Start" to begin autonomous discussion with voting rounds (max 5 rounds to reach consensus).</span>
+                        </div>
+                    </div>
+                    <div class="discussion-log hidden" id="council-history-log">
+                        <div class="council-entry system">
+                            <span class="entry-content">No session history yet.</span>
                         </div>
                     </div>
 
+                    <!-- User Guidance Input -->
                     <div class="council-input-container">
-                        <input type="text" id="council-input" placeholder="Propose a topic for council discussion..." onkeypress="handleCouncilKeypress(event)">
-                        <button class="council-btn" onclick="submitToCouncil()">Convene</button>
+                        <input type="text" id="council-input" placeholder="Guide the council (optional) - type to intervene during discussion..." onkeypress="handleCouncilKeypress(event)">
+                        <button class="council-btn" onclick="sendCouncilGuidance()">Send Guidance</button>
+                    </div>
+
+                    <!-- Topic Input for Starting -->
+                    <div class="council-topic-container" id="council-topic-container">
+                        <input type="text" id="council-topic" placeholder="Discussion topic (e.g., 'Should we increase position size?')" onkeypress="handleTopicKeypress(event)">
+                        <button class="council-btn start-btn" onclick="startCouncilWithTopic()">Start Discussion</button>
                     </div>
                 </div>
 
-                <!-- Consensus Panel -->
+                <!-- Voting & Consensus Panel -->
                 <div class="consensus-panel">
-                    <h3>Current Consensus</h3>
+                    <h3>Voting Progress</h3>
+                    <div class="voting-progress" id="voting-progress">
+                        <div class="vote-tally">
+                            <div class="tally-item long" id="tally-long">
+                                <span class="tally-label">LONG</span>
+                                <div class="tally-bar"><div class="tally-fill" id="tally-fill-long"></div></div>
+                                <span class="tally-score" id="tally-score-long">0</span>
+                            </div>
+                            <div class="tally-item short" id="tally-short">
+                                <span class="tally-label">SHORT</span>
+                                <div class="tally-bar"><div class="tally-fill" id="tally-fill-short"></div></div>
+                                <span class="tally-score" id="tally-score-short">0</span>
+                            </div>
+                            <div class="tally-item hold" id="tally-hold">
+                                <span class="tally-label">HOLD</span>
+                                <div class="tally-bar"><div class="tally-fill" id="tally-fill-hold"></div></div>
+                                <span class="tally-score" id="tally-score-hold">0</span>
+                            </div>
+                            <div class="tally-item reduce" id="tally-reduce">
+                                <span class="tally-label">REDUCE</span>
+                                <div class="tally-bar"><div class="tally-fill" id="tally-fill-reduce"></div></div>
+                                <span class="tally-score" id="tally-score-reduce">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Consensus</h3>
                     <div class="consensus-meter">
                         <div class="meter-fill" id="consensus-fill" style="width: 0%"></div>
                     </div>
                     <div class="consensus-value" id="consensus-value">--</div>
                     <div class="consensus-action" id="consensus-action">
-                        <span class="action-label">Recommended Action:</span>
-                        <span class="action-value">Awaiting discussion</span>
+                        <span class="action-label">Decision:</span>
+                        <span class="action-value" id="consensus-decision">Awaiting council</span>
+                    </div>
+                    <div class="action-plan" id="action-plan" style="display: none;">
+                        <h4>Action Plan</h4>
+                        <ul id="action-plan-steps"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Modal -->
+            <div class="council-history-modal hidden" id="council-history-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Council Session History</h3>
+                        <button class="modal-close" onclick="hideCouncilHistory()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="history-stats">
+                            <div class="stat-box">
+                                <span class="stat-num" id="history-total">0</span>
+                                <span class="stat-label">Total Sessions</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-num" id="history-consensus">0</span>
+                                <span class="stat-label">Consensus Reached</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="stat-num" id="history-rate">0%</span>
+                                <span class="stat-label">Success Rate</span>
+                            </div>
+                        </div>
+                        <div class="history-list" id="history-list">
+                            <p class="loading">Loading history...</p>
+                        </div>
                     </div>
                 </div>
             </div>
