@@ -895,6 +895,25 @@
                     <button class="action-btn" onclick="resumeBot()">▶️ Resume Bot</button>
                     <button class="action-btn danger" onclick="emergencyStop()">🛑 Emergency Stop</button>
                 </div>
+
+                <div class="settings-card api-status-card">
+                    <h3>AI API Status</h3>
+                    <button class="action-btn" onclick="testApiConnections()">🔄 Test Connections</button>
+                    <div class="api-status-list" id="api-status-list">
+                        <div class="api-item">
+                            <span class="api-name">Claude (Anthropic)</span>
+                            <span class="api-status" id="api-claude-status">⏳ Not tested</span>
+                        </div>
+                        <div class="api-item">
+                            <span class="api-name">DeepSeek</span>
+                            <span class="api-status" id="api-deepseek-status">⏳ Not tested</span>
+                        </div>
+                        <div class="api-item">
+                            <span class="api-name">Qween (Mistral)</span>
+                            <span class="api-status" id="api-qween-status">⏳ Not tested</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Agent Profiles Section -->

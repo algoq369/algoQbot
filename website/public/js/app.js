@@ -2440,3 +2440,56 @@ function showAgentTab(tabName) {
 
 // Initialize agent profiles on DOM ready
 document.addEventListener('DOMContentLoaded', loadAgentProfiles);
+
+// ============== API STATUS TESTING ==============
+async function testApiConnections() {
+    // Set all to testing state
+    const apis = ['claude', 'deepseek', 'qween'];
+    apis.forEach(api => {
+        const el = document.getElementById(`api-${api}-status`);
+        if (el) {
+            el.textContent = '🔄 Testing...';
+            el.className = 'api-status testing';
+        }
+    });
+
+    try {
+        const response = await fetch('/api/status/apis');
+        const data = await response.json();
+
+        // Update status for each API
+        updateApiStatus('claude', data.claude);
+        updateApiStatus('deepseek', data.deepseek);
+        updateApiStatus('qween', data.qween);
+
+    } catch (error) {
+        apis.forEach(api => {
+            const el = document.getElementById(`api-${api}-status`);
+            if (el) {
+                el.textContent = '❌ Test failed';
+                el.className = 'api-status error';
+            }
+        });
+    }
+}
+
+function updateApiStatus(apiName, status) {
+    const el = document.getElementById(`api-${apiName}-status`);
+    if (!el) return;
+
+    if (!status.configured) {
+        el.textContent = '⚠️ Not configured';
+        el.className = 'api-status error';
+    } else if (status.connected) {
+        el.textContent = '✅ Connected';
+        el.className = 'api-status connected';
+    } else {
+        el.textContent = `❌ ${status.status}`;
+        el.className = 'api-status error';
+    }
+}
+
+// Test APIs on page load (delayed)
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(testApiConnections, 2000);
+});

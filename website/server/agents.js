@@ -1010,6 +1010,157 @@ function getSentimentAction(fg) {
     return 'Standard operations - follow technical signals';
 }
 
+// ============== API CONNECTION TESTING ==============
+async function testApiConnections() {
+    const results = {
+        timestamp: new Date().toISOString(),
+        claude: { configured: false, connected: false, status: 'not configured' },
+        deepseek: { configured: false, connected: false, status: 'not configured' },
+        qween: { configured: false, connected: false, status: 'not configured' }
+    };
+
+    // Test Claude API
+    if (API_KEYS.claude) {
+        results.claude.configured = true;
+        try {
+            const testResult = await new Promise((resolve) => {
+                const data = JSON.stringify({
+                    model: 'claude-3-haiku-20240307',
+                    max_tokens: 10,
+                    messages: [{ role: 'user', content: 'test' }]
+                });
+
+                const options = {
+                    hostname: 'api.anthropic.com',
+                    path: '/v1/messages',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEYS.claude,
+                        'anthropic-version': '2023-06-01'
+                    }
+                };
+
+                const req = https.request(options, (res) => {
+                    let body = '';
+                    res.on('data', chunk => body += chunk);
+                    res.on('end', () => {
+                        if (res.statusCode === 200) {
+                            resolve({ connected: true, status: 'connected' });
+                        } else if (res.statusCode === 401) {
+                            resolve({ connected: false, status: 'invalid API key' });
+                        } else {
+                            resolve({ connected: false, status: `error: ${res.statusCode}` });
+                        }
+                    });
+                });
+
+                req.on('error', () => resolve({ connected: false, status: 'connection error' }));
+                req.setTimeout(5000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.write(data);
+                req.end();
+            });
+            results.claude = { ...results.claude, ...testResult };
+        } catch (e) {
+            results.claude.status = 'test failed';
+        }
+    }
+
+    // Test DeepSeek API
+    if (API_KEYS.deepseek) {
+        results.deepseek.configured = true;
+        try {
+            const testResult = await new Promise((resolve) => {
+                const data = JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [{ role: 'user', content: 'test' }],
+                    max_tokens: 10
+                });
+
+                const options = {
+                    hostname: 'api.deepseek.com',
+                    path: '/v1/chat/completions',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEYS.deepseek}`
+                    }
+                };
+
+                const req = https.request(options, (res) => {
+                    let body = '';
+                    res.on('data', chunk => body += chunk);
+                    res.on('end', () => {
+                        if (res.statusCode === 200) {
+                            resolve({ connected: true, status: 'connected' });
+                        } else if (res.statusCode === 401) {
+                            resolve({ connected: false, status: 'invalid API key' });
+                        } else {
+                            resolve({ connected: false, status: `error: ${res.statusCode}` });
+                        }
+                    });
+                });
+
+                req.on('error', () => resolve({ connected: false, status: 'connection error' }));
+                req.setTimeout(5000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.write(data);
+                req.end();
+            });
+            results.deepseek = { ...results.deepseek, ...testResult };
+        } catch (e) {
+            results.deepseek.status = 'test failed';
+        }
+    }
+
+    // Test Qween/Mistral API
+    if (API_KEYS.qween) {
+        results.qween.configured = true;
+        try {
+            const testResult = await new Promise((resolve) => {
+                const data = JSON.stringify({
+                    model: 'mistral-large-latest',
+                    messages: [{ role: 'user', content: 'test' }],
+                    max_tokens: 10
+                });
+
+                const options = {
+                    hostname: 'api.mistral.ai',
+                    path: '/v1/chat/completions',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEYS.qween}`
+                    }
+                };
+
+                const req = https.request(options, (res) => {
+                    let body = '';
+                    res.on('data', chunk => body += chunk);
+                    res.on('end', () => {
+                        if (res.statusCode === 200) {
+                            resolve({ connected: true, status: 'connected' });
+                        } else if (res.statusCode === 401) {
+                            resolve({ connected: false, status: 'invalid API key' });
+                        } else {
+                            resolve({ connected: false, status: `error: ${res.statusCode}` });
+                        }
+                    });
+                });
+
+                req.on('error', () => resolve({ connected: false, status: 'connection error' }));
+                req.setTimeout(5000, () => { req.destroy(); resolve({ connected: false, status: 'timeout' }); });
+                req.write(data);
+                req.end();
+            });
+            results.qween = { ...results.qween, ...testResult };
+        } catch (e) {
+            results.qween.status = 'test failed';
+        }
+    }
+
+    return results;
+}
+
 // ============== EXPORTS ==============
 module.exports = {
     AGENT_PROFILES,
@@ -1019,5 +1170,6 @@ module.exports = {
     generateEnhancedAIResponse,
     reviewTrade,
     saveApiKeys,
+    testApiConnections,
     API_KEYS
 };

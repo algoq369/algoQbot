@@ -1321,6 +1321,17 @@ app.post('/api/agents/:agentId/memory', (req, res) => {
     }
 });
 
+// ============== API STATUS & VERIFICATION ==============
+app.get('/api/status/apis', async (req, res) => {
+    const { testApiConnections } = require('./agents');
+    try {
+        const status = await testApiConnections();
+        res.json(status);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to test API connections', details: error.message });
+    }
+});
+
 // Market data endpoint - comprehensive
 app.get('/api/market', async (req, res) => {
     try {
