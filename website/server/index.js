@@ -1291,6 +1291,40 @@ app.get('/api/agents', (req, res) => {
     }
 });
 
+// IMPORTANT: Fleet routes MUST come before :agentId routes!
+// Get all agents organized by tier
+app.get('/api/agents/fleet', (req, res) => {
+    res.json({
+        main: {
+            agents: MAIN_AGENTS,
+            description: 'Premium API agents - Primary decision makers',
+            count: Object.keys(MAIN_AGENTS).length
+        },
+        specialists: {
+            agents: SPECIALIST_AGENTS,
+            description: 'HuggingFace specialists - Consulted by main agents',
+            count: Object.keys(SPECIALIST_AGENTS).length
+        },
+        total: Object.keys(AGENT_PROFILES).length
+    });
+});
+
+// Get main agents only
+app.get('/api/agents/main', (req, res) => {
+    res.json({
+        agents: MAIN_AGENTS,
+        ids: getMainAgents()
+    });
+});
+
+// Get specialist agents only
+app.get('/api/agents/specialists', (req, res) => {
+    res.json({
+        agents: SPECIALIST_AGENTS,
+        ids: getSpecialistAgents()
+    });
+});
+
 // Get specific agent full profile
 app.get('/api/agents/:agentId', (req, res) => {
     try {
@@ -1459,41 +1493,6 @@ app.get('/api/council/knowledge', (req, res) => {
 // Agent directives
 app.get('/api/council/directives', (req, res) => {
     res.json(AGENT_DIRECTIVES);
-});
-
-// ============== AGENT FLEET ENDPOINTS ==============
-
-// Get all agents organized by tier
-app.get('/api/agents/fleet', (req, res) => {
-    res.json({
-        main: {
-            agents: MAIN_AGENTS,
-            description: 'Premium API agents - Primary decision makers',
-            count: Object.keys(MAIN_AGENTS).length
-        },
-        specialists: {
-            agents: SPECIALIST_AGENTS,
-            description: 'HuggingFace specialists - Consulted by main agents',
-            count: Object.keys(SPECIALIST_AGENTS).length
-        },
-        total: Object.keys(AGENT_PROFILES).length
-    });
-});
-
-// Get main agents only
-app.get('/api/agents/main', (req, res) => {
-    res.json({
-        agents: MAIN_AGENTS,
-        ids: getMainAgents()
-    });
-});
-
-// Get specialist agents only
-app.get('/api/agents/specialists', (req, res) => {
-    res.json({
-        agents: SPECIALIST_AGENTS,
-        ids: getSpecialistAgents()
-    });
 });
 
 // ============== SPECIALIST CONSULTATION ENDPOINTS ==============
