@@ -1,0 +1,28 @@
+{
+  "deepseek": {
+    "apiKey": "YOUR_DEEPSEEK_API_KEY",
+    "baseUrl": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat",
+    "pricing": {
+      "input": 0.14,
+      "output": 0.28
+    }
+  },
+  "qwen": {
+    "apiKey": "YOUR_QWEN_API_KEY",
+    "baseUrl": "https://dashscope.aliyuncs.com/api/v1",
+    "model": "qwen-turbo",
+    "pricing": {
+      "input": 0.10,
+      "output": 0.20
+    }
+  },
+  "algoqbot": {
+    "dataPath": "/home/user/algoQbot/data",
+    "apiUrl": "http://localhost:3001"
+  },
+  "blockchain": {
+    "bscRpc": "https://bsc-dataseed.binance.org",
+    "testnetRpc": "https://data-seed-prebsc-1-s1.binance.org:8545"
+  }
+}
