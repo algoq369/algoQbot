@@ -36,6 +36,31 @@ const CouncilState = {
     STOPPED: 'stopped'
 };
 
+// ============== DISCUSSION MODES ==============
+const DiscussionModes = {
+    ANALYSE: 'analyse',
+    BRAINSTORM: 'brainstorm',
+    DEBATE: 'debate'
+};
+
+const MODE_PROMPTS = {
+    analyse: {
+        instruction: 'Provide detailed quantitative analysis with specific data points, metrics, and evidence-based conclusions. Reference exact numbers and percentages.',
+        style: 'analytical',
+        responseLength: 'detailed'
+    },
+    brainstorm: {
+        instruction: 'Think creatively and propose innovative strategies. Build on previous speakers\' ideas. Suggest unconventional approaches and explore "what if" scenarios.',
+        style: 'creative',
+        responseLength: 'exploratory'
+    },
+    debate: {
+        instruction: 'Challenge the previous speaker\'s position directly. Present counter-arguments and alternative viewpoints. Point out weaknesses in their reasoning but remain constructive.',
+        style: 'confrontational',
+        responseLength: 'argumentative'
+    }
+};
+
 // ============== AGENT DIRECTIVES & MISSIONS ==============
 const AGENT_DIRECTIVES = {
     'AlgoQ': {
@@ -97,7 +122,7 @@ const AGENT_DIRECTIVES = {
 
 // ============== COUNCIL SESSION CLASS ==============
 class CouncilSession extends EventEmitter {
-    constructor(sessionId, topic, context) {
+    constructor(sessionId, topic, context, mode = 'analyse') {
         super();
         this.sessionId = sessionId;
         this.topic = topic;
@@ -112,6 +137,9 @@ class CouncilSession extends EventEmitter {
         this.endTime = null;
         this.isPaused = false;
         this.userInterventions = [];
+        this.discussionMode = mode;
+        this.lastSpeaker = null;
+        this.roundDiscussions = []; // Current round's discussions for agent exchange
     }
 
     toJSON() {
@@ -201,19 +229,20 @@ class CouncilManager {
     }
 
     // ============== SESSION CONTROL ==============
-    startSession(topic, context, generateResponse) {
+    startSession(topic, context, generateResponse, mode = 'analyse') {
         if (this.activeSession && this.activeSession.state !== CouncilState.STOPPED) {
             return { error: 'Session already in progress', session: this.activeSession.toJSON() };
         }
 
         const sessionId = `council_${Date.now()}`;
-        this.activeSession = new CouncilSession(sessionId, topic, context);
+        this.activeSession = new CouncilSession(sessionId, topic, context, mode);
         this.activeSession.state = CouncilState.RESEARCHING;
         this.generateResponse = generateResponse;
 
         this.emit('session-started', {
             sessionId,
             topic,
+            mode,
             state: this.activeSession.state
         });
 
@@ -221,6 +250,21 @@ class CouncilManager {
         this.runCouncilLoop();
 
         return { success: true, session: this.activeSession.toJSON() };
+    }
+
+    // Change discussion mode mid-session
+    setDiscussionMode(mode) {
+        if (!this.activeSession) return { error: 'No active session' };
+        if (!MODE_PROMPTS[mode]) return { error: 'Invalid mode' };
+
+        this.activeSession.discussionMode = mode;
+
+        this.emit('mode-changed', {
+            sessionId: this.activeSession.sessionId,
+            mode
+        });
+
+        return { success: true, mode };
     }
 
     pauseSession() {
@@ -318,13 +362,18 @@ class CouncilManager {
         this.activeSession.currentRound++;
         this.activeSession.state = CouncilState.DISCUSSING;
 
+        // Reset round discussions for agent exchange tracking
+        this.activeSession.roundDiscussions = [];
+        this.activeSession.lastSpeaker = null;
+
         this.emit('round-started', {
             sessionId: this.activeSession.sessionId,
             round: this.activeSession.currentRound,
-            maxRounds: this.activeSession.maxRounds
+            maxRounds: this.activeSession.maxRounds,
+            mode: this.activeSession.discussionMode
         });
 
-        // Each agent discusses in sequence
+        // Each agent discusses in sequence, with context from previous speakers
         const agents = ['AlgoQ', 'Strategist', 'Analyst', 'RiskManager', 'Sentiment'];
         const roundDiscussions = [];
 
@@ -336,10 +385,12 @@ class CouncilManager {
             const discussion = await this.agentDiscuss(agentId);
             roundDiscussions.push(discussion);
 
+            // Emit with respondingTo field for frontend agent exchange display
             this.emit('agent-spoke', {
                 sessionId: this.activeSession.sessionId,
                 round: this.activeSession.currentRound,
                 agent: agentId,
+                respondingTo: discussion.respondingTo,
                 discussion
             });
 
@@ -350,6 +401,7 @@ class CouncilManager {
         this.activeSession.discussions.push({
             round: this.activeSession.currentRound,
             timestamp: new Date().toISOString(),
+            mode: this.activeSession.discussionMode,
             discussions: roundDiscussions
         });
 
@@ -390,65 +442,152 @@ class CouncilManager {
         const topic = this.activeSession.topic;
         const previousRounds = this.activeSession.discussions;
         const userInterventions = this.activeSession.userInterventions;
+        const mode = this.activeSession.discussionMode || 'analyse';
+        const modeConfig = MODE_PROMPTS[mode];
+        const roundDiscussions = this.activeSession.roundDiscussions || [];
+        const lastSpeaker = this.activeSession.lastSpeaker;
 
         // Build prompt with context and previous discussions
-        let prompt = `Topic: ${topic}\n`;
+        let prompt = `You are ${agentId}, an AI agent in a trading council.\n`;
+        prompt += `Topic: ${topic}\n`;
         prompt += `Your directive: ${directive.directive}\n`;
         prompt += `Round ${this.activeSession.currentRound} of ${this.activeSession.maxRounds}\n\n`;
 
+        // Add discussion mode instructions
+        prompt += `**DISCUSSION MODE: ${mode.toUpperCase()}**\n`;
+        prompt += `${modeConfig.instruction}\n\n`;
+
+        // Add previous rounds context
         if (previousRounds.length > 0) {
-            prompt += `Previous round summary:\n`;
+            prompt += `### Previous Round Summary:\n`;
             const lastRound = previousRounds[previousRounds.length - 1];
             lastRound.discussions.forEach(d => {
-                prompt += `- ${d.agent}: ${d.summary}\n`;
+                prompt += `- **${d.agent}**: ${d.summary}\n`;
             });
             prompt += '\n';
         }
 
-        if (userInterventions.length > 0) {
-            const recent = userInterventions[userInterventions.length - 1];
-            prompt += `User guidance: ${recent.message}\n\n`;
+        // Add current round discussions - THIS ENABLES AGENT EXCHANGE
+        if (roundDiscussions.length > 0) {
+            prompt += `### This Round So Far:\n`;
+            roundDiscussions.forEach(d => {
+                prompt += `- **${d.agent}**: ${d.content}\n`;
+            });
+            prompt += '\n';
+
+            // In debate mode, specifically reference the last speaker to respond to
+            if (mode === 'debate' && lastSpeaker) {
+                const lastDiscussion = roundDiscussions.find(d => d.agent === lastSpeaker);
+                if (lastDiscussion) {
+                    prompt += `**You must respond directly to ${lastSpeaker}'s position:** "${lastDiscussion.summary}"\n`;
+                    prompt += `Challenge their reasoning, present counter-arguments, or build upon their analysis.\n\n`;
+                }
+            }
+
+            // In brainstorm mode, encourage building on ideas
+            if (mode === 'brainstorm' && lastSpeaker) {
+                prompt += `Build upon the ideas presented so far. What creative strategies can you add?\n\n`;
+            }
         }
 
-        prompt += `Based on your expertise, provide your analysis and recommendation. Consider what consensus we should reach.`;
+        // Add user guidance
+        if (userInterventions.length > 0) {
+            const recent = userInterventions[userInterventions.length - 1];
+            prompt += `**User Guidance**: ${recent.message}\n\n`;
+        }
+
+        // Add market context
+        if (context?.marketData?.bnb) {
+            const bnb = context.marketData.bnb;
+            prompt += `### Current Market Data:\n`;
+            prompt += `- BNB Price: $${bnb.price?.toFixed(2) || 'N/A'}\n`;
+            prompt += `- 24h Change: ${bnb.change24h?.toFixed(2) || 'N/A'}%\n`;
+            if (context.technical) {
+                prompt += `- RSI: ${context.technical.rsi?.toFixed(1) || 'N/A'}\n`;
+                prompt += `- Trend: ${context.technical.trend || 'N/A'}\n`;
+            }
+            if (context.sentiment) {
+                prompt += `- Fear & Greed: ${context.sentiment.value || 'N/A'} (${context.sentiment.classification || 'N/A'})\n`;
+            }
+            prompt += '\n';
+        }
+
+        prompt += `Provide your ${modeConfig.style} response. Be specific and reference the data. ${lastSpeaker ? `Engage with ${lastSpeaker}'s points.` : ''}`;
 
         // Get AI response
         let response;
+        let respondingTo = lastSpeaker;
+
         if (this.generateResponse) {
             try {
                 response = await this.generateResponse(agentId, prompt, context);
             } catch (e) {
-                response = this.generateFallbackResponse(agentId, context);
+                response = this.generateFallbackResponse(agentId, context, mode, roundDiscussions);
             }
         } else {
-            response = this.generateFallbackResponse(agentId, context);
+            response = this.generateFallbackResponse(agentId, context, mode, roundDiscussions);
         }
 
-        return {
+        // Track this agent's discussion for next agents
+        const discussion = {
             agent: agentId,
             directive: directive.directive,
             content: response,
             summary: this.extractSummary(response),
+            respondingTo,
+            mode,
             timestamp: new Date().toISOString()
         };
+
+        this.activeSession.roundDiscussions.push(discussion);
+        this.activeSession.lastSpeaker = agentId;
+
+        return discussion;
     }
 
-    generateFallbackResponse(agentId, context) {
+    generateFallbackResponse(agentId, context, mode = 'analyse', roundDiscussions = []) {
         const directive = AGENT_DIRECTIVES[agentId];
         const price = context?.marketData?.bnb?.price || 700;
         const rsi = context?.technical?.rsi || 50;
         const fg = context?.sentiment?.value || 50;
         const trend = context?.technical?.trend || 'Sideways';
+        const lastSpeaker = roundDiscussions.length > 0 ? roundDiscussions[roundDiscussions.length - 1] : null;
 
-        const responses = {
-            'AlgoQ': `Based on current market conditions (BNB: $${price.toFixed(2)}, RSI: ${rsi.toFixed(1)}, Trend: ${trend}), I recommend ${rsi > 70 ? 'reducing long exposure' : rsi < 30 ? 'considering accumulation' : 'maintaining current strategy'}. My directive is to ${directive.directive}`,
-            'Strategist': `Current regime appears to be ${trend.toLowerCase()}. With RSI at ${rsi.toFixed(1)} and Fear & Greed at ${fg}, I suggest ${fg < 30 ? 'contrarian accumulation' : fg > 70 ? 'defensive positioning' : 'trend-following strategy'}.`,
-            'Analyst': `Statistical analysis shows RSI at ${rsi.toFixed(1)}, which is ${rsi > 70 ? 'overbought - historically leads to correction' : rsi < 30 ? 'oversold - historically leads to bounce' : 'neutral - no clear signal'}. Win rate and exit patterns should guide position sizing.`,
-            'RiskManager': `Risk assessment: ${rsi > 75 || rsi < 25 ? 'ELEVATED' : 'MODERATE'}. Fear & Greed at ${fg} suggests ${fg < 25 ? 'extreme fear - opportunity but careful sizing' : fg > 75 ? 'extreme greed - reduce exposure' : 'normal conditions'}. Recommend ${rsi > 70 ? 'tighter stops' : 'standard risk parameters'}.`,
-            'Sentiment': `Fear & Greed Index at ${fg} (${fg < 25 ? 'Extreme Fear' : fg < 45 ? 'Fear' : fg < 55 ? 'Neutral' : fg < 75 ? 'Greed' : 'Extreme Greed'}). ${fg < 30 ? 'Contrarian BUY signal' : fg > 70 ? 'Contrarian SELL signal' : 'No extreme sentiment'}.`
+        // Base analysis
+        const baseAnalysis = {
+            'AlgoQ': `BNB: $${price.toFixed(2)}, RSI: ${rsi.toFixed(1)}, Trend: ${trend}`,
+            'Strategist': `Regime: ${trend}, RSI: ${rsi.toFixed(1)}, F&G: ${fg}`,
+            'Analyst': `RSI: ${rsi.toFixed(1)} (${rsi > 70 ? 'overbought' : rsi < 30 ? 'oversold' : 'neutral'})`,
+            'RiskManager': `Risk: ${rsi > 75 || rsi < 25 ? 'ELEVATED' : 'MODERATE'}, F&G: ${fg}`,
+            'Sentiment': `F&G: ${fg} (${fg < 25 ? 'Extreme Fear' : fg < 45 ? 'Fear' : fg < 55 ? 'Neutral' : fg < 75 ? 'Greed' : 'Extreme Greed'})`
         };
 
-        return responses[agentId] || `Analysis in progress...`;
+        // Mode-specific responses with agent exchange
+        const modeResponses = {
+            analyse: {
+                'AlgoQ': `**Data Analysis**: ${baseAnalysis['AlgoQ']}.\n\nBased on quantitative metrics:\n• RSI at ${rsi.toFixed(1)} indicates ${rsi > 70 ? 'overbought conditions - 73% historical probability of 3% correction' : rsi < 30 ? 'oversold conditions - 68% historical bounce probability' : 'neutral territory - no statistical edge'}.\n• Recommendation: ${rsi > 70 ? 'Scale out 25% of long positions' : rsi < 30 ? 'Initiate 15% position accumulation' : 'Maintain current allocation'}.`,
+                'Strategist': `**Strategic Assessment**: ${baseAnalysis['Strategist']}.\n\n${lastSpeaker ? `Building on ${lastSpeaker.agent}'s analysis, ` : ''}Current regime suggests:\n• ${trend === 'Uptrend' ? 'Trend-following long bias with momentum entries' : trend === 'Downtrend' ? 'Defensive positioning with counter-trend scalps' : 'Range-bound strategy with mean reversion'}.\n• Position sizing: ${fg < 30 ? 'Contrarian accumulation (larger size)' : fg > 70 ? 'Reduced exposure (smaller size)' : 'Standard sizing'}.`,
+                'Analyst': `**Quantitative Analysis**: ${baseAnalysis['Analyst']}.\n\n${lastSpeaker ? `Validating ${lastSpeaker.agent}'s points: ` : ''}Statistical observations:\n• RSI divergence: ${rsi > 60 && trend === 'Downtrend' ? 'Bullish divergence forming' : rsi < 40 && trend === 'Uptrend' ? 'Bearish divergence warning' : 'No significant divergence'}.\n• Win rate impact: ${rsi > 70 ? 'Historical win rate drops 15% in overbought' : rsi < 30 ? 'Win rate improves 12% from oversold' : 'Baseline win rate expected'}.`,
+                'RiskManager': `**Risk Assessment**: ${baseAnalysis['RiskManager']}.\n\n${lastSpeaker ? `Regarding ${lastSpeaker.agent}'s recommendations: ` : ''}Risk parameters:\n• Max drawdown tolerance: ${fg < 25 ? '3% (fear = opportunity)' : fg > 75 ? '1.5% (greed = danger)' : '2.5% standard'}.\n• Stop-loss adjustment: ${rsi > 70 ? 'Tighten to 1.2%' : 'Standard 2%'}.\n• Position limit: ${fg > 80 ? 'Reduce to 50% max allocation' : '75% max allocation'}.`,
+                'Sentiment': `**Sentiment Analysis**: ${baseAnalysis['Sentiment']}.\n\n${lastSpeaker ? `Adding to ${lastSpeaker.agent}'s view: ` : ''}Market psychology:\n• Crowd positioning: ${fg < 30 ? 'Extreme pessimism = contrarian BUY signal' : fg > 70 ? 'Extreme optimism = contrarian SELL warning' : 'Neutral sentiment'}.\n• Recommended action: ${fg < 25 ? 'LONG with conviction' : fg > 75 ? 'SHORT or REDUCE' : 'Follow technical signals'}.`
+            },
+            brainstorm: {
+                'AlgoQ': `**Creative Strategy Ideas**: ${baseAnalysis['AlgoQ']}.\n\nInnovative approaches:\n• Grid trading: Set up 5 buy orders at 1% intervals below current price.\n• DCA enhancement: ${rsi < 40 ? 'Accelerate accumulation schedule' : 'Pause and wait for dip'}.\n• What if we tried: Momentum scalping with 0.5% targets during high volume periods?`,
+                'Strategist': `**Strategic Innovation**: ${lastSpeaker ? `Building on ${lastSpeaker.agent}'s ideas: ` : ''}What if we:\n• ${trend === 'Uptrend' ? 'Add pyramid positions at each new high' : 'Set up inverse DCA for shorts'}?\n• Explore: Cross-asset correlation strategy using BTC/BNB ratio.\n• Consider: Time-based entries during historically profitable hours (2-4 AM UTC).`,
+                'Analyst': `**Data-Driven Creativity**: ${lastSpeaker ? `Expanding ${lastSpeaker.agent}'s concept: ` : ''}New approaches:\n• Pattern recognition: ${rsi > 50 ? 'Look for continuation flags' : 'Scout for reversal patterns'}.\n• Alternative metrics: What if we weighted recent trades 2x in our signals?\n• Experimental: Machine learning ensemble voting on next 4h direction.`,
+                'RiskManager': `**Risk Innovation**: ${lastSpeaker ? `Making ${lastSpeaker.agent}'s idea safer: ` : ''}Creative risk management:\n• Dynamic stops: Trail by ATR(14) * 1.5 instead of fixed %.\n• Position scaling: What if we used inverse volatility sizing?\n• Insurance: Consider options collar during high F&G readings.`,
+                'Sentiment': `**Sentiment Strategies**: ${lastSpeaker ? `Adding emotional intelligence to ${lastSpeaker.agent}'s strategy: ` : ''}Crowd psychology plays:\n• Contrarian timing: ${fg < 30 ? 'Buy when Twitter is crying' : fg > 70 ? 'Sell when everyone is celebrating' : 'Follow momentum'}.\n• Social signals: Monitor large wallet movements for early warnings.`
+            },
+            debate: {
+                'AlgoQ': `**Challenging the Analysis**: ${baseAnalysis['AlgoQ']}.\n\n${lastSpeaker ? `I disagree with ${lastSpeaker.agent}'s position. ` : ''}Counter-argument:\n• ${rsi < 30 ? 'Just because RSI is oversold doesn\'t mean it can\'t go lower - "oversold can stay oversold"' : 'Overbought conditions can persist in strong trends'}.\n• My position: ${rsi > 60 ? 'Wait for confirmation before acting' : 'Smaller initial size, scale in on confirmation'}.`,
+                'Strategist': `**Strategic Counter-Point**: ${lastSpeaker ? `While ${lastSpeaker.agent} makes valid points, ` : ''}I challenge:\n• ${trend === 'Uptrend' ? 'Trends end eventually - we may be near exhaustion' : 'Downtrends offer short opportunities many miss'}.\n• Risk of their approach: ${fg > 50 ? 'Chasing at potentially elevated levels' : 'Missing the turn if sentiment shifts'}.\n• Alternative view: Consider the opposite scenario.`,
+                'Analyst': `**Data Debate**: ${lastSpeaker ? `${lastSpeaker.agent}'s analysis overlooks: ` : ''}Statistical concerns:\n• Selection bias: Are we cherry-picking supportive data?\n• Counter-data: ${rsi > 50 ? 'Similar RSI readings in 2022 led to 30% drops' : 'Oversold bounces failed 40% of time in bear markets'}.\n• Weakness: Single-indicator reliance is dangerous.`,
+                'RiskManager': `**Risk Challenge**: ${lastSpeaker ? `I must push back on ${lastSpeaker.agent}: ` : ''}Safety concerns:\n• ${fg < 40 ? 'Fear can be justified - don\'t catch falling knives' : 'Complacency is the biggest risk right now'}.\n• Position size debate: ${rsi > 60 ? 'Proposed sizing is too aggressive for these conditions' : 'We\'re being too conservative, missing opportunities'}.\n• Counter-proposal: ${rsi > 70 ? 'Reduce ALL positions by 30%' : 'Maximum 50% of proposed size'}.`,
+                'Sentiment': `**Sentiment Counter**: ${lastSpeaker ? `Against ${lastSpeaker.agent}'s view: ` : ''}Market psychology debate:\n• ${fg > 50 ? 'The crowd is right during trends - contrarian losses money' : 'Fear is sometimes rational - smart money is exiting'}.\n• Challenge: ${fg < 30 ? 'Is this "extreme fear" or rational response to real risks?' : 'Is greed driving prices or is there fundamental support?'}.\n• Alternative read: Maybe the crowd is smarter than we think.`
+            }
+        };
+
+        return modeResponses[mode]?.[agentId] || `Analysis in progress for ${mode} mode...`;
     }
 
     extractSummary(response) {
@@ -804,6 +943,8 @@ const councilManager = new CouncilManager();
 module.exports = {
     CouncilManager,
     CouncilState,
+    DiscussionModes,
+    MODE_PROMPTS,
     AGENT_DIRECTIVES,
     councilManager
 };

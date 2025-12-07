@@ -758,8 +758,60 @@ let councilState = {
     paused: false,
     currentRound: 0,
     maxRounds: 5,
-    sessionId: null
+    sessionId: null,
+    discussionMode: 'analyse',
+    lastSpeaker: null,
+    discussionHistory: []
 };
+
+// Discussion mode descriptions
+const DISCUSSION_MODES = {
+    analyse: {
+        name: 'Analyse',
+        description: 'Deep data-driven market analysis',
+        prompt: 'Provide detailed quantitative analysis with specific data points, metrics, and evidence-based conclusions.'
+    },
+    brainstorm: {
+        name: 'Brainstorm',
+        description: 'Creative strategy exploration',
+        prompt: 'Think creatively and propose innovative strategies. Build on others\' ideas and suggest unconventional approaches.'
+    },
+    debate: {
+        name: 'Debate',
+        description: 'Challenge and counter-argue',
+        prompt: 'Challenge the previous speaker\'s position. Present counter-arguments and alternative viewpoints. Be critical but constructive.'
+    }
+};
+
+// Set discussion mode
+function setDiscussionMode(mode) {
+    councilState.discussionMode = mode;
+
+    // Update UI
+    const modeButtons = document.querySelectorAll('.mode-btn');
+    modeButtons.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.mode === mode) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Update mode indicator
+    const modeIndicator = document.getElementById('council-mode-indicator');
+    if (modeIndicator) {
+        const modeInfo = DISCUSSION_MODES[mode];
+        modeIndicator.textContent = `Mode: ${modeInfo.name}`;
+    }
+
+    // If session is active, notify the server
+    if (councilState.active) {
+        socket.emit('council-set-mode', { mode });
+        addCouncilEntry({
+            type: 'system',
+            content: `Discussion mode changed to: ${DISCUSSION_MODES[mode].name} - ${DISCUSSION_MODES[mode].description}`
+        });
+    }
+}
 
 // Start council session
 function startCouncilSession() {
@@ -767,16 +819,29 @@ function startCouncilSession() {
     const topic = topicInput ? topicInput.value.trim() : '';
 
     const log = document.getElementById('council-log');
+    const modeInfo = DISCUSSION_MODES[councilState.discussionMode];
+
     log.innerHTML = `
         <div class="council-entry system">
-            <span class="entry-content">Initializing council session... Agents preparing for discussion.</span>
+            <span class="entry-content">Initializing council session...</span>
+        </div>
+        <div class="council-entry system">
+            <span class="entry-content">Mode: ${modeInfo.name} - ${modeInfo.description}</span>
+        </div>
+        <div class="council-entry system">
+            <span class="entry-content">Agents preparing for discussion. They will exchange ideas and respond to each other.</span>
         </div>
     `;
 
     // Reset voting display
     resetVotingDisplay();
+    councilState.discussionHistory = [];
+    councilState.lastSpeaker = null;
 
-    socket.emit('council-start', { topic: topic || 'Market Analysis & Trading Strategy' });
+    socket.emit('council-start', {
+        topic: topic || 'Market Analysis & Trading Strategy',
+        mode: councilState.discussionMode
+    });
 
     // Update UI
     updateCouncilControls('running');
@@ -916,15 +981,37 @@ function addCouncilEntry(data) {
             <span class="entry-content">${data.content}</span>
         `;
     } else if (data.agent) {
-        entry.className = 'council-entry agent';
+        // Check if this is a response to another agent
+        const isResponse = data.respondingTo && councilState.lastSpeaker;
+        entry.className = `council-entry agent${isResponse ? ' response-to' : ''}`;
+
         const formatted = (data.content || '')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\n/g, '<br>');
+            .replace(/\n/g, '<br>')
+            .replace(/• /g, '&bull; ')
+            .replace(/→/g, '&rarr;');
+
+        // Build response indicator if responding to someone
+        let responseIndicator = '';
+        if (data.respondingTo) {
+            responseIndicator = `<span class="response-indicator">Responding to ${data.respondingTo}</span>`;
+        }
+
         entry.innerHTML = `
+            ${responseIndicator}
             <span class="entry-time">${time}</span>
             <span class="agent-badge">${getAgentEmoji(data.agent)} ${data.agent}</span>
             <span class="entry-content">${formatted}</span>
         `;
+
+        // Track discussion history
+        councilState.discussionHistory.push({
+            agent: data.agent,
+            content: data.content,
+            respondingTo: data.respondingTo
+        });
+        councilState.lastSpeaker = data.agent;
+
         updateMemberStatus(data.agent, 'speaking');
         setTimeout(() => updateMemberStatus(data.agent, 'ready'), 3000);
     } else if (data.type === 'round') {
@@ -932,6 +1019,7 @@ function addCouncilEntry(data) {
         entry.innerHTML = `
             <span class="round-badge">Round ${data.round} of ${data.maxRounds}</span>
         `;
+        councilState.currentRound = data.round;
     } else if (data.type === 'voting') {
         entry.className = 'council-entry voting';
         entry.innerHTML = `
@@ -943,6 +1031,13 @@ function addCouncilEntry(data) {
         entry.innerHTML = `
             <span class="entry-time">${time}</span>
             <span class="entry-content">✅ ${data.content}</span>
+        `;
+    } else if (data.type === 'exchange') {
+        // Agent exchange/debate entry
+        entry.className = 'council-entry exchange';
+        entry.innerHTML = `
+            <span class="entry-time">${time}</span>
+            <span class="entry-content">💬 ${data.content}</span>
         `;
     } else {
         entry.className = 'council-entry system';
@@ -1210,14 +1305,14 @@ function updateInstitutionalDashboard(data) {
         const bigStatus = document.getElementById('big-bot-status');
         if (bigStatus) {
             const statusDot = bigStatus.querySelector('.status-dot');
-            const statusText = bigStatus.querySelector('.status-text');
+            const statusTextEl = document.getElementById('bot-status-text');
 
             if (data.botStatus.running) {
-                statusDot.className = 'status-dot running';
-                statusText.textContent = 'Running';
+                if (statusDot) statusDot.className = 'status-dot running';
+                if (statusTextEl) statusTextEl.textContent = 'Running';
             } else {
-                statusDot.className = 'status-dot stopped';
-                statusText.textContent = 'Stopped';
+                if (statusDot) statusDot.className = 'status-dot stopped';
+                if (statusTextEl) statusTextEl.textContent = 'Stopped';
             }
         }
 
@@ -1234,61 +1329,216 @@ function updateInstitutionalDashboard(data) {
             }
         }
 
-        // Update uptime
+        // Update PID, uptime, CPU, memory
+        const pidEl = document.getElementById('bot-pid');
         const uptimeEl = document.getElementById('bot-uptime');
+        const cpuEl = document.getElementById('bot-cpu');
+        const memEl = document.getElementById('bot-memory');
+
+        if (pidEl) pidEl.textContent = data.botStatus.pid || '--';
         if (uptimeEl) uptimeEl.textContent = data.botStatus.uptime || '--';
+        if (cpuEl) cpuEl.textContent = data.botStatus.cpu || '0';
+        if (memEl) memEl.textContent = data.botStatus.memory || '0';
     }
 
     // [2] Portfolio
     if (data.portfolio) {
         const total = data.portfolio.totalValue || 0;
-        document.getElementById('total-value').textContent = total.toFixed(2);
-        document.getElementById('usdt-balance').textContent = (data.portfolio.usdt || 0).toFixed(2);
-        document.getElementById('bnb-balance').textContent = (data.portfolio.bnb || 0).toFixed(4);
+        const totalEl = document.getElementById('total-value');
+        const usdtEl = document.getElementById('usdt-balance');
+        const bnbEl = document.getElementById('bnb-balance');
+        const bnbPctEl = document.getElementById('bnb-percent');
+        const allocStatusEl = document.getElementById('allocation-status');
+
+        if (totalEl) totalEl.textContent = total.toFixed(2);
+        if (usdtEl) usdtEl.textContent = (data.portfolio.usdt || 0).toFixed(2);
+        if (bnbEl) bnbEl.textContent = (data.portfolio.bnb || 0).toFixed(4);
 
         // Allocation bars
-        const usdtPct = total > 0 ? ((data.portfolio.usdt || 0) / total) * 100 : 50;
-        const bnbPct = 100 - usdtPct;
-        document.getElementById('usdt-bar').style.width = `${usdtPct}%`;
-        document.getElementById('bnb-bar').style.width = `${bnbPct}%`;
+        const bnbPct = data.portfolio.bnbPercent || 0;
+        const usdtPct = 100 - bnbPct;
+
+        const usdtBar = document.getElementById('usdt-bar');
+        const bnbBar = document.getElementById('bnb-bar');
+
+        if (usdtBar) usdtBar.style.width = `${usdtPct}%`;
+        if (bnbBar) bnbBar.style.width = `${bnbPct}%`;
+        if (bnbPctEl) bnbPctEl.textContent = bnbPct.toFixed(1);
+
+        // Allocation status
+        if (allocStatusEl) {
+            const inRange = data.portfolio.inRange;
+            allocStatusEl.textContent = inRange ? 'In target range' : 'Out of target range';
+            allocStatusEl.style.color = inRange ? 'var(--accent-green)' : 'var(--accent-orange)';
+        }
     }
 
     // [3] Market
     if (data.market) {
-        document.getElementById('bnb-price').textContent = `$${(data.market.price || 0).toFixed(2)}`;
+        const priceEl = document.getElementById('bnb-price');
         const changeEl = document.getElementById('price-change');
-        const change = data.market.change24h || 0;
-        changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-        changeEl.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
-
-        // Regime
-        const regimeEl = document.getElementById('current-regime');
-        if (regimeEl) regimeEl.textContent = data.market.regime || '--';
-
-        // Volatility
+        const btcEl = document.getElementById('btc-price');
         const volEl = document.getElementById('volatility');
+        const regimeEl = document.getElementById('current-regime');
+
+        if (priceEl) priceEl.textContent = `$${(data.market.price || 0).toFixed(2)}`;
+
+        if (changeEl) {
+            const change = data.market.change24h || 0;
+            changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+            changeEl.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
+        }
+
+        if (btcEl) btcEl.textContent = `$${(data.market.btcPrice || 0).toFixed(0)}`;
+
         if (volEl) {
             const vol = typeof data.market.volatility === 'number'
                 ? `${data.market.volatility.toFixed(2)}%`
                 : data.market.volatility || '--';
             volEl.textContent = vol;
         }
+
+        if (regimeEl) {
+            const regime = data.market.regime || '--';
+            regimeEl.textContent = regime;
+            regimeEl.className = 'inst-value regime-badge';
+            if (regime.toLowerCase().includes('high')) regimeEl.classList.add('high');
+            else if (regime.toLowerCase().includes('medium')) regimeEl.classList.add('medium');
+            else if (regime.toLowerCase().includes('low')) regimeEl.classList.add('low');
+        }
     }
 
-    // [4] Stats
-    if (data.stats) {
-        document.getElementById('total-trades').textContent = data.stats.totalTrades || 0;
-        document.getElementById('win-rate').textContent = `${(data.stats.winRate || 0).toFixed(1)}%`;
+    // [4] Institutional Indicators
+    if (data.institutional) {
+        const inst = data.institutional;
+
+        // Order Flow
+        updateIndicator('orderflow', inst.orderFlow?.score, inst.orderFlow?.delta, 'orderflow-delta');
+        // Volume Profile
+        updateIndicator('volumeprofile', inst.volumeProfile?.score, inst.volumeProfile?.poc, 'volumeprofile-poc');
+        // Liquidity
+        updateIndicator('liquidity', inst.liquidity?.score, inst.liquidity?.ratio, 'liquidity-ratio');
+        // VWAP
+        updateIndicator('vwap', inst.vwap?.score);
+        // ATR
+        updateIndicator('atr', inst.atr?.score);
+        // Regime
+        updateIndicator('regime', inst.regime?.score);
+
+        // Final Confidence
+        const confEl = document.getElementById('final-confidence');
+        const confFill = document.getElementById('conf-fill');
+        const confTimestamp = document.getElementById('conf-timestamp');
+
+        if (confEl) {
+            const conf = inst.finalConfidence || 0;
+            const confStr = typeof conf === 'string' ? conf : `${conf.toFixed(1)}%`;
+            confEl.textContent = confStr;
+
+            const confNum = parseFloat(conf) || 0;
+            if (confFill) confFill.style.width = `${Math.min(confNum, 100)}%`;
+        }
+
+        if (confTimestamp && inst.timestamp) {
+            const date = new Date(inst.timestamp);
+            confTimestamp.textContent = `Last updated: ${date.toLocaleTimeString()}`;
+        }
     }
 
-    // Trading activity
+    // [5] Trading Activity
     if (data.tradingActivity) {
-        const tradesTodayEl = document.getElementById('open-positions');
-        if (tradesTodayEl) tradesTodayEl.textContent = data.tradingActivity.tradesToday || 0;
+        const tradesToday = document.getElementById('trades-today');
+        const lastDecision = document.getElementById('last-decision');
+
+        if (tradesToday) tradesToday.textContent = data.tradingActivity.tradesToday || 0;
+
+        if (lastDecision && data.tradingActivity.lastDecision) {
+            const decision = data.tradingActivity.lastDecision;
+            let action = 'HOLD';
+            if (decision.message) {
+                if (decision.message.includes('"action":"buy"')) action = 'BUY';
+                else if (decision.message.includes('"action":"sell"')) action = 'SELL';
+            }
+            lastDecision.textContent = action;
+            lastDecision.className = `inst-value decision-badge ${action.toLowerCase()}`;
+        }
+    }
+
+    // [6] Last 3 Trades
+    if (data.last3Trades) {
+        const tradesContainer = document.getElementById('last-3-trades');
+        if (tradesContainer) {
+            if (data.last3Trades.length > 0) {
+                tradesContainer.innerHTML = data.last3Trades.map(trade => {
+                    const action = trade.action || 'hold';
+                    const msg = trade.message?.replace('Shadow Trade: ', '') || '';
+                    return `<div class="trade-item ${action}">${msg}</div>`;
+                }).join('');
+            } else {
+                tradesContainer.innerHTML = '<div class="trade-item placeholder">No trades yet</div>';
+            }
+        }
+    }
+
+    // [7] Active Positions
+    if (data.positions) {
+        const totalPos = document.getElementById('total-positions');
+        const virtualPos = document.getElementById('virtual-positions');
+        const livePos = document.getElementById('live-positions');
+
+        const posCount = data.positions.active || data.positions.positions?.length || 0;
+        if (totalPos) totalPos.textContent = posCount;
+        if (virtualPos) virtualPos.textContent = data.positions.virtual || posCount;
+        if (livePos) livePos.textContent = data.positions.live || 0;
+
+        // Positions table
+        const posTable = document.getElementById('positions-table');
+        if (posTable && data.positions.positions && data.positions.positions.length > 0) {
+            posTable.innerHTML = data.positions.positions.slice(0, 5).map(p => `
+                <div class="trade-item ${(p.profitPercent || 0) >= 0 ? 'buy' : 'sell'}">
+                    <span>${p.id?.slice(-8) || 'Position'}</span>
+                    <span style="float: right">${(p.profitPercent || 0).toFixed(2)}%</span>
+                </div>
+            `).join('');
+        }
+    }
+
+    // [8] Recent Errors
+    if (data.errors) {
+        const errorsList = document.getElementById('errors-list');
+        if (errorsList) {
+            if (data.errors.length > 0) {
+                errorsList.innerHTML = data.errors.slice(0, 5).map(err => {
+                    const msg = err.message || JSON.stringify(err);
+                    return `<div class="error-item">${msg}</div>`;
+                }).join('');
+            } else {
+                errorsList.innerHTML = '<div class="no-errors">No errors</div>';
+            }
+        }
     }
 
     // Update last update time
     updateLastUpdate();
+}
+
+// Helper to update indicator scores
+function updateIndicator(id, score, detail = null, detailId = null) {
+    const scoreEl = document.getElementById(`${id}-score`);
+    if (scoreEl) {
+        scoreEl.textContent = score || '--';
+        scoreEl.className = 'ind-score';
+        if (score) {
+            const scoreStr = String(score);
+            if (scoreStr.startsWith('+')) scoreEl.classList.add('positive');
+            else if (scoreStr.startsWith('-')) scoreEl.classList.add('negative');
+            else scoreEl.classList.add('neutral');
+        }
+    }
+    if (detail && detailId) {
+        const detailEl = document.getElementById(detailId);
+        if (detailEl) detailEl.textContent = detail;
+    }
 }
 
 // ============== LIVE LOGS ==============

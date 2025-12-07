@@ -60,137 +60,210 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <!-- Live Monitor Section -->
+        <!-- Live Monitor Section - INSTITUTIONAL DASHBOARD -->
         <section id="monitor" class="section active">
-            <div class="section-header">
-                <h2>Live Monitor</h2>
+            <div class="section-header institutional-header">
+                <h2>INSTITUTIONAL DASHBOARD</h2>
                 <div class="refresh-indicator">
                     <span class="pulse"></span>
-                    <span>Auto-refresh: 5s</span>
+                    <span>Live - Auto-refresh: 10s</span>
                 </div>
             </div>
 
-            <div class="dashboard-grid">
-                <!-- Bot Status Card -->
-                <div class="card status-card">
-                    <div class="card-header">
-                        <h3>Bot Status</h3>
-                        <span class="card-icon">🤖</span>
-                    </div>
-                    <div class="card-body">
+            <!-- [1] BOT STATUS -->
+            <div class="institutional-section">
+                <div class="section-title">[1] BOT STATUS</div>
+                <div class="inst-grid-4">
+                    <div class="inst-item">
+                        <span class="inst-label">Status</span>
                         <div class="big-status" id="big-bot-status">
                             <span class="status-dot"></span>
-                            <span class="status-text">Loading...</span>
+                            <span class="status-text" id="bot-status-text">Loading...</span>
                         </div>
-                        <div class="status-details">
-                            <div class="detail-row">
-                                <span class="label">Strategy:</span>
-                                <span class="value" id="current-strategy">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Regime:</span>
-                                <span class="value" id="current-regime">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Confidence:</span>
-                                <span class="value" id="current-confidence">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Uptime:</span>
-                                <span class="value" id="bot-uptime">--</span>
-                            </div>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">PID</span>
+                        <span class="inst-value" id="bot-pid">--</span>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">Uptime</span>
+                        <span class="inst-value" id="bot-uptime">--</span>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">CPU / Memory</span>
+                        <span class="inst-value"><span id="bot-cpu">0</span>% / <span id="bot-memory">0</span>%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [2] PORTFOLIO STATUS -->
+            <div class="institutional-section">
+                <div class="section-title">[2] PORTFOLIO STATUS</div>
+                <div class="inst-grid-3">
+                    <div class="inst-item highlight">
+                        <span class="inst-label">Total Value</span>
+                        <span class="inst-value large">$<span id="total-value">0.00</span></span>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">USDT</span>
+                        <span class="inst-value" id="usdt-balance">0.00</span>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">BNB</span>
+                        <span class="inst-value" id="bnb-balance">0.0000</span>
+                    </div>
+                </div>
+                <div class="allocation-container">
+                    <span class="inst-label">BNB Allocation: <span id="bnb-percent">0</span>% (target 35-45%)</span>
+                    <div class="allocation-bar-full">
+                        <div class="usdt-bar" id="usdt-bar"></div>
+                        <div class="bnb-bar" id="bnb-bar"></div>
+                    </div>
+                    <span class="allocation-status" id="allocation-status"></span>
+                </div>
+            </div>
+
+            <!-- [3] MARKET CONDITIONS -->
+            <div class="institutional-section">
+                <div class="section-title">[3] MARKET CONDITIONS</div>
+                <div class="inst-grid-4">
+                    <div class="inst-item highlight">
+                        <span class="inst-label">BNB Price</span>
+                        <span class="inst-value large" id="bnb-price">$0.00</span>
+                        <span class="change" id="price-change">+0.00%</span>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">BTC Price</span>
+                        <span class="inst-value" id="btc-price">$0</span>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">Volatility (4h)</span>
+                        <span class="inst-value" id="volatility">--</span>
+                    </div>
+                    <div class="inst-item">
+                        <span class="inst-label">Regime</span>
+                        <span class="inst-value regime-badge" id="current-regime">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [4] INSTITUTIONAL TOOLS (6-Indicator System) -->
+            <div class="institutional-section inst-tools">
+                <div class="section-title">[4] INSTITUTIONAL TOOLS (6-Indicator System)</div>
+
+                <div class="indicator-group">
+                    <div class="group-header">INSTITUTIONAL TOOLS (56% total weight)</div>
+                    <div class="inst-grid-3">
+                        <div class="indicator-item" id="ind-orderflow">
+                            <span class="ind-num">[1/6]</span>
+                            <span class="ind-name">Order Flow (20%)</span>
+                            <span class="ind-score" id="orderflow-score">--</span>
+                            <span class="ind-detail">Delta: <span id="orderflow-delta">--</span></span>
+                        </div>
+                        <div class="indicator-item" id="ind-volumeprofile">
+                            <span class="ind-num">[2/6]</span>
+                            <span class="ind-name">Volume Profile (18%)</span>
+                            <span class="ind-score" id="volumeprofile-score">--</span>
+                            <span class="ind-detail">POC: <span id="volumeprofile-poc">--</span></span>
+                        </div>
+                        <div class="indicator-item" id="ind-liquidity">
+                            <span class="ind-num">[3/6]</span>
+                            <span class="ind-name">Liquidity (18%)</span>
+                            <span class="ind-score" id="liquidity-score">--</span>
+                            <span class="ind-detail">Ratio: <span id="liquidity-ratio">--</span></span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Portfolio Card -->
-                <div class="card portfolio-card">
-                    <div class="card-header">
-                        <h3>Portfolio Value</h3>
-                        <span class="card-icon">💼</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="portfolio-total">
-                            <span class="currency">$</span>
-                            <span class="amount" id="total-value">0.00</span>
+                <div class="indicator-group">
+                    <div class="group-header">TECHNICAL TOOLS (44% total weight)</div>
+                    <div class="inst-grid-3">
+                        <div class="indicator-item" id="ind-vwap">
+                            <span class="ind-num">[4/6]</span>
+                            <span class="ind-name">VWAP (15%)</span>
+                            <span class="ind-score" id="vwap-score">--</span>
                         </div>
-                        <div class="portfolio-breakdown">
-                            <div class="asset">
-                                <span class="asset-icon">💵</span>
-                                <span class="asset-name">USDT</span>
-                                <span class="asset-value" id="usdt-balance">0.00</span>
-                            </div>
-                            <div class="asset">
-                                <span class="asset-icon">🔶</span>
-                                <span class="asset-name">BNB</span>
-                                <span class="asset-value" id="bnb-balance">0.0000</span>
-                            </div>
+                        <div class="indicator-item" id="ind-atr">
+                            <span class="ind-num">[5/6]</span>
+                            <span class="ind-name">ATR (12%)</span>
+                            <span class="ind-score" id="atr-score">--</span>
                         </div>
-                        <div class="allocation-bar">
-                            <div class="usdt-bar" id="usdt-bar"></div>
-                            <div class="bnb-bar" id="bnb-bar"></div>
+                        <div class="indicator-item" id="ind-regime">
+                            <span class="ind-num">[6/6]</span>
+                            <span class="ind-name">Regime (9%)</span>
+                            <span class="ind-score" id="regime-score">--</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Market Data Card -->
-                <div class="card market-card">
-                    <div class="card-header">
-                        <h3>Market Data</h3>
-                        <span class="card-icon">📈</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="price-display">
-                            <span class="label">BNB/USDT</span>
-                            <span class="price" id="bnb-price">$0.00</span>
-                            <span class="change" id="price-change">+0.00%</span>
+                <div class="confidence-display">
+                    <span class="conf-label">FINAL INSTITUTIONAL CONFIDENCE:</span>
+                    <span class="conf-value" id="final-confidence">--</span>
+                    <div class="conf-bar"><div class="conf-fill" id="conf-fill"></div></div>
+                    <span class="conf-timestamp" id="conf-timestamp">--</span>
+                </div>
+            </div>
+
+            <!-- [5] & [6] RECENT TRADING ACTIVITY & LAST 3 TRADES -->
+            <div class="institutional-row">
+                <div class="institutional-section half">
+                    <div class="section-title">[5] RECENT TRADING ACTIVITY</div>
+                    <div class="inst-grid-2">
+                        <div class="inst-item">
+                            <span class="inst-label">Trades Today</span>
+                            <span class="inst-value large" id="trades-today">0</span>
                         </div>
-                        <div class="market-metrics">
-                            <div class="metric">
-                                <span class="label">24h Vol</span>
-                                <span class="value" id="volume-24h">--</span>
-                            </div>
-                            <div class="metric">
-                                <span class="label">Volatility</span>
-                                <span class="value" id="volatility">--</span>
-                            </div>
+                        <div class="inst-item">
+                            <span class="inst-label">Last Decision</span>
+                            <span class="inst-value decision-badge" id="last-decision">--</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Trading Stats Card -->
-                <div class="card stats-card">
-                    <div class="card-header">
-                        <h3>Trading Stats</h3>
-                        <span class="card-icon">📊</span>
+                <div class="institutional-section half">
+                    <div class="section-title">[6] LAST 3 TRADES</div>
+                    <div class="trades-list" id="last-3-trades">
+                        <div class="trade-item placeholder">No trades yet</div>
                     </div>
-                    <div class="card-body">
-                        <div class="stats-grid">
-                            <div class="stat">
-                                <span class="stat-value" id="total-trades">0</span>
-                                <span class="stat-label">Total Trades</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="win-rate">0%</span>
-                                <span class="stat-label">Win Rate</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="open-positions">0</span>
-                                <span class="stat-label">Open Positions</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="today-pnl">$0.00</span>
-                                <span class="stat-label">Today P&L</span>
-                            </div>
+                </div>
+            </div>
+
+            <!-- [7] ACTIVE POSITIONS -->
+            <div class="institutional-section">
+                <div class="section-title">[7] ACTIVE POSITIONS</div>
+                <div class="positions-summary" id="positions-summary">
+                    <div class="inst-grid-3">
+                        <div class="inst-item">
+                            <span class="inst-label">Total Active</span>
+                            <span class="inst-value" id="total-positions">0</span>
+                        </div>
+                        <div class="inst-item">
+                            <span class="inst-label">Virtual</span>
+                            <span class="inst-value" id="virtual-positions">0</span>
+                        </div>
+                        <div class="inst-item">
+                            <span class="inst-label">Live</span>
+                            <span class="inst-value" id="live-positions">0</span>
                         </div>
                     </div>
+                </div>
+                <div class="positions-table-container" id="positions-table">
+                    <div class="empty-state">No open positions</div>
+                </div>
+            </div>
+
+            <!-- [8] RECENT ERRORS -->
+            <div class="institutional-section errors-section">
+                <div class="section-title">[8] RECENT ERRORS</div>
+                <div class="errors-list" id="errors-list">
+                    <div class="no-errors">No errors</div>
                 </div>
             </div>
 
             <!-- Activity Log -->
             <div class="card activity-card">
                 <div class="card-header">
-                    <h3>Activity Log</h3>
+                    <h3>Live Activity Log</h3>
                     <button class="btn-small" onclick="clearActivityLog()">Clear</button>
                 </div>
                 <div class="card-body">
@@ -291,7 +364,29 @@
         <section id="council" class="section">
             <div class="section-header">
                 <h2>AI Council</h2>
-                <span class="section-desc">Autonomous multi-agent consensus system</span>
+                <span class="section-desc">Autonomous multi-agent consensus system with interactive discussions</span>
+            </div>
+
+            <!-- Discussion Mode Selection -->
+            <div class="discussion-mode-panel">
+                <div class="mode-label">Discussion Mode:</div>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" data-mode="analyse" onclick="setDiscussionMode('analyse')">
+                        <span class="mode-icon">🔍</span>
+                        <span class="mode-name">Analyse</span>
+                        <span class="mode-desc">Deep market analysis with data</span>
+                    </button>
+                    <button class="mode-btn" data-mode="brainstorm" onclick="setDiscussionMode('brainstorm')">
+                        <span class="mode-icon">💡</span>
+                        <span class="mode-name">Brainstorm</span>
+                        <span class="mode-desc">Creative strategy exploration</span>
+                    </button>
+                    <button class="mode-btn" data-mode="debate" onclick="setDiscussionMode('debate')">
+                        <span class="mode-icon">⚔️</span>
+                        <span class="mode-name">Debate</span>
+                        <span class="mode-desc">Challenge & counter-argue positions</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Control Panel -->
@@ -300,6 +395,7 @@
                     <span class="status-indicator" id="council-status-indicator">●</span>
                     <span id="council-status-text">Idle</span>
                     <span class="round-info" id="council-round-info"></span>
+                    <span class="mode-indicator" id="council-mode-indicator">Mode: Analyse</span>
                 </div>
                 <div class="control-buttons">
                     <button class="control-btn start" onclick="startCouncilSession()" id="btn-council-start">▶ Start</button>

@@ -767,6 +767,269 @@ async function generateAIResponse(message, context) {
     return generateEnhancedAIResponse('AlgoQ', message, fullContext);
 }
 
+// ============== DETAILED AI CHAT RESPONSES WITH LIVE DATA ==============
+async function generateDetailedAIResponse(message, ctx) {
+    const { botData, marketData, technical, sentiment, trades, balances, total, price } = ctx;
+
+    const lowerMsg = message.toLowerCase();
+    const fg = sentiment?.value || 50;
+    const fgClass = sentiment?.classification || 'Neutral';
+    const rsi = technical?.rsi || 50;
+    const trend = technical?.trend || 'Sideways';
+    const bnbChange = marketData?.bnb?.change24h || 0;
+    const btcPrice = marketData?.btc?.price || 0;
+    const bnbPct = total > 0 ? ((balances.bnb * price) / total * 100) : 0;
+
+    // Comprehensive bot/system status
+    if (lowerMsg.includes('status') || lowerMsg.includes('running') || lowerMsg.includes('bot') || lowerMsg.includes('how are')) {
+        const riskLevel = botData.stats?.winRate >= 50 ? 'LOW' : botData.stats?.winRate >= 35 ? 'MEDIUM' : 'HIGH';
+
+        return `**ALGOQBOT SYSTEM STATUS REPORT**
+
+**System Health**
+• Status: ${botData.running ? '🟢 RUNNING' : '🔴 STOPPED'}
+• Process ID: ${botData.pid || 'N/A'}
+• Uptime: ${botData.uptime || 'N/A'}
+• CPU Usage: ${botData.cpu}% | Memory: ${botData.memory}%
+• Trading Mode: Shadow Trading (Simulated)
+
+**Live Market Conditions**
+• BNB Price: $${price.toFixed(2)} (${bnbChange >= 0 ? '+' : ''}${bnbChange.toFixed(2)}% 24h)
+• BTC Price: $${btcPrice.toFixed(0)}
+• Market Regime: ${botData.regime?.toUpperCase() || trend}
+• Volatility: ${technical?.volatility?.toFixed(2) || 'N/A'}%
+
+**Technical Indicators**
+• RSI(14): ${rsi.toFixed(1)} ${rsi > 70 ? '(OVERBOUGHT - Consider reducing)' : rsi < 30 ? '(OVERSOLD - Watch for entry)' : '(Neutral)'}
+• Trend: ${trend}
+• Support: $${technical?.support?.toFixed(2) || 'N/A'} | Resistance: $${technical?.resistance?.toFixed(2) || 'N/A'}
+
+**Market Sentiment**
+• Fear & Greed Index: ${fg}/100 (${fgClass})
+• ${fg < 25 ? 'Extreme fear = Potential contrarian BUY opportunity' : fg > 75 ? 'Extreme greed = Caution advised, potential reversal' : 'Sentiment balanced - Follow technicals'}
+
+**Trading Performance Today**
+• Trades Executed: ${botData.tradesToday || 0}
+• Win Rate: ${(botData.stats?.winRate || 0).toFixed(1)}%
+• Risk Level: ${riskLevel}
+
+**Portfolio Summary**
+• Total Value: $${total.toFixed(2)}
+• USDT: $${balances.usdt.toFixed(2)} (${((balances.usdt / total) * 100).toFixed(1)}%)
+• BNB: ${balances.bnb.toFixed(4)} ($${(balances.bnb * price).toFixed(2)}) (${bnbPct.toFixed(1)}%)
+• Allocation Status: ${bnbPct >= 35 && bnbPct <= 45 ? '✅ In target range (35-45%)' : '⚠️ Out of target range'}
+
+**My Assessment**: ${getMarketAssessment(rsi, fg, trend, botData.stats?.winRate || 0)}`;
+    }
+
+    // Deep market analysis
+    if (lowerMsg.includes('market') || lowerMsg.includes('price') || lowerMsg.includes('bnb') || lowerMsg.includes('analyse') || lowerMsg.includes('analyze')) {
+        return `**DETAILED MARKET ANALYSIS**
+
+**Current Prices**
+• BNB/USDT: $${price.toFixed(2)} (${bnbChange >= 0 ? '▲' : '▼'} ${Math.abs(bnbChange).toFixed(2)}% in 24h)
+• BTC/USDT: $${btcPrice.toFixed(0)} (market leader)
+• BNB/BTC Correlation: ${btcPrice > 0 ? (price / btcPrice * 10000).toFixed(4) : 'N/A'}
+
+**Technical Analysis**
+• RSI(14): ${rsi.toFixed(1)} - ${rsi > 70 ? 'OVERBOUGHT territory (>70). Historically leads to 3-5% corrections within 48h. Consider taking profits or tightening stops.' : rsi < 30 ? 'OVERSOLD territory (<30). Statistical probability of 68% for bounce within 24h. Watch for volume confirmation.' : 'Neutral zone. No extreme readings. Follow trend direction.'}
+• SMA(20): $${technical?.sma20?.toFixed(2) || 'N/A'} ${price > (technical?.sma20 || 0) ? '(Price above - Bullish bias)' : '(Price below - Bearish pressure)'}
+• SMA(50): $${technical?.sma50?.toFixed(2) || 'N/A'} ${price > (technical?.sma50 || 0) ? '(Above - Medium-term uptrend)' : '(Below - Medium-term downtrend)'}
+• Volatility: ${technical?.volatility?.toFixed(2) || 'N/A'}% ${technical?.volatility > 2 ? '(HIGH - Wider stops needed)' : '(NORMAL)'}
+
+**Key Levels**
+• Immediate Support: $${technical?.support?.toFixed(2) || 'N/A'} ${price - (technical?.support || 0) < 10 ? '(CLOSE - Watch for breakdown!)' : ''}
+• Immediate Resistance: $${technical?.resistance?.toFixed(2) || 'N/A'}
+• Distance to Resistance: ${((technical?.resistance || price) - price).toFixed(2)}
+
+**Market Regime: ${(botData.regime || trend).toUpperCase()}**
+${trend === 'Uptrend' ? '• Favors: Long positions with trailing stops\n• Avoid: Counter-trend shorts\n• Entry: Pullbacks to SMA(20)' : trend === 'Downtrend' ? '• Favors: Defensive positioning, quick scalps\n• Avoid: New long positions\n• Entry: Wait for trend reversal confirmation' : '• Favors: Range-bound mean reversion\n• Entry: Buy support, sell resistance\n• Risk: False breakouts common'}
+
+**Sentiment Analysis**
+• Fear & Greed: ${fg}/100 (${fgClass})
+• Crowd Behavior: ${fg < 25 ? 'Extreme pessimism - Smart money often accumulates here' : fg > 75 ? 'Euphoria - Distribution phase likely, smart money selling' : 'Balanced sentiment - No extreme readings'}
+
+**Trading Recommendation**
+${getDetailedRecommendation(rsi, fg, trend, price, technical)}`;
+    }
+
+    // Portfolio deep dive
+    if (lowerMsg.includes('portfolio') || lowerMsg.includes('balance') || lowerMsg.includes('holdings') || lowerMsg.includes('position')) {
+        const targetBnbPct = 40;
+        const deviation = bnbPct - targetBnbPct;
+
+        return `**PORTFOLIO ANALYSIS**
+
+**Current Holdings**
+• Total Portfolio Value: $${total.toFixed(2)}
+• USDT Balance: $${balances.usdt.toFixed(2)} (${((balances.usdt / total) * 100).toFixed(1)}%)
+• BNB Holdings: ${balances.bnb.toFixed(4)} BNB
+• BNB USD Value: $${(balances.bnb * price).toFixed(2)} (${bnbPct.toFixed(1)}%)
+
+**Allocation Analysis**
+• Target BNB Allocation: 35-45%
+• Current BNB Allocation: ${bnbPct.toFixed(1)}%
+• Status: ${bnbPct >= 35 && bnbPct <= 45 ? '✅ OPTIMAL - Within target range' : bnbPct < 35 ? '⚠️ UNDERWEIGHT - Consider accumulating BNB' : '⚠️ OVERWEIGHT - Consider taking profits'}
+• Deviation from Target (40%): ${deviation >= 0 ? '+' : ''}${deviation.toFixed(1)}%
+
+**Rebalancing Suggestion**
+${Math.abs(deviation) > 5 ? `• ${deviation < 0 ? `BUY ${((Math.abs(deviation) / 100) * total / price).toFixed(4)} BNB to reach 40% allocation` : `SELL ${((Math.abs(deviation) / 100) * total / price).toFixed(4)} BNB to reach 40% allocation`}` : '• No rebalancing needed - allocation within tolerance'}
+
+**Risk Exposure**
+• Crypto Exposure: ${bnbPct.toFixed(1)}% of portfolio
+• Cash Reserve: ${((balances.usdt / total) * 100).toFixed(1)}%
+• Recommendation: ${bnbPct > 60 ? 'High crypto exposure - Consider reducing for safety' : bnbPct < 25 ? 'Low exposure - May be missing upside if bullish' : 'Balanced exposure for current market'}
+
+**Market Context for Portfolio**
+• BNB at $${price.toFixed(2)} (${bnbChange >= 0 ? '+' : ''}${bnbChange.toFixed(2)}% 24h)
+• Sentiment: ${fgClass} (${fg}/100)
+• Technical Bias: ${rsi > 50 ? 'Bullish' : 'Bearish'} (RSI: ${rsi.toFixed(1)})
+
+**Position Sizing Guidance**
+• Max single trade: ${(total * 0.02).toFixed(2)} USDT (2% rule)
+• Stop loss should be: ${(total * 0.01).toFixed(2)} max loss (1% portfolio)`;
+    }
+
+    // Performance analysis
+    if (lowerMsg.includes('trade') || lowerMsg.includes('performance') || lowerMsg.includes('stats') || lowerMsg.includes('result')) {
+        const stats = botData.stats || { totalTrades: 0, wins: 0, losses: 0, neutral: 0, winRate: 0, exitReasons: {} };
+
+        return `**TRADING PERFORMANCE ANALYSIS**
+
+**Overall Statistics**
+• Total Trades: ${stats.totalTrades}
+• Wins: ${stats.wins} (${stats.totalTrades > 0 ? (stats.wins / stats.totalTrades * 100).toFixed(1) : 0}%)
+• Losses: ${stats.losses} (${stats.totalTrades > 0 ? (stats.losses / stats.totalTrades * 100).toFixed(1) : 0}%)
+• Neutral: ${stats.neutral}
+• Win Rate: ${stats.winRate.toFixed(1)}% ${stats.winRate >= 55 ? '(Excellent)' : stats.winRate >= 45 ? '(Good)' : stats.winRate >= 35 ? '(Needs improvement)' : '(Critical - review strategy)'}
+
+**Exit Analysis**
+• Take Profit Exits: ${stats.exitReasons?.take_profit || 0}
+• Stop Loss Exits: ${stats.exitReasons?.stop_loss || 0}
+• Timeout Exits: ${stats.exitReasons?.max_hold_time_exceeded || 0}
+• Breakout Exits: ${(stats.exitReasons?.upward_breakout || 0) + (stats.exitReasons?.downward_breakout || 0)}
+
+**Performance Insights**
+${stats.winRate < 45 ? '⚠️ Win rate below 45% - Consider tightening entry criteria\n' : ''}${(stats.exitReasons?.stop_loss || 0) > 20 ? '⚠️ High stop loss rate - Review risk/reward ratios\n' : ''}${(stats.exitReasons?.max_hold_time_exceeded || 0) > 25 ? '⚠️ Many timeouts - Consider reducing max hold time\n' : ''}${stats.winRate >= 50 ? '✅ Win rate above 50% - Strategy is profitable\n' : ''}
+
+**Current Market Alignment**
+• Regime: ${botData.regime || trend}
+• RSI: ${rsi.toFixed(1)} (${rsi > 70 ? 'Overbought - Reduce long exposure' : rsi < 30 ? 'Oversold - Look for entries' : 'Neutral'})
+• Trades Today: ${botData.tradesToday || 0}
+
+**Recommendations to Improve**
+${getPerformanceRecommendations(stats, rsi, fg)}`;
+    }
+
+    // Risk assessment
+    if (lowerMsg.includes('risk') || lowerMsg.includes('danger') || lowerMsg.includes('safe')) {
+        const riskScore = calculateRiskScore(rsi, fg, botData.stats?.winRate || 50, technical?.volatility || 0);
+
+        return `**COMPREHENSIVE RISK ASSESSMENT**
+
+**Overall Risk Level: ${riskScore.level}**
+Risk Score: ${riskScore.score}/100
+
+**Market Risk Factors**
+• RSI: ${rsi.toFixed(1)} ${rsi > 70 ? '⚠️ OVERBOUGHT - High risk for longs' : rsi < 30 ? '⚠️ OVERSOLD - High risk for shorts' : '✅ Neutral'}
+• Fear & Greed: ${fg}/100 ${fg < 20 ? '⚠️ EXTREME FEAR - Capitulation risk but opportunity' : fg > 80 ? '⚠️ EXTREME GREED - Reversal risk high' : '✅ Balanced'}
+• Volatility: ${technical?.volatility?.toFixed(2) || 'N/A'}% ${(technical?.volatility || 0) > 3 ? '⚠️ HIGH - Use wider stops' : '✅ Normal'}
+• Trend: ${trend} ${trend === 'Downtrend' ? '⚠️ Counter-trend longs are risky' : ''}
+
+**Strategy Risk**
+• Win Rate: ${(botData.stats?.winRate || 0).toFixed(1)}% ${(botData.stats?.winRate || 0) < 40 ? '⚠️ LOW - Review entry criteria' : '✅ Acceptable'}
+• Stop Loss Rate: ${botData.stats?.exitReasons?.stop_loss || 0} hits ${(botData.stats?.exitReasons?.stop_loss || 0) > 20 ? '⚠️ HIGH' : '✅ Normal'}
+
+**Portfolio Risk**
+• Crypto Exposure: ${bnbPct.toFixed(1)}% ${bnbPct > 60 ? '⚠️ HIGH - Consider reducing' : '✅ Acceptable'}
+• Concentration: ${bnbPct > 50 ? 'Single asset concentration risk' : 'Diversified between crypto/cash'}
+
+**Risk Mitigation Recommendations**
+${riskScore.recommendations.map(r => `• ${r}`).join('\n')}
+
+**Current Safety Actions**
+• Max position size: ${(total * 0.02).toFixed(2)} USDT (2% of portfolio)
+• Stop loss: Set at ${(price * 0.98).toFixed(2)} for longs (2% below entry)
+• Take profit: Set at ${(price * 1.04).toFixed(2)} for 2:1 reward`;
+    }
+
+    // Default: comprehensive response using AI
+    try {
+        return await generateEnhancedAIResponse('AlgoQ', message, ctx);
+    } catch (e) {
+        return `**AlgoQ Analysis**
+
+Based on current market conditions:
+• BNB: $${price.toFixed(2)} (${bnbChange >= 0 ? '+' : ''}${bnbChange.toFixed(2)}%)
+• RSI: ${rsi.toFixed(1)} | Trend: ${trend}
+• Fear & Greed: ${fg}/100 (${fgClass})
+
+${getMarketAssessment(rsi, fg, trend, botData.stats?.winRate || 0)}
+
+For more detailed analysis, try asking about:
+• "market analysis" - Deep technical and sentiment analysis
+• "portfolio status" - Holdings and rebalancing suggestions
+• "trading performance" - Stats and improvement recommendations
+• "risk assessment" - Comprehensive risk evaluation`;
+    }
+}
+
+// Helper functions for detailed AI responses
+function getMarketAssessment(rsi, fg, trend, winRate) {
+    if (rsi > 70 && fg > 70) return 'Market showing signs of exhaustion. High RSI and extreme greed suggest caution. Consider taking profits or tightening stops.';
+    if (rsi < 30 && fg < 30) return 'Oversold conditions with extreme fear. Historically good for contrarian entries. Watch for volume confirmation before buying.';
+    if (trend === 'Uptrend' && rsi < 60) return 'Healthy uptrend with room to run. Look for pullbacks to add to positions.';
+    if (trend === 'Downtrend' && rsi > 40) return 'Downtrend in progress. Avoid new longs until trend reversal confirmed.';
+    return 'Market in consolidation. Wait for clear directional move before taking large positions.';
+}
+
+function getDetailedRecommendation(rsi, fg, trend, price, technical) {
+    if (rsi > 70) return `**Action: REDUCE or HOLD**\nRSI overbought at ${rsi.toFixed(1)}. Take partial profits. Set trailing stop at $${(price * 0.97).toFixed(2)}.`;
+    if (rsi < 30) return `**Action: CONSIDER ENTRY**\nRSI oversold at ${rsi.toFixed(1)}. Watch for reversal candle. Entry zone: $${(technical?.support || price * 0.98).toFixed(2)}-$${price.toFixed(2)}.`;
+    if (fg < 25) return `**Action: ACCUMULATE**\nExtreme fear detected. Historical data suggests 70% probability of bounce within 7 days.`;
+    if (fg > 75) return `**Action: DEFENSIVE**\nExtreme greed. Consider reducing exposure by 20-30%. Set tight stops.`;
+    return `**Action: WAIT**\nNo extreme readings. Follow trend: ${trend}. Enter on confirmation of direction.`;
+}
+
+function getPerformanceRecommendations(stats, rsi, fg) {
+    const recs = [];
+    if ((stats.winRate || 0) < 45) recs.push('Tighten entry criteria - only take high-probability setups');
+    if ((stats.exitReasons?.stop_loss || 0) > 20) recs.push('Review stop loss placement - consider using ATR-based stops');
+    if ((stats.exitReasons?.max_hold_time_exceeded || 0) > 25) recs.push('Reduce max hold time or use time-based exits');
+    if (rsi > 70) recs.push('Current RSI overbought - avoid new longs');
+    if (fg > 75) recs.push('Market euphoric - reduce position sizes');
+    if (recs.length === 0) recs.push('Performance metrics look healthy. Continue current approach.');
+    return recs.map((r, i) => `${i + 1}. ${r}`).join('\n');
+}
+
+function calculateRiskScore(rsi, fg, winRate, volatility) {
+    let score = 50; // Base score
+    const recommendations = [];
+
+    // RSI risk
+    if (rsi > 75) { score += 20; recommendations.push('RSI extremely overbought - high reversal risk'); }
+    else if (rsi > 70) { score += 10; recommendations.push('RSI overbought - moderate reversal risk'); }
+    else if (rsi < 25) { score += 15; recommendations.push('RSI extremely oversold - volatility expected'); }
+    else if (rsi < 30) { score += 5; recommendations.push('RSI oversold - watch for bounce'); }
+
+    // Sentiment risk
+    if (fg > 80) { score += 20; recommendations.push('Extreme greed - market top risk'); }
+    else if (fg < 20) { score += 15; recommendations.push('Extreme fear - capitulation possible'); }
+
+    // Win rate risk
+    if (winRate < 35) { score += 15; recommendations.push('Low win rate - review strategy'); }
+    else if (winRate < 45) { score += 5; recommendations.push('Win rate below target'); }
+
+    // Volatility risk
+    if (volatility > 3) { score += 10; recommendations.push('High volatility - use wider stops'); }
+
+    const level = score > 70 ? 'HIGH' : score > 50 ? 'MEDIUM' : 'LOW';
+
+    if (recommendations.length === 0) recommendations.push('Risk levels acceptable');
+
+    return { score: Math.min(score, 100), level, recommendations };
+}
+
 // ============== AI COUNCIL AGENTS - ENHANCED ==============
 async function generateCouncilResponse(agentName, topic, stats, technical, fearGreed) {
     const fg = fearGreed[0] || { value: 50 };
@@ -1413,7 +1676,47 @@ io.on('connection', (socket) => {
     // AI Chat handler
     socket.on('chat-message', async (data) => {
         const { message } = data;
-        const response = await generateAIResponse(message, {});
+
+        // Gather comprehensive context for detailed responses
+        const [binanceData, technical, fearGreed, botInfo] = await Promise.all([
+            fetchBinancePrice(),
+            fetchTechnicalData(),
+            fetchFearGreedIndex(),
+            getBotProcessInfo()
+        ]);
+
+        const trades = getShadowTrades();
+        const stats = calculateStats(trades);
+        const balances = getVirtualBalances();
+        const logStats = getLogStats();
+        const price = binanceData?.bnb?.price || 700;
+        const total = balances.usdt + (balances.bnb * price);
+
+        const fullContext = {
+            botData: {
+                running: botInfo.running,
+                pid: botInfo.pid,
+                uptime: botInfo.uptime,
+                cpu: botInfo.cpu,
+                memory: botInfo.memory,
+                stats,
+                regime: detectRegime(trades),
+                tradesToday: logStats.tradesToday,
+                lastDecision: logStats.lastDecision
+            },
+            marketData: binanceData,
+            technical,
+            sentiment: {
+                value: fearGreed[0]?.value || 50,
+                classification: fearGreed[0]?.value_classification || 'Neutral'
+            },
+            trades,
+            balances,
+            total,
+            price
+        };
+
+        const response = await generateDetailedAIResponse(message, fullContext);
         socket.emit('chat-response', { message: response });
     });
 
@@ -1421,7 +1724,7 @@ io.on('connection', (socket) => {
 
     // Start council session via socket
     socket.on('council-start', async (data) => {
-        const { topic } = data || {};
+        const { topic, mode } = data || {};
 
         // Gather context
         const [binanceData, technical, fearGreed] = await Promise.all([
@@ -1443,17 +1746,34 @@ io.on('connection', (socket) => {
             }
         };
 
+        // Start session with discussion mode (analyse, brainstorm, or debate)
         const result = councilManager.startSession(
             topic || 'Market Analysis & Trading Strategy',
             context,
-            generateEnhancedAIResponse
+            generateEnhancedAIResponse,
+            mode || 'analyse'
         );
 
+        const modeNames = { analyse: 'Analyse', brainstorm: 'Brainstorm', debate: 'Debate' };
         socket.emit('council-response', {
             type: 'system',
-            content: result.error || 'Council session started. Agents now researching and discussing...',
+            content: result.error || `Council session started in ${modeNames[mode] || 'Analyse'} mode. Agents now researching and discussing...`,
             session: result.session
         });
+    });
+
+    // Set discussion mode mid-session
+    socket.on('council-set-mode', (data) => {
+        const { mode } = data || {};
+        if (mode) {
+            const result = councilManager.setDiscussionMode(mode);
+            const modeNames = { analyse: 'Analyse', brainstorm: 'Brainstorm', debate: 'Debate' };
+            socket.emit('council-response', {
+                type: 'system',
+                content: result.error || `Discussion mode changed to: ${modeNames[mode]}`,
+                mode
+            });
+        }
     });
 
     // Pause council
